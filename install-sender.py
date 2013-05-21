@@ -223,7 +223,7 @@ def perform_sanity_check(current_environment):
         printMessage("Aborting")
         sys.exit(-1)
 
-    printLog("Sanity Check Passed. You are having environment supported by loggly.")
+    printLog("Sanity Check Passed. Your environment is supported.")
 
 # Checks for syslog daemon status.
 def check_syslog_service_status(distro_name, syslog_type):
@@ -237,7 +237,7 @@ def product_for_configuration(current_environment):
     user_choice = 0
     
     if len(current_environment['supported_syslog_versions']) > 1:
-        printLog("Multiple Vesrions of Syslog Detected on your system.")
+        printLog("Multiple versions of syslog detected on your system.")
         index = 0
         for (syslog_name, syslog_version) in current_environment['supported_syslog_versions'].iteritems():
             index += 1
@@ -246,17 +246,17 @@ def product_for_configuration(current_environment):
         for _ in range(0, 5):
             try:
                 sys.stdin = open("/dev/tty") 
-                str_msg = "Please select (1-" + str(index) + ") product index you want loggly to be configured.(Default 1): "
+                str_msg = "Please select (1-" + str(index) + ") to specify which version of syslog you'd like configured. (Default is 1): "
                 user_choice = int(usr_input(str_msg)) - 1
                 break
             except ValueError:
-                printLog ("Not a valid Input. Please retry.")
+                printLog ("Not a valid response. Please retry.")
         if user_choice < 0 or user_choice > (index):
-            printLog("Invalid Choice entered. Continue with default value.")
+            printLog("Invalid choice entered. Continue with default value.")
             user_choice = 0
 
     check_syslog_service_status(current_environment['distro_name'], current_environment['supported_syslog_versions'].keys()[user_choice])
-    printLog("Configuring Loggly Forwarder for %s-%s" % (current_environment['supported_syslog_versions'].keys()[user_choice], current_environment['supported_syslog_versions'].values()[user_choice]))
+    printLog("Configuring %s-%s" % (current_environment['supported_syslog_versions'].keys()[user_choice], current_environment['supported_syslog_versions'].values()[user_choice]))
 
     return current_environment['supported_syslog_versions'].keys()[user_choice]
 
@@ -265,7 +265,7 @@ def get_installed_syslog_configuration(syslog_id):
     default_directory = ''
     auth_token = ''
     source = ''
-    printLog("Reading Default Configuration directory path from (%s) file." % default_config_file_name.get(syslog_id))
+    printLog("Reading default configuration directory path from (%s)." % default_config_file_name.get(syslog_id))
     text_file = open(default_config_file_name.get(syslog_id), "r")
     
     if syslog_id == PROD_RSYSLOG:
@@ -305,13 +305,13 @@ def get_installed_syslog_configuration(syslog_id):
 
 # Function to create/modify configuration file
 def write_configuration(syslog_id, authorization_details, user_type):
-    printLog("Reading Configuration directory path....")
+    printLog("Reading configuration directory path....")
     syslog_configuration_details = get_installed_syslog_configuration(syslog_id)
     
     sys.stdin = open("/dev/tty")
     if len(syslog_configuration_details.get("path")) > 0:
-        printLog("Default configuration files location is (%s)." % syslog_configuration_details.get("path"))
-        question = "\nInstaller will either create new configuration file or will add configuration parameters to existing file (%s). Installer will create a new configuration file for loggly at (%s). The new file won't affect the existing configuration.\n\nDo you want installer to create new file? [Yes|No] " % (default_config_file_name.get(syslog_id), os.path.join(syslog_configuration_details.get("path"), LOGGLY_CONFIG_FILE))
+        printLog("Default configuration file location is (%s)." % syslog_configuration_details.get("path"))
+        question = "\nInstaller will either create a new configuration file or will add configuration parameters to the existing file (%s). Installer will create a new configuration file for Loggly at (%s). The new file won't affect the existing configuration.\n\nDo you want this installer to create a new file? [Yes|No] " % (default_config_file_name.get(syslog_id), os.path.join(syslog_configuration_details.get("path"), LOGGLY_CONFIG_FILE))
         for _ in range(0, 5):
             user_input = usr_input(question).lower()
             if len(user_input) > 0:
@@ -325,7 +325,7 @@ def write_configuration(syslog_id, authorization_details, user_type):
         modify_syslog_config_file(syslog_id, syslog_configuration_details, authorization_details)
         return
 
-    printLog("\nFailed to read configuration directory path, after maximum attempts.\nPlease contact support@loggly.com for more information.\n")
+    printLog("\nFailed to read configuration directory path after maximum attempts.\nPlease contact support@loggly.com for more information.\n")
     printMessage("Aborting")
     sys.exit(-1)
 
@@ -369,33 +369,33 @@ def get_auth_token_and_distribution_id(loggly_user, loggly_password):
             auth_tokens = data["tokens"]
             user_choice = 0
             if not auth_tokens:
-                printLog ("No Auth Tokens were found.")
+                printLog ("No Customer Tokens were found.")
                 sys.exit()
 
             if len(auth_tokens) > 1:
-                printLog("Multiple Auth Tokens received from server.")
+                printLog("Multiple Customer Tokens received from server.")
                 for index in range(0, len(auth_tokens)):
                     printLog("\t%d. %s"%(index + 1, auth_tokens[index]))
                 for _ in range(0, 5):
                     try:
                         sys.stdin = open("/dev/tty") 
-                        str_msg = "Please select (1-" + str(index + 1) + ") Auth Token index you want to use.(Default 1): "
+                        str_msg = "Please select (1-" + str(index + 1) + ") to specify which Customer Token you want to use. (Default is 1): "
                         user_choice = int(usr_input(str_msg)) - 1
                         if user_choice < 0 or user_choice > (index):
                             printLog("Invalid choice entered.")
                             continue
                         break
                     except ValueError:
-                        printLog ("Not a valid Input. Please retry.")
+                        printLog ("Not a valid selection. Please retry.")
                 if user_choice < 0 or user_choice > (index):
-                    printLog("Invalid Choice entered. Continue with default value.")
+                    printLog("Invalid choice entered. Continue with default value.")
                     user_choice = 0
             token = auth_tokens[user_choice]
             distribution_id = "41058"
-            printLog("\nLoggly will be configured with \"%s\" Auth Token.\n" % token)
+            printLog("\nLoggly will be configured with \"%s\" Customer Token.\n" % token)
             return { "token" : token, "id": distribution_id }
         else:
-            printLog("Loggly Credentials were not provided properly.")
+            printLog("Loggly credentials could not be verified.")
             sys.exit()
 
     except urllib2.HTTPError:
@@ -420,7 +420,7 @@ def syslog_config_file_content(syslog_id, source, authorization_details):
     if syslog_id == PROD_RSYSLOG:
         content = configuration_text.get(syslog_id) % (authorization_details.get("token"), authorization_details.get("id"), LOGGLY_SYSLOG_SERVER, LOGGLY_SYSLOG_PORT)
     elif syslog_id == PROD_SYSLOG_NG:
-        printLog("Reading Configured Source from (%s) file." % default_config_file_name.get(syslog_id))
+        printLog("Reading configured source from (%s) file." % default_config_file_name.get(syslog_id))
         configured_source = source
         source_created = ''
        
@@ -450,12 +450,12 @@ def create_loggly_config_file(syslog_id, syslog_configuration_details, authoriza
         config_file.close()
         if user_type == 3:
             # print Instructions...
-            printLog("Current user do not have sudo privileges. Please copy loggly configuration file (%s) to (%s) directory and restart syslog service." % (file_path, syslog_configuration_details.get("path")))
+            printLog("Current user does not have sudo privileges. Please copy the loggly configuration file (%s) to the (%s) directory and restart the syslog service." % (file_path, syslog_configuration_details.get("path")))
             printMessage("Finished")
             sys.exit()
         else:
             if os.path.isfile(os.path.join(syslog_configuration_details.get("path"), LOGGLY_CONFIG_FILE)):
-                msg = "Loggly Configuration file (%s) is already present. Do you want to overwrite it? [Yes|No]: " % os.path.join(syslog_configuration_details.get("path"), LOGGLY_CONFIG_FILE) 
+                msg = "Loggly configuration file (%s) is already present. Do you want to overwrite it? [Yes|No]: " % os.path.join(syslog_configuration_details.get("path"), LOGGLY_CONFIG_FILE) 
                 sys.stdin = open("/dev/tty")
                 for _ in range(0, 5):
                     user_input = usr_input(msg).lower()
@@ -466,7 +466,7 @@ def create_loggly_config_file(syslog_id, syslog_configuration_details, authoriza
                         elif user_input in no:
                             return
                         else:
-                            printLog("Not a valid Input. Please retry.")
+                            printLog("Not a valid input. Please retry.")
             else:
                 os.popen("sudo mv -f %s %s" % (file_path, os.path.join(syslog_configuration_details.get("path"), LOGGLY_CONFIG_FILE)))
                 return
@@ -486,7 +486,7 @@ def modify_syslog_config_file(syslog_id, syslog_configuration_details, authoriza
     content = syslog_config_file_content(syslog_id, syslog_configuration_details.get("source"), authorization_details)
     
     if len(syslog_configuration_details.get("token")) <= 0:
-        question = "\nLoggly Configuration will be appended to (%s) file.\n\nDo you want installer to modify configuration file? [Yes|No]: " % default_config_file_name.get(syslog_id)
+        question = "\nThe Loggly configuration will be appended to (%s) file.\n\nDo you want this installer to modify the configuration file? [Yes|No]: " % default_config_file_name.get(syslog_id)
         for _ in range(0, 5):
             user_input = usr_input(question).lower()
             if len(user_input) > 0:
@@ -505,11 +505,11 @@ def modify_syslog_config_file(syslog_id, syslog_configuration_details, authoriza
                     return backup_file_name
                 
                 elif user_input in no:
-                    printLog("\n\nPlease Add following lines to syslog configuration file (%s).\n\n%s%s" % (default_config_file_name.get(syslog_id), comment, content))
+                    printLog("\n\nPlease add the following lines to the syslog configuration file (%s).\n\n%s%s" % (default_config_file_name.get(syslog_id), comment, content))
                     printMessage("Finished")
                     sys.exit(0)
     else:
-        question = "\nLoggly is already configured with %s Auth Token. Do you want to overwrite it? [Yes|No]: " % syslog_configuration_details.get("token")
+        question = "\nLoggly is already configured with %s Customer Token. Do you want to overwrite it? [Yes|No]: " % syslog_configuration_details.get("token")
         sys.stdin = open("/dev/tty")
         for _ in range(0, 5):
             user_input = usr_input(question).lower()
@@ -521,7 +521,7 @@ def modify_syslog_config_file(syslog_id, syslog_configuration_details, authoriza
                 elif user_input in no:
                     return
                 else:
-                    printLog("Not a valid Input. Please retry.")
+                    printLog("Not a valid input. Please retry.")
         printMessage("Aborting")
         sys.exit(-1)
     
@@ -535,7 +535,7 @@ def send_sighup_to_syslog(syslog_type, user_type, distro_id):
         sys.stdin = open("/dev/tty")
         syslog_processid_file = syslog_processid_path.get(distro_id).get(get_syslog_id(syslog_type))
         if os.path.exists(syslog_processid_file):
-            question = "Do you want configuration script to restart (SIGHUP) syslog daemon. [Yes|No]: "
+            question = "Do you want this configuration script to restart (SIGHUP) the syslog daemon. [Yes|No]: "
             for _ in range(0, 5):
                 user_input = usr_input(question).lower()
                 if len(user_input) > 0:
@@ -547,9 +547,9 @@ def send_sighup_to_syslog(syslog_type, user_type, distro_id):
                     elif user_input in no:
                         return False
                     else:
-                        printLog("Not a valid Input. Please retry.")
+                        printLog("Not a valid input. Please retry.")
         else:
-            printLog("Syslog daemon (%s) is not running. Configuration file is being modified, please start %s daemon manually." % (syslog_type, syslog_type))
+            printLog("Syslog daemon (%s) is not running. Configuration file has been modified, please start %s daemon manually." % (syslog_type, syslog_type))
 
     return False
 
@@ -589,7 +589,7 @@ def write_env_details():
             for index in range(0, len(current_environment['syslog_versions'])):
                 env_file.write("\t%d.   %s(%s)" % (index + 1, current_environment['syslog_versions'][index][0], current_environment['syslog_versions'][index][1]))
         else:
-            env_file.write("\tNo Syslog Version Found......")
+            env_file.write("\tNo Syslog version Found......")
 
         env_file.close()
         printLog("Created environment details file at %s, please forward it to support@loggly.com" % file_path)
@@ -649,8 +649,8 @@ def main():
     perform_sanity_check(current_environment)
     syslog_name_for_configuration = product_for_configuration(current_environment)  
 
-    # 3. Ask for the customer's Loggly credentials and gather the list of available Authentication Tokens on their account.
-    # Allow the customer to select which Auth Token they would like to connect to if there is more than one available.
+    # 3. Ask for the customer's Loggly credentials and gather the list of available Customer Tokens on their account.
+    # Allow the customer to select which Cust Token they would like to connect to if there is more than one available.
 
     loggly_user, loggly_password = login()
     
@@ -668,15 +668,15 @@ def main():
     sighup_status = send_sighup_to_syslog(syslog_name_for_configuration, user_type, current_environment['distro_id'])
 
     if sighup_status:
-        printLog("Sending dummy message using Logger.")
+        printLog("Sending a test message using Logger.")
         unique_string = str(uuid.uuid4()).replace("-","")
-        dummy_message = "Thanks for configuring loggly. We are verifying your configuration. %s" % unique_string
+        dummy_message = "Testing that your log messages can make it to Loggly! %s" % unique_string
         printLog ("Sending message (%s) to loggly server (%s)" % (dummy_message, LOGGLY_SYSLOG_SERVER))
         os.popen("sudo logger -p INFO '%s'" % dummy_message).read()
         time.sleep(15)
         # Implement REST APIs to search if dummy message has been sent.
         if doverify(loggly_user, loggly_password, unique_string):
-            printLog("******* Congratulations Loggly configured successfully.")
+            printLog("******* Congratulations! Loggly is configured successfully.")
         else:
             printLog("!!!!!! Loggly verification failed. Please contact support@loggly.com for more information.")
         
