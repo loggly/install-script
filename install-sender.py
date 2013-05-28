@@ -29,7 +29,7 @@ LOGGLY_SYSLOG_PORT = 514
 LOGGLY_CONFIG_FILE = "22-loggly.conf"
 LOGGLY_ENV_DETAILS_FILE = "env_details.txt"
 
-STR_EXIT_MESSAGE = "\nThis environment (OS) is not supported by this script.  Please contact support@loggly.com for more information.\n"
+STR_EXIT_MESSAGE = "\nThis environment (OS) is not supported by the Loggly Syslog Configuration Script.  Please contact support@loggly.com for more information.\n"
 STR_NO_SYSLOG_MESSAGE = "\nSupported syslog type/version not found.  Please contact support@loggly.com for more information.\n"
 STR_SYSLOG_DAEMON_MESSAGE = "\nSyslog daemon (%s) is not running. Please start %s daemon and try again.\n"
 
@@ -113,7 +113,7 @@ def printLog(message):
 
 def printMessage(message):
     printLog("\n*************************************************************")
-    printLog("************ " + message + " Sender Installation Script ************")
+    printLog("****** " + message + " Loggly Syslog Configuration Script ******")
     printLog("*************************************************************\n")
 
 def printEnvironment(current_environment):
@@ -310,8 +310,8 @@ def write_configuration(syslog_id, authorization_details, user_type):
     
     sys.stdin = open("/dev/tty")
     if len(syslog_configuration_details.get("path")) > 0:
-        printLog("Default configuration file location is (%s)." % syslog_configuration_details.get("path"))
-        question = "\nInstaller will either create a new configuration file or will add configuration parameters to the existing file (%s). Installer will create a new configuration file for Loggly at (%s). The new file won't affect the existing configuration.\n\nDo you want this installer to create a new file? [Yes|No] " % (default_config_file_name.get(syslog_id), os.path.join(syslog_configuration_details.get("path"), LOGGLY_CONFIG_FILE))
+        printLog("The default syslog configuration file location is (%s)." % syslog_configuration_details.get("path"))
+        question = "\nThe Loggly Syslog Configuration Script will either create a new configuration file or will add configuration parameters to the existing file (%s). The new configuration file will be located at (%s). The new file won't affect the existing configuration.\n\nDo you want the Loggly Syslog Configuration Script to create a new file? [Yes|No] " % (default_config_file_name.get(syslog_id), os.path.join(syslog_configuration_details.get("path"), LOGGLY_CONFIG_FILE))
         for _ in range(0, 5):
             user_input = usr_input(question).lower()
             if len(user_input) > 0:
@@ -482,7 +482,7 @@ def create_loggly_config_file(syslog_id, syslog_configuration_details, authoriza
 # Modifying configuration file by adding Loggly configuration text
 def modify_syslog_config_file(syslog_id, syslog_configuration_details, authorization_details):
 
-    comment = "\n#Configuration modified by Loggly Sender Installation Script (%s)\n#\n" % datetime.now().strftime('%Y-%m-%dT%H:%M:%S')
+    comment = "\n#Configuration modified by Loggly Syslog Configuration Script (%s)\n#\n" % datetime.now().strftime('%Y-%m-%dT%H:%M:%S')
     content = syslog_config_file_content(syslog_id, syslog_configuration_details.get("source"), authorization_details)
     
     if len(syslog_configuration_details.get("token")) <= 0:
@@ -535,7 +535,7 @@ def send_sighup_to_syslog(syslog_type, user_type, distro_id):
         sys.stdin = open("/dev/tty")
         syslog_processid_file = syslog_processid_path.get(distro_id).get(get_syslog_id(syslog_type))
         if os.path.exists(syslog_processid_file):
-            question = "Do you want this configuration script to restart (SIGHUP) the syslog daemon. [Yes|No]: "
+            question = "Do you want the Loggly Syslog Configuration Script to restart (SIGHUP) the syslog daemon. [Yes|No]: "
             for _ in range(0, 5):
                 user_input = usr_input(question).lower()
                 if len(user_input) > 0:
@@ -602,10 +602,10 @@ def write_env_details():
 def version_compatibility_check(minimum_version):
     sys_version = ".".join(map(str, sys.version_info[:2]))
     if sys_version < minimum_version:
-        printLog('Version Check Fails: Installed Version is ' + sys_version + ' Minimum Required Version is ' + str(minimum_version))
+        printLog('Python version check fails: Installed version is ' + sys_version + '. Minimum required version is ' + str(minimum_version))
         return False
     
-    printLog('Version Check Successful: Installed Version is ' + sys_version + ' Minimum Required Version is ' + str(minimum_version))
+    printLog('Python version check successful: Installed version is ' + sys_version + '. Minimum required version is ' + str(minimum_version))
     return True
 
 # Script starts here
@@ -668,10 +668,10 @@ def main():
     sighup_status = send_sighup_to_syslog(syslog_name_for_configuration, user_type, current_environment['distro_id'])
 
     if sighup_status:
-        printLog("Sending a test message using Logger.")
+        printLog("Sending a test message using logger.")
         unique_string = str(uuid.uuid4()).replace("-","")
         dummy_message = "Testing that your log messages can make it to Loggly! %s" % unique_string
-        printLog ("Sending message (%s) to loggly server (%s)" % (dummy_message, LOGGLY_SYSLOG_SERVER))
+        printLog ("Sending message (%s) to Loggly server (%s)" % (dummy_message, LOGGLY_SYSLOG_SERVER))
         os.popen("sudo logger -p INFO '%s'" % dummy_message).read()
         time.sleep(15)
         # Implement REST APIs to search if dummy message has been sent.
