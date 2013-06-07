@@ -346,7 +346,7 @@ def login():
             if not password:
                 password = pprompt()
             else:
-                msg = "Loggly Subdomain [%s]:" % user
+                msg = "Loggly Account Name [%s]:" % user
                 subdomain = usr_input(msg).lower()
                 if len(subdomain) <= 0 :
                     subdomain = user
