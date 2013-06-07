@@ -38,6 +38,7 @@ REST_URL_SUBMIT_ENVIRONMENT = "http://testing.fe-app.dev.loggly.net:8000/chopper
 REST_URL_GET_AUTH_TOKEN = "http://%s.frontend.chipper01.loggly.net/chopper/api/customer"
 REST_URL_GET_SEARCH_ID = "http://%s.frontend.chipper01.loggly.net/chopper/api/search?q=%s&from=-2h&until=now&size=10"
 REST_URL_GET_SEARCH_RESULT = "http://%s.frontend.chipper01.loggly.net/chopper/api/events?rsid=%s"
+REST_URL_PUSH_INFO = "https://logs.frontend.chipper01.loggly.net/inputs/4f476788-f526-4744-a7c0-ff9b4b215689"
 
 supported_os_environments = {
                                 OS_UBUNTU: ["9.04", "9.10", "10.04", "10.10", "11.04", "11.10", "12.04", "12.10", "13.04"],
@@ -345,7 +346,11 @@ def login():
             if not password:
                 password = pprompt()
             else:
-                return user, password
+                msg = "Loggly Subdomain [%s]:" % user
+                subdomain = usr_input(msg).lower()
+                if len(subdomain) <= 0 :
+                    subdomain = user
+                return user, password, subdomain
 
     printLog("\nLoggly credentials not provided after maximum attempts.")
     printMessage("Aborting")
@@ -359,12 +364,12 @@ def get_json_data(url, user, password):
     req.add_header("Authorization", "Basic " + (user + ":" + password).encode("base64").rstrip())
     return json.loads(urllib2.urlopen(req).read())
     
-def get_auth_token_and_distribution_id(loggly_user, loggly_password):
+def get_auth_token_and_distribution_id(loggly_user, loggly_password, loggly_subdomain):
 
     # Create the request object and set some headers
     try:
         if loggly_user and loggly_password:
-            url = (REST_URL_GET_AUTH_TOKEN % (loggly_user))
+            url = (REST_URL_GET_AUTH_TOKEN % (loggly_subdomain))
             data = get_json_data(url, loggly_user, loggly_password)
             auth_tokens = data["tokens"]
             user_choice = 0
@@ -553,9 +558,9 @@ def send_sighup_to_syslog(syslog_type, user_type, distro_id):
 
     return False
 
-def doverify(loggly_user, loggly_password, unique_string):
+def doverify(loggly_user, loggly_password, loggly_subdomain, unique_string):
     #get  (search id)
-    search_url = REST_URL_GET_SEARCH_ID % (loggly_user, unique_string)
+    search_url = REST_URL_GET_SEARCH_ID % (loggly_subdomain, unique_string)
     printLog("Sending search request. %s" % search_url)
 
     data = get_json_data(search_url, loggly_user, loggly_password)
@@ -652,9 +657,9 @@ def main():
     # 3. Ask for the customer's Loggly credentials and gather the list of available Customer Tokens on their account.
     # Allow the customer to select which Cust Token they would like to connect to if there is more than one available.
 
-    loggly_user, loggly_password = login()
+    loggly_user, loggly_password, loggly_subdomain = login()
     
-    authorization_details = get_auth_token_and_distribution_id(loggly_user, loggly_password)
+    authorization_details = get_auth_token_and_distribution_id(loggly_user, loggly_password, loggly_subdomain)
 
     # 4. If possible, determine the location of the syslog.conf file or the syslog.conf.d/ directory.
     # Provide the location as the default and prompt the user for confirmation.
@@ -675,7 +680,7 @@ def main():
         os.popen("sudo logger -p INFO '%s'" % dummy_message).read()
         time.sleep(15)
         # Implement REST APIs to search if dummy message has been sent.
-        if doverify(loggly_user, loggly_password, unique_string):
+        if doverify(loggly_user, loggly_password, loggly_subdomain, unique_string):
             printLog("******* Congratulations! Loggly is configured successfully.")
         else:
             printLog("!!!!!! Loggly verification failed. Please contact support@loggly.com for more information.")
