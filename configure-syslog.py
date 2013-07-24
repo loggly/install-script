@@ -15,7 +15,6 @@ except ImportError:
 import json
 import uuid
 import base64
-import traceback
 import socket
 import subprocess
 
@@ -24,6 +23,7 @@ TEMP_PREFIX = 'temp'
 ROOT_USER = 1
 NON_ROOT_USER = 2
 
+MINIMUM_SUPPORTED_PYTHON_VERSION = '2.6'
 VERIFICATION_SLEEP_INTERAVAL = 15
 VERIFICATION_SLEEP_INTERAVAL_PER_ITERATION = 5
 
@@ -35,7 +35,6 @@ OS_UNSUPPORTED = -1
 
 PROD_SYSLOG_NG = 1
 PROD_RSYSLOG = 2
-PROD_PLAIN_SYSLOG = 3
 PROD_UNSUPPORTED = -1
 
 #LOGGLY_SYSLOG_SERVER = "10.10.15.101"
@@ -44,14 +43,12 @@ LOGGLY_SYSLOG_PORT = 514
 DISTRIBUTION_ID = "41058"
 LOGGLY_CONFIG_FILE = "22-loggly.conf"
 LOGGLY_ENV_DETAILS_FILE = "env_details.txt"
+PROCESS_ID = -1
 
 STR_EXIT_MESSAGE = "\nThis environment (OS) is not supported by the Loggly Syslog Configuration Script.  Please contact support@loggly.com for more information.\n"
-STR_NO_SYSLOG_MESSAGE = "\nSupported syslog type/version not found.  Please contact support@loggly.com for more information.\n"
-STR_MULTIPLE_SYSLOG_MESSAGE = ""
+STR_NO_SYSLOG_MESSAGE = "\nSupported syslog type/version not found."
+STR_ERROR_MESSAGE = "\nCan not automatically re-configure syslog for this Linux distribution.\nUse the help option for instructions to manually re-configure syslog for Loggly."
 STR_SYSLOG_DAEMON_MESSAGE = "\nSyslog daemon (%s) is not running. Please start %s daemon and try again.\n"
-
-REST_URL_SUBMIT_ENVIRONMENT = "http://testing.fe-app.dev.loggly.net:8000/chopper/account/overview" #"http://httpbin.org/post"
-##REST_URL_GET_AUTH_TOKEN = "https://agistar.loggly.com/api/inputs"
 REST_URL_GET_AUTH_TOKEN = "http://%s.frontend.chipper01.loggly.net/chopper/api/customer"
 REST_URL_GET_SEARCH_ID = "http://%s.frontend.chipper01.loggly.net/chopper/api/search?q=%s&from=-2h&until=now&size=10"
 REST_URL_GET_SEARCH_RESULT = "http://%s.frontend.chipper01.loggly.net/chopper/api/events?rsid=%s"
@@ -62,59 +59,21 @@ OUR_PROGNAME      = "configure-syslog"
 LOGGLY_PEN        = 41058
 LOGGLY_AUTH_TOKEN = "f5b38b8c-ed99-11e2-8ee8-3c07541ea376"
 LOGGLY_LOG_HOST = "logs-01.loggly.com"
+#LOGGLY_LOG_HOST = "10.10.15.105"
 LOGGLY_UDP_PORT = 514
-# log priorities...
-LOG_PRIORITIES = {"emerg":   0,  "alert":  1,  "crit": 2,   "error": 3,
-                  "warning": 4,  "notice": 5,  "info": 6,   "debug": 7}
 
-# log facilities...
-LOG_FACILITIES = {"kern": 0<<3,    "user": 1<<3,      "mail": 2<<3,       "daemon": 3<<3,
-                  "auth": 4<<3,    "syslog": 5<<3,    "lpr": 6<<3,        "news": 7<<3,
-                  "uucp": 8<<3,    "cron": 9<<3,      "security": 10<<3,  "ftp": 11<<3,
-                  "ntp": 12<<3,    "logaudit": 13<<3, "logalert": 14<<3,  "clock": 15<<3,
-                  "local0": 16<<3, "local1": 17<<3,   "local2": 18<<3,    "local3": 19<<3,
-                  "local4": 20<<3, "local5": 21<<3,   "local6": 22<<3,    "local7": 23<<3}
 
-supported_os_environments = {
-                                OS_UBUNTU: ["9.04", "9.10", "10.04", "10.10", "11.04", "11.10", "12.04", "12.10", "13.04"],
-                                OS_FEDORA: ["11", "12", "13", "14", "15", "16", "17", "18", "19"],
-                                OS_RHEL: ["5.2", "5.3", "5.4", "5.5", "5.6", "5.7", "5.8", "5.9", "6.1", "6.2", "6.3", "6.4", "6.0" ],
-                                OS_CENTOS: ["5.2", "5.3", "5.4", "5.5", "5.6", "5.7", "5.8", "5.9", "6.0", "6.1", "6.2", "6.3", "6.4"]
-                            }
+RSYSLOG_PROCESS = 'rsyslogd'
+SYSLOG_NG_PROCESS = 'syslog-ng'
 
 supported_syslog_versions = {
                                 PROD_SYSLOG_NG: ["1.6", "2.0", "2.1", "3.1", "3.2", "3.3", "3.4", "3.5"],
                                 PROD_RSYSLOG: ["1.19", "2.0", "3.14", "3.21", "3.22", "4.2", "4.4", "4.6", "5.7", "5.8", "7.2", "7.3"],
-                                PROD_PLAIN_SYSLOG: ["1.3", "1.4", "1.5"]
                             }
 
 default_config_file_name = {
                                 PROD_SYSLOG_NG: "/etc/syslog-ng/syslog-ng.conf",
                                 PROD_RSYSLOG: "/etc/rsyslog.conf",
-                                PROD_PLAIN_SYSLOG: "/etc/syslogd.conf"
-                            }
-
-syslog_processid_path = {
-                                OS_UBUNTU: {
-                                    PROD_SYSLOG_NG: "/var/run/syslog-ng.pid",
-                                    PROD_RSYSLOG: "/var/run/rsyslogd.pid",
-                                    PROD_PLAIN_SYSLOG: "sysklogd"
-                                },
-                                OS_FEDORA: {
-                                    PROD_SYSLOG_NG: "/var/run/syslogd.pid",
-                                    PROD_RSYSLOG: "/var/run/syslogd.pid",
-                                    PROD_PLAIN_SYSLOG: "sysklogd"
-                                },
-                                OS_RHEL: {
-                                    PROD_SYSLOG_NG: "/var/run/syslog-ng.pid",
-                                    PROD_RSYSLOG: "/var/run/syslogd.pid",
-                                    PROD_PLAIN_SYSLOG: "/var/run/syslogd.pid"
-                                },
-                                OS_CENTOS: {
-                                    PROD_SYSLOG_NG: "/var/run/syslog-ng.pid",
-                                    PROD_RSYSLOG: "/var/run/syslogd.pid",
-                                    PROD_PLAIN_SYSLOG: "sysklogd"
-                                }
                             }
 
 configuration_text = {
@@ -140,38 +99,117 @@ $template LogglyFormat,"<%%pri%%>%%protocol-version%% %%timestamp:::date-rfc3339
 *.*             @@%s:%s;LogglyFormat
 
 #                -------------------------------------------------------
-""",
-
-                                PROD_PLAIN_SYSLOG: "/etc/syslogd.conf"
+"""
                             }
-
+USER = None
+SUBDOMAIN = None
 SYSLOG_NG_SOURCE = 's_all'
-SYSLOG_NG_SOURCE_TEXT = 'source %s { unix-stream("/dev/log"); internal(); file("/proc/kmsg" program_override("kernel: "));};' % SYSLOG_NG_SOURCE
+SYSLOG_NG_SOURCE_TEXT = r'source %s { \nunix-stream("/dev/log"); \ninternal(); \nfile("/proc/kmsg" program_override("kernel: "));\n};'
 
 yes = ['yes', 'ye', 'y']
 no = ['no', 'n']
 
+LOGGLY_HELP = r"""
+Instructions to manually re-configure syslog for Loggly
+=======================================================
+
+1.Modification in configuration file
+ rsyslog
+ -------
+ 
+ -Edit your rsyslog.conf file, usually found in /etc/rsyslog.conf, and add the following line at the bottom of the file:
+ $template LogglyFormat,"<%%pri%%>%%protoco-version%% %%timestamp:::date-rfc3339%% %%HOSTNAME%% a:%%app-name%% p:%%procid%% m:%%msgid%% [%s@%s tag=\"Example1\"] %%msg:::drop-last-lf%%"
+ *.*             @@%s:%s;LogglyFormat
+ 
+ syslog-ng
+ ---------
+ 
+ -Edit your syslog-ng.conf file, usually found in /etc/syslog-ng/syslog-ng.conf, and add the following line at the bottom of the file:
+ template t_LogglyFormat { template("<${PRI}>1 ${ISODATE} ${HOST} a:${PROGRAM\ p:${PID} m:${MSGID} [%s@%s tag=\"Example1\"] $MSG");};
+ destination d_loggly { tcp("%s" port (%s) template(t_LogglyFormat)); };
+ log { source(%s); destination(d_loggly); };
+ 
+ Also make sure that your source should be like as below
+    source %s {
+    internal();
+    unix-stream("/dev/log");
+    file("/path/to/your/file" follow_freq(1) flags(no-parse));
+    };
+    
+2. Once you are done configuring syslog-ng or rsyslog, restart it
+   Example:  /etc/init.d/syslog-ng restart
+   
+3. Send some data through syslog-ng or rsyslog to have it forwarded to your Loggly account
+   logger 'loggly is better than a bee in your aunt's bonnet'
+   """
+
+LOGGLY_HELP = LOGGLY_HELP % ('auth-token', DISTRIBUTION_ID, LOGGLY_SYSLOG_SERVER, LOGGLY_SYSLOG_PORT, 'auth-token', DISTRIBUTION_ID, LOGGLY_SYSLOG_SERVER, LOGGLY_SYSLOG_PORT, 'source_name', 'source_name')
+#% (configuration_text.get(PROD_RSYSLOG) % ('auth-token', 'enterprise id', LOGGLY_SYSLOG_SERVER, LOGGLY_SYSLOG_PORT))
+# log priorities...
+LOG_PRIORITIES = {"emerg":   0,  "alert":  1,  "crit": 2,   "error": 3,
+                  "warning": 4,  "notice": 5,  "info": 6,   "debug": 7}
+
+# log facilities...
+LOG_FACILITIES = {"kern": 0<<3,    "user": 1<<3,      "mail": 2<<3,       "daemon": 3<<3,
+                  "auth": 4<<3,    "syslog": 5<<3,    "lpr": 6<<3,        "news": 7<<3,
+                  "uucp": 8<<3,    "cron": 9<<3,      "security": 10<<3,  "ftp": 11<<3,
+                  "ntp": 12<<3,    "logaudit": 13<<3, "logalert": 14<<3,  "clock": 15<<3,
+                  "local0": 16<<3, "local1": 17<<3,   "local2": 18<<3,    "local3": 19<<3,
+                  "local4": 20<<3, "local5": 21<<3,   "local6": 22<<3,    "local7": 23<<3}
+
+
+
+class Logger:
+    is_printLog = False
+    #Display messages or not based on command line argument
+    @staticmethod
+    #def log(msg, prio = 'info', facility = 'local0'):
+    def printLog(message, prio = 'info', print_comp = False):
+        if Logger.is_printLog or print_comp:
+            print(message)
+        log(message, prio = prio)
                 
 def printLog(message):
     print(message)
 
 def printMessage(message):
-    printLog("\n*************************************************************")
-    printLog("****** " + message + " Loggly Syslog Configuration Script ******")
-    printLog("*************************************************************\n")
+    Logger.printLog("\n*************************************************************", print_comp = True)
+    Logger.printLog("****** " + message + " Loggly Syslog Configuration Script ******", print_comp = True)
+    Logger.printLog("*************************************************************\n", print_comp = True)
 
 def printEnvironment(current_environment):
-    printLog("Operating System: %s-%s(%s)" % (current_environment['distro_name'], current_environment['version'], current_environment['id']))
-    printLog("Syslog versions:")
+    Logger.printLog("Operating System: %s-%s(%s)" % (current_environment['distro_name'], current_environment['version'], current_environment['id']), print_comp = True)
+    Logger.printLog("Syslog versions:", print_comp = True)
     if len(current_environment['syslog_versions']) > 0:
         for index in range(0, len(current_environment['syslog_versions'])):
-            printLog("\t%d.   %s(%s)" % (index + 1, current_environment['syslog_versions'][index][0], current_environment['syslog_versions'][index][1]))
+            Logger.printLog("\t%d.   %s(%s)" % (index + 1, current_environment['syslog_versions'][index][0], current_environment['syslog_versions'][index][1]), print_comp = True)
     else:
-        printLog("\tNo Syslog Version Found......")
+        Logger.printLog("\tNo Syslog Version Found......", prio = 'crit', print_comp = True)
 
-def sendEnvironment(current_environment):
-    printLog (current_environment)
-    printLog ("Sending Environment Details to Loggly Server.")
+def sendEnvironment(data):
+    Logger.printLog("Sending Environment Details to Loggly Server.")
+    try:
+        urllib_request.urlopen(REST_URL_PUSH_INFO, data)
+    except urllib_request.HTTPError as e:
+        Logger.printLog("%s" % e, prio = 'error', print_comp = True)
+        sys.exit(-1)
+    except urllib_request.URLError as e:
+        Logger.printLog("%s" % e, prio = 'error', print_comp = True)
+        sys.exit(-1)
+    except Exception as e:
+        Logger.printLog("Exception %s" % e, prio = 'error', print_comp = True)
+        sys.exit(-1)
+    #distro_name
+
+
+def sys_exit(reason = None):
+    current_environment = get_environment_details()
+    operating_system = "%s-%s(%s)" % (current_environment['distro_name'], current_environment['version'], current_environment['id'])
+    syslog_versions = current_environment['syslog_versions'] if len(current_environment['syslog_versions']) > 0 else None
+    data = json.dumps({"operating_system": operating_system, "syslog_versions": syslog_versions, "reason":reason, "username":USER, "subdomain": SUBDOMAIN})
+    sendEnvironment(data)
+    sys.exit(-1)
+    
 
 def usr_input(st):
     sys.stdin = open("/dev/tty")
@@ -207,26 +245,31 @@ def get_syslog_id(product_name):
     Get syslog id from installed syslog product
     """
     return {
-        'syslog-ng': PROD_SYSLOG_NG, 'rsyslog': PROD_RSYSLOG, 'syslogd': PROD_PLAIN_SYSLOG, 'sysklogd': PROD_PLAIN_SYSLOG,
+        'syslog-ng': PROD_SYSLOG_NG, 'rsyslog': PROD_RSYSLOG,
+        }.get(product_name.lower(), PROD_UNSUPPORTED)
+
+def get_syslog_process_name(product_name):
+    return {
+        'syslog-ng': SYSLOG_NG_PROCESS, 'rsyslog': RSYSLOG_PROCESS,
         }.get(product_name.lower(), PROD_UNSUPPORTED)
 
 def get_syslog_version(distro_id):
     """
     Derive which syslog version is installed
     """
-    printLog("Reading Installed Syslog Versions....")
+    Logger.printLog("Reading Installed Syslog Versions....", prio = 'debug')
     if distro_id == OS_UBUNTU:
         command = "dpkg -l \*sys\*log\* | grep ^ii"
-        pattern = 'ii\s+(rsyslog|syslog-ng|sysklogd)\s+(\d+\.\d+)'
+        pattern = 'ii\s+(rsyslog|syslog-ng)\s+(\d+\.\d+)'
     elif distro_id == OS_FEDORA:
         command = "rpm -qa | grep -i 'sys' | grep -i 'log'"
-        pattern = '(rsyslog|syslog-ng|sysklogd)-(\d+\.\d+)'
+        pattern = '(rsyslog|syslog-ng)-(\d+\.\d+)'
     elif distro_id == OS_RHEL:
         command = "rpm -qa | grep -i 'sys' | grep -i 'log'"
-        pattern = '(rsyslog|syslog-ng|sysklogd)-(\d+\.\d+)'
+        pattern = '(rsyslog|syslog-ng)-(\d+\.\d+)'
     elif distro_id == OS_CENTOS:
         command = "rpm -qa | grep -i 'sys' | grep -i 'log'"
-        pattern = '(rsyslog|syslog-ng|sysklogd)-(\d+\.\d+)'
+        pattern = '(rsyslog|syslog-ng)-(\d+\.\d+)'
     else:
         return []
 
@@ -242,14 +285,14 @@ def get_user_type():
     if os.getuid() == 0:
         return ROOT_USER
     else:
-        printLog("Script not started as root")
+        Logger.printLog("Script not started as root", print_comp = True)
         return NON_ROOT_USER
 
 def get_environment_details():
     """
     Get Distro Name, Distro ID, Version and ID.
     """
-    printLog("Reading Environment Details....")
+    Logger.printLog("Reading Environment Details....", prio = 'debug')
     environment = {}
     distribution = platform.linux_distribution()
     environment['distro_name'] = distribution[0]
@@ -264,11 +307,11 @@ def perform_sanity_check(current_environment):
     """
     Performing quick check for OS and Syslog
     """
-    printLog("Performing Sanity Check....")
-    if (current_environment['distro_id'] == OS_UNSUPPORTED) or (current_environment['version'] not in supported_os_environments.get(current_environment['distro_id'])):
+    Logger.printLog("Performing Sanity Check....", prio = 'debug')
+    if (current_environment['distro_id'] == OS_UNSUPPORTED):
         printLog(STR_EXIT_MESSAGE)
         printMessage("Aborting")
-        sys.exit(-1)
+        sys_exit(reason = STR_EXIT_MESSAGE)
 
     syslog_versions = {}
     for (syslog_type, syslog_version) in current_environment['syslog_versions']:
@@ -280,34 +323,34 @@ def perform_sanity_check(current_environment):
 
     if(current_environment['supported_syslog_versions'] == None or len(current_environment['supported_syslog_versions']) <= 0):
         printLog(STR_NO_SYSLOG_MESSAGE)
+        printLog(STR_ERROR_MESSAGE)
         printMessage("Aborting")
-        sys.exit(-1)
+        sys_exit(reason = STR_NO_SYSLOG_MESSAGE)
 
     #Check whether multiple syslogd running or not
     if len(current_environment['supported_syslog_versions']) > 1:
         index = 0
         running_syslog_count = 0
         for (syslog_name, syslog_version) in current_environment['supported_syslog_versions'].iteritems():
-            if check_syslog_service_status(current_environment['distro_name'], list(current_environment['supported_syslog_versions'].keys())[index]):
+            if check_syslog_service_status(list(current_environment['supported_syslog_versions'].keys())[index]):
                 running_syslog_count += 1 
             index += 1
-            printLog("\t%d. %s(%s)" % (index, syslog_name, syslog_version))
+            Logger.printLog("\t%d. %s(%s)" % (index, syslog_name, syslog_version), print_comp = True)
         if running_syslog_count > 1:
-            printLog('Multiple syslogd are running')
-            printLog('Can not automatically re-configure syslog for this Linux distribution')
-            sys.exit(-1)
-    printLog("Sanity Check Passed. Your environment is supported.")
+            Logger.printLog('Multiple syslogd are running', prio = 'error', print_comp = True)
+            Logger.printLog(STR_ERROR_MESSAGE, prio = 'error', print_comp = True)
+            sys_exit(reason = 'Multiple syslogd are running')
+    Logger.printLog("Sanity Check Passed. Your environment is supported.")
 
 def find_syslog_process():
     """Returns the running syslog type (syslog-ng, rsyslog) and the PID of the running process."""
 
     syslog_ps_commands = ["ps -U syslog | grep syslog | grep -v grep",
-                          "ps -e | grep syslog | grep -v grep"]
+                          "ps -ef | grep syslog | grep -v supervising | grep -v python | grep $USER | grep -v grep"]
 
     for ps_command in syslog_ps_commands:
         errorfname = TEMP_PREFIX + ".cmdout"
         errorfile = open(errorfname, 'w')
-        print("Looking for syslog process: executing '%s'" % ps_command)
         nullfile = open(os.devnull)
         p = subprocess.Popen(ps_command, shell=True, stdin=nullfile,
                              stdout=subprocess.PIPE, stderr=errorfile)
@@ -315,8 +358,6 @@ def find_syslog_process():
         p.stdout.close()
         errorfile.close()
         p.poll()
-        print("Return code is %s" % p.returncode)
-
         try:
             os.remove(errorfname)
         except (IOError, OSError): pass
@@ -324,21 +365,30 @@ def find_syslog_process():
         if results:
             reslines = results.split('\n')
             if len(reslines) == 1:
-                print("PS output: %s" % reslines[0])
                 ps_out_fields = reslines[0].split()
-                pid = int(ps_out_fields[0])
-                progname = ps_out_fields[3]
+                pid = int(ps_out_fields[1])
+                progname = ps_out_fields[7]
+                if '/' in progname:
+                    progname = progname.split('/')[-1]
                 return (progname, pid)
+    return None, 0
 
-    return None,0
-
-def check_syslog_service_status(distro_name, syslog_type):
+def check_syslog_service_status(syslog_type):
     """
     Checks for syslog daemon status
     """
-    if not os.path.exists(syslog_processid_path.get(get_os_id(distro_name)).get(get_syslog_id(syslog_type))):
-        return False
-    return True
+    process_name, pid = find_syslog_process()
+    if process_name is None:
+        pass
+    else:
+        global PROCESS_ID
+        PROCESS_ID = pid
+        syslog_process_name = get_syslog_process_name(syslog_type)
+        if syslog_process_name == PROD_UNSUPPORTED:
+            return False
+        elif syslog_process_name == process_name:
+            return True
+    return False
 
       
 def product_for_configuration(current_environment, check_syslog_service = True):
@@ -348,11 +398,11 @@ def product_for_configuration(current_environment, check_syslog_service = True):
     user_choice = 0
     
     if len(current_environment['supported_syslog_versions']) > 1:
-        printLog("Multiple versions of syslog detected on your system.")
+        Logger.printLog("Multiple versions of syslog detected on your system.", prio = 'notice', print_comp = True)
         index = 0
         for (syslog_name, syslog_version) in current_environment['supported_syslog_versions'].iteritems():
             index += 1
-            printLog("\t%d. %s(%s)" % (index, syslog_name, syslog_version))
+            Logger.printLog("\t%d. %s(%s)" % (index, syslog_name, syslog_version), print_comp = True)
             
         for _ in range(0, 5):
             try:
@@ -362,15 +412,15 @@ def product_for_configuration(current_environment, check_syslog_service = True):
             except ValueError:
                 printLog ("Not a valid response. Please retry.")
         if user_choice < 0 or user_choice > (index):
-            printLog("Invalid choice entered. Continue with default value.")
+            Logger.printLog("Invalid choice entered. Continue with default value.", prio = 'warning', print_comp = True)
             user_choice = 0
     syslog_type = list(current_environment['supported_syslog_versions'].keys())[user_choice]
-
+    service_status = check_syslog_service_status(syslog_type)
     if check_syslog_service:
-        if not check_syslog_service_status(current_environment['distro_name'], syslog_type):
-            printLog(STR_SYSLOG_DAEMON_MESSAGE % (syslog_type, syslog_type))
-            sys.exit(-1)
-    printLog("Configuring %s-%s" % (list(current_environment['supported_syslog_versions'].keys())[user_choice], list(current_environment['supported_syslog_versions'].values())[user_choice]))
+        if not service_status:
+            Logger.printLog(STR_SYSLOG_DAEMON_MESSAGE % (syslog_type, syslog_type), prio = 'crit', print_comp = True)
+            sys_exit(reason = STR_SYSLOG_DAEMON_MESSAGE % (syslog_type, syslog_type))
+    Logger.printLog("Configuring %s-%s" % (list(current_environment['supported_syslog_versions'].keys())[user_choice], list(current_environment['supported_syslog_versions'].values())[user_choice]))
     return syslog_type
 
 
@@ -382,7 +432,7 @@ def get_installed_syslog_configuration(syslog_id):
     default_directory = ''
     auth_token = ''
     source = ''
-    printLog("Reading default configuration directory path from (%s)." % default_config_file_name.get(syslog_id))
+    Logger.printLog("Reading default configuration directory path from (%s)." % default_config_file_name.get(syslog_id), prio = 'debug')
     text_file = open(default_config_file_name.get(syslog_id), "r")
     
     if syslog_id == PROD_RSYSLOG:
@@ -393,8 +443,6 @@ def get_installed_syslog_configuration(syslog_id):
         source_pattern = "^\s*source\s+([\S]+)\s*"
         auth_token_pattern = "^\s*template\s+t_LogglyFormat\s*.*\[([a-z0-9]{8}-[a-z0-9]{4}-[a-z0-9]{4}-[a-z0-9]{4}-[a-z0-9]{12}).*\}"
         source_compiled_regex = re.compile(source_pattern, re.MULTILINE | re.IGNORECASE)
-    elif syslog_id == PROD_PLAIN_SYSLOG:
-        include_pattern = "rpm -qa | grep -i 'sys' | grep -i 'log'"
     else:
         return default_directory
 
@@ -424,18 +472,18 @@ def write_configuration(syslog_name_for_configuration, authorization_details, us
     """
     Function to create/modify configuration file
     """
-    printLog("Reading configuration directory path....")
+    Logger.printLog("Reading configuration directory path....", prio = 'debug')
     syslog_id = get_syslog_id(syslog_name_for_configuration)
     syslog_configuration_details = get_installed_syslog_configuration(syslog_id)
 
     if len(syslog_configuration_details.get("path")) > 0:
-        printLog("The default syslog configuration file location is (%s)." % syslog_configuration_details.get("path"))
+        Logger.printLog("The default syslog configuration file location is (%s)." % syslog_configuration_details.get("path"))
         question = "\nThe Loggly Syslog Configuration Script will either create a new configuration file or will add configuration parameters to the existing file (%s). The new configuration file will be located at (%s). The new file won't affect the existing configuration.\n\nDo you want the Loggly Syslog Configuration Script to create a new file? [Yes|No] " % (default_config_file_name.get(syslog_id), os.path.join(syslog_configuration_details.get("path"), LOGGLY_CONFIG_FILE))
         for _ in range(0, 5):
             user_input = usr_input(question).lower()
             if len(user_input) > 0:
                 if  user_input in yes:
-                    create_loggly_config_file(syslog_id, syslog_configuration_details, authorization_details, user_type, syslog_name_for_configuration)
+                    create_loggly_config_file(syslog_id, syslog_configuration_details, authorization_details, user_type)
                     return
                 elif user_input in no:
                     modify_syslog_config_file(syslog_id, syslog_configuration_details, authorization_details, user_type)
@@ -444,21 +492,23 @@ def write_configuration(syslog_name_for_configuration, authorization_details, us
         modify_syslog_config_file(syslog_id, syslog_configuration_details, authorization_details, user_type)
         return
 
-    printLog("\nFailed to read configuration directory path after maximum attempts.\nPlease contact support@loggly.com for more information.\n")
+    Logger.printLog("\nFailed to read configuration directory path after maximum attempts.\nPlease contact support@loggly.com for more information.\n", prio = 'error', print_comp = True)
     printMessage("Aborting")
-    sys.exit(-1)
+    sys_exit(reason = 'Failed to read configuration directory path after maximum attempts')
 
 def remove_configuration(syslog_name_for_configuration):
-    
+    """
+    Remove configuration files 22-loggly.conf and comment configuration settings in default config file
+    """    
     syslog_id = get_syslog_id(syslog_name_for_configuration)
     syslog_configuration_details = get_installed_syslog_configuration(syslog_id)
     default_config_file = default_config_file_name.get(syslog_id)
     if len(syslog_configuration_details.get("path")) > 0:
         loggly_file_path = os.path.join(syslog_configuration_details.get("path"), LOGGLY_CONFIG_FILE)
         if os.path.exists(loggly_file_path):
-            printLog('Removing configuration file %s' % loggly_file_path)
+            Logger.printLog('Removing configuration file %s' % loggly_file_path, print_comp = True)
             os.remove(loggly_file_path)
-    printLog('Removing configuration settings from file %s for %s' % (default_config_file, syslog_name_for_configuration))
+    Logger.printLog('Removing configuration settings from file %s for %s' % (default_config_file, syslog_name_for_configuration), print_comp = True)
     if syslog_name_for_configuration == 'rsyslog':
         os.popen("sed -i 's/^\s*$template LogglyFormat/#$template LogglyFormat/g' %s" % default_config_file)
         pattern = "s/^\s*\*\.\*.*@@{0}:{1};LogglyFormat/#*.* @@{0}:{1};LogglyFormat/g".format(LOGGLY_SYSLOG_SERVER, LOGGLY_SYSLOG_PORT)
@@ -475,7 +525,7 @@ def login():
     """
     Ask for Loggly credentials
     """
-    printLog("Reading Loggly credentials from user....")
+    Logger.printLog("Reading Loggly credentials from user....", prio = 'debug')
     user = usr_input("Loggly Username [%s]: " % getpass.getuser())
     if not user:
         user = getpass.getuser()
@@ -491,24 +541,37 @@ def login():
                 subdomain = usr_input(msg).lower()
                 if len(subdomain) <= 0 :
                     subdomain = user
+                global USER
+                global SUBDOMAIN
+                USER = user
+                SUBDOMAIN = subdomain
                 return user, password, subdomain
 
-    printLog("\nLoggly credentials not provided after maximum attempts.")
+    Logger.printLog("\nLoggly credentials not provided after maximum attempts.", prio = 'crit', print_comp = True)
     printMessage("Aborting")
-    sys.exit(-1)
+    sys.exit()
 
 
 def get_json_data(url, user, password):
     """
     Retrieve Auth Token and Distribution ID from Loggly account
     """
-    req = urllib_request.Request(url)
-    req.add_header("Accept", "application/json")
-    req.add_header("Content-type", "application/json")
-    user_passwd = base64.b64encode((user + ":" + password).encode('utf-8'))
-    req.add_header("Authorization", "Basic " + str(user_passwd.rstrip().decode("utf-8")))
-    return json.loads(urllib_request.urlopen(req).read().decode("utf-8"))
-
+    try:
+        req = urllib_request.Request(url)
+        req.add_header("Accept", "application/json")
+        req.add_header("Content-type", "application/json")
+        user_passwd = base64.b64encode((user + ":" + password).encode('utf-8'))
+        req.add_header("Authorization", "Basic " + str(user_passwd.rstrip().decode("utf-8")))
+        return json.loads(urllib_request.urlopen(req).read().decode("utf-8"))
+    except urllib_request.HTTPError as e:
+        Logger.printLog("%s" % e, prio = 'error', print_comp = True)
+        sys_exit(reason = "%s" % e)
+    except urllib_request.URLError as e:
+        Logger.printLog("%s" % e, prio = 'error', print_comp = True)
+        sys_exit(reason = "%s" % e)
+    except Exception as e:
+        Logger.printLog("Exception %s" % e, prio = 'error', print_comp = True)
+        sys_exit(reason = "%s" % e)
 
     
 def get_auth_token_and_distribution_id(loggly_user, loggly_password, loggly_subdomain):
@@ -522,98 +585,93 @@ def get_auth_token_and_distribution_id(loggly_user, loggly_password, loggly_subd
             auth_tokens = data["tokens"]
             user_choice = 0
             if not auth_tokens:
-                printLog ("No Customer Tokens were found.")
-                sys.exit()
+                Logger.printLog("No Customer Tokens were found.", prio = 'crit', print_comp = True)
+                sys_exit(reason = "No Customer Tokens were found.")
 
             if len(auth_tokens) > 1:
-                printLog("Multiple Customer Tokens received from server.")
+                Logger.printLog("Multiple Customer Tokens received from server.", print_comp = True)
                 for index in range(0, len(auth_tokens)):
-                    printLog("\t%d. %s"%(index + 1, auth_tokens[index]))
+                    Logger.printLog("\t%d. %s"%(index + 1, auth_tokens[index]), print_comp = True)
                 for _ in range(0, 5):
                     try:
                         str_msg = "Please select (1-" + str(index + 1) + ") to specify which Customer Token you want to use. (Default is 1): "
                         user_choice = int(usr_input(str_msg)) - 1
                         if user_choice < 0 or user_choice > (index):
-                            printLog("Invalid choice entered.")
+                            Logger.printLog("Invalid choice entered.", prio = 'error', print_comp = True)
                             continue
                         break
                     except ValueError:
-                        printLog ("Not a valid selection. Please retry.")
+                        Logger.printLog ("Not a valid selection. Please retry.", prio = 'warning', print_comp = True)
                 if user_choice < 0 or user_choice > (index):
-                    printLog("Invalid choice entered. Continue with default value.")
+                    Logger.printLog("Invalid choice entered. Continue with default value.", prio = 'warning', print_comp = True)
                     user_choice = 0
             token = auth_tokens[user_choice]
-            printLog("\nLoggly will be configured with \"%s\" Customer Token.\n" % token)
+            Logger.printLog("\nLoggly will be configured with \"%s\" Customer Token.\n" % token)
             return { "token" : token, "id": DISTRIBUTION_ID }
         else:
-            printLog("Loggly credentials could not be verified.")
-            sys.exit()
-
-    except urllib_request.HTTPError as e:
-        printLog ("%s" % e)
-        sys.exit(-1)
-        
-    except urllib_request.URLError as e:
-        printLog ("%s" % e)
-        sys.exit(-1)
+            Logger.printLog("Loggly credentials could not be verified.", prio = 'crit', print_comp = True)
+            sys_exit(reason = "Loggly credentials could not be verified.")
         
     except Exception as e:
-        traceback.print_exc()
-        printLog ("Exception %s" % e)
-        sys.exit(-1)
+        Logger.printLog ("Exception %s" % e, prio = 'error', print_comp = True)
+        sys_exit(reason = "%s" % e)
 
 def syslog_config_file_content(syslog_id, source, authorization_details):
     """
     Creating syslog content for configuring Loggly
     """
     content = ""
-    
+    modify_source_content = ""
     if syslog_id == PROD_RSYSLOG:
         content = configuration_text.get(syslog_id) % (authorization_details.get("token"), authorization_details.get("id"), LOGGLY_SYSLOG_SERVER, LOGGLY_SYSLOG_PORT)
     elif syslog_id == PROD_SYSLOG_NG:
-        printLog("Reading configured source from (%s) file." % default_config_file_name.get(syslog_id))
+        Logger.printLog("Reading configured source from (%s) file." % default_config_file_name.get(syslog_id))
         configured_source = source
         source_created = ''
-       
+        modify_source_content = None
         if len(configured_source) <= 0:
-            source_created = SYSLOG_NG_SOURCE_TEXT
+            source_created = SYSLOG_NG_SOURCE_TEXT % SYSLOG_NG_SOURCE
             configured_source = SYSLOG_NG_SOURCE
+        else:
+            modify_source_content = SYSLOG_NG_SOURCE_TEXT % source
         content = configuration_text.get(syslog_id) % (source_created, authorization_details.get("token"), authorization_details.get("id"), LOGGLY_SYSLOG_SERVER, LOGGLY_SYSLOG_PORT, configured_source)
-    elif syslog_id == PROD_PLAIN_SYSLOG:
-        content = "rpm -qa | grep -i 'sys' | grep -i 'log'"
     else:
-        printLog("Failed to create content for syslog id %s\n" % syslog_id)
+        Logger.printLog("Failed to create content for syslog id %s\n" % syslog_id, prio = 'error', print_comp = True)
         printMessage("Aborting")
-        sys.exit(-1)
+        sys_exit(reason = "Failed to create content for syslog id %s" % syslog_id)
         
-    return content + "\n"
+    return content + "\n", modify_source_content
 
 def create_bash_script(content):
+    """
+    If user is not ROOT user then create bash script in /tmp folder
+    """
     file_path = '/tmp/configure-syslog.%s.sh' % os.getpid()
     config_file =  open(file_path, "w")
     config_file.write(content)
     config_file.close()
-    printLog("Current user is not root user. Run script % s as root and then run configure-syslog.py again with 'verify'" % file_path)
+    Logger.printLog("Current user is not root user. Run script % s as root and then run configure-syslog.py again with 'verify'" % file_path, prio = 'crit', print_comp = True)
     printMessage("Finished")
     sys.exit()
 
-    return file_path
-
-def create_loggly_config_file(syslog_id, syslog_configuration_details, authorization_details, user_type, syslog_name_for_configuration):
+def create_loggly_config_file(syslog_id, syslog_configuration_details, authorization_details, user_type):
     """
     Create Loggly configuration file
     """
     file_path = os.path.join(os.getenv("HOME"), LOGGLY_CONFIG_FILE)
-    printLog("Creating configuration file at %s" % file_path)
-    content = syslog_config_file_content(syslog_id, syslog_configuration_details.get("source"), authorization_details)
+    Logger.printLog("Creating configuration file at %s" % file_path)
+    command_content = ""
+    content, modified_syslog_content = syslog_config_file_content(syslog_id, syslog_configuration_details.get("source"), authorization_details)
     try:
         config_file =  open(file_path, "w")
         config_file.write(content)
         config_file.close()
         if user_type == NON_ROOT_USER:
             # print Instructions...
-            content = "mv -f %s %s" % (file_path, os.path.join(syslog_configuration_details.get("path"), LOGGLY_CONFIG_FILE))
-            bash_script_name = create_bash_script(content)
+            if modified_syslog_content and len(modified_syslog_content) > 0:
+                command_content = "sed -i '/^source/,/};$/c %s' %s" % (modified_syslog_content, default_config_file_name.get(syslog_id))
+            content = "mv -f %s %s\n%s" % (file_path, os.path.join(syslog_configuration_details.get("path"), LOGGLY_CONFIG_FILE), command_content)
+            create_bash_script(content)
         else:
             if os.path.isfile(os.path.join(syslog_configuration_details.get("path"), LOGGLY_CONFIG_FILE)):
                 msg = "Loggly configuration file (%s) is already present. Do you want to overwrite it? [Yes|No]: " % os.path.join(syslog_configuration_details.get("path"), LOGGLY_CONFIG_FILE)
@@ -623,29 +681,34 @@ def create_loggly_config_file(syslog_id, syslog_configuration_details, authoriza
                     if len(user_input) > 0:
                         if  user_input in yes:
                             os.popen("mv -f %s %s" % (file_path, os.path.join(syslog_configuration_details.get("path"), LOGGLY_CONFIG_FILE)))
+                            if modified_syslog_content and len(modified_syslog_content) > 0:
+                                os.popen("sed -i '/^source/,/};$/c %s' %s" % (modified_syslog_content, default_config_file_name.get(syslog_id)))
                             return
                         elif user_input in no:
                             return
                         else:
-                            printLog("Not a valid input. Please retry.")
+                            Logger.printLog("Not a valid input. Please retry.", prio = 'warning', print_comp = True)
             else:
                 os.popen("mv -f %s %s" % (file_path, os.path.join(syslog_configuration_details.get("path"), LOGGLY_CONFIG_FILE)))
+                if modified_syslog_content and len(modified_syslog_content) > 0:
+                    os.popen("sed -i '/^source/,/};$/c %s' %s" % (modified_syslog_content, default_config_file_name.get(syslog_id)))
                 return
             
-            printLog("Invalid input received after maximum attempts.")
+            Logger.printLog("Invalid input received after maximum attempts.", prio = 'error', print_comp = True)
             printMessage("Aborting")
             sys.exit(-1)
             
     except IOError as e:
-        printLog ("IOError %s" % e)
+        Logger.printLog ("IOError %s" % e, prio = 'crit', print_comp = True)
 
 def modify_syslog_config_file(syslog_id, syslog_configuration_details, authorization_details, user_type):
     """
     Modifying configuration file by adding Loggly configuration text
     """
     comment = "\n#Configuration modified by Loggly Syslog Configuration Script (%s)\n#\n" % datetime.now().strftime('%Y-%m-%dT%H:%M:%S')
-    content = syslog_config_file_content(syslog_id, syslog_configuration_details.get("source"), authorization_details)
-
+    content, modified_syslog_content = syslog_config_file_content(syslog_id, syslog_configuration_details.get("source"), authorization_details)
+    command_content = ''
+         
     if len(syslog_configuration_details.get("token")) <= 0:
         question = "\nThe Loggly configuration will be appended to (%s) file.\n\nDo you want this installer to modify the configuration file? [Yes|No]: " % default_config_file_name.get(syslog_id)
         for _ in range(0, 5):
@@ -661,14 +724,18 @@ def modify_syslog_config_file(syslog_id, syslog_configuration_details, authoriza
                     if user_type == ROOT_USER:
                         os.popen("cp -p %s %s" % (default_config_file_name.get(syslog_id), backup_file_name))
                         os.popen("bash -c 'cat %s >> %s' " % (temp_file.name, default_config_file_name.get(syslog_id))).read()
+                        if modified_syslog_content and len(modified_syslog_content) > 0:
+                            os.popen("sed -i '/^source/,/};$/c %s' %s" % (modified_syslog_content, default_config_file_name.get(syslog_id)))
                         os.unlink(temp_file.name)
                     else:
-                        bash_script_content = "cp -p %s %s \nbash -c 'cat %s >> %s'" % (default_config_file_name.get(syslog_id), backup_file_name, temp_file.name, default_config_file_name.get(syslog_id))
+                        if modified_syslog_content and len(modified_syslog_content) > 0:
+                            command_content = "sed -i '/^source/,/};$/c %s' %s" % (modified_syslog_content, default_config_file_name.get(syslog_id))
+                        bash_script_content = "cp -p %s %s \nbash -c 'cat %s >> %s'\n%s" % (default_config_file_name.get(syslog_id), backup_file_name, temp_file.name, default_config_file_name.get(syslog_id), command_content)
                         create_bash_script(bash_script_content)
                     return backup_file_name
                 
                 elif user_input in no:
-                    printLog("\n\nPlease add the following lines to the syslog configuration file (%s).\n\n%s%s" % (default_config_file_name.get(syslog_id), comment, content))
+                    Logger.printLog("\nPlease add the following lines to the syslog configuration file (%s).\n\n%s%s" % (default_config_file_name.get(syslog_id), comment, content), prio = 'notice', print_comp = True)
                     printMessage("Finished")
                     sys.exit(0)
     else:
@@ -680,72 +747,75 @@ def modify_syslog_config_file(syslog_id, syslog_configuration_details, authoriza
                     pattern = "s/[a-z0-9]\{8\}\-[a-z0-9]\{4\}\-[a-z0-9]\{4\}\-[a-z0-9]\{4\}\-[a-z0-9]\{12\}/%s/g" % authorization_details.get("token")
                     if user_type == ROOT_USER:
                         os.popen("sed -i '%s' %s" % (pattern, default_config_file_name.get(syslog_id)))
+                        if modified_syslog_content and len(modified_syslog_content) > 0:
+                            os.popen("sed -i '/^source/,/};/c %s' %s" % (modified_syslog_content, default_config_file_name.get(syslog_id)))
                     else:
-                        bash_script_content = "sed -i '%s' %s" % (pattern, default_config_file_name.get(syslog_id))
+                        if modified_syslog_content and len(modified_syslog_content) > 0:
+                            command_content = "sed -i '/^source/,/};$/c %s' %s" % (modified_syslog_content, default_config_file_name.get(syslog_id))
+                        bash_script_content = "sed -i '%s' %s\n%s" % (pattern, default_config_file_name.get(syslog_id), command_content)
                         create_bash_script(bash_script_content)
                     return
                 elif user_input in no:
                     return
                 else:
-                    printLog("Not a valid input. Please retry.")
+                    Logger.printLog("Not a valid input. Please retry.", prio = 'warning', print_comp = True)
         printMessage("Aborting")
         sys.exit(-1)
     
-    printLog("Invalid input received after maximum attempts.")
+    Logger.printLog("Invalid input received after maximum attempts.", prio = 'error', print_comp = True)
     printMessage("Aborting")
     sys.exit(-1)
 
-def send_sighup_to_syslog(syslog_type, user_type, distro_id):
+def send_sighup_to_syslog(syslog_type, distro_id):
     """
     Sending sighup to syslog daemon
     """
-    if user_type == ROOT_USER:
-        syslog_processid_file = syslog_processid_path.get(distro_id).get(get_syslog_id(syslog_type))
-        if os.path.exists(syslog_processid_file):
-            question = "Do you want the Loggly Syslog Configuration Script to restart (SIGHUP) the syslog daemon. [Yes|No]: "
-            for _ in range(0, 5):
-                user_input = usr_input(question).lower()
-                if len(user_input) > 0:
-                    if  user_input in yes:
-                        output = os.popen("sudo kill -SIGHUP `cat %s`" % syslog_processid_file).read()
-                        #output = os.popen("/etc/init.d/rsyslog restart").read()
-                        printLog("SIGHUP Sent. %s" % (output))
-                        return True
-                    elif user_input in no:
-                        return False
-                    else:
-                        printLog("Not a valid input. Please retry.")
-        else:
-            printLog("Syslog daemon (%s) is not running. Configuration file has been modified, please start %s daemon manually." % (syslog_type, syslog_type))
-
+    if PROCESS_ID != -1:
+        question = "Do you want the Loggly Syslog Configuration Script to restart (SIGHUP) the syslog daemon. [Yes|No]: "
+        for _ in range(0, 5):
+            user_input = usr_input(question).lower()
+            if len(user_input) > 0:
+                if  user_input in yes:
+                    output = os.popen("kill -HUP %d" % PROCESS_ID).read()
+                    #output = os.popen("/etc/init.d/rsyslog restart").read()
+                    Logger.printLog("SIGHUP Sent. %s" % (output))
+                    return True
+                elif user_input in no:
+                    return False
+                else:
+                    Logger.printLog("Not a valid input. Please retry.", prio = 'warning', print_comp = True)
+    else:
+        Logger.printLog("Syslog daemon (%s) is not running. Configuration file has been modified, please start %s daemon manually." % (syslog_type, syslog_type), prio = 'warning', print_comp = True)
     return False
 
 
 def doverify(loggly_user, loggly_password, loggly_subdomain):
-    
-    printLog("Sending a test message using logger.")
+    """
+    Send test message to loggly server using logger and search this message to verify whether message is received or not.    
+    """    
+    Logger.printLog("Sending a test message using logger.")
     unique_string = str(uuid.uuid4()).replace("-","")
     dummy_message = "Testing that your log messages can make it to Loggly! %s" % unique_string
-    printLog ("Sending message (%s) to Loggly server (%s)" % (dummy_message, LOGGLY_SYSLOG_SERVER))
+    Logger.printLog("Sending message (%s) to Loggly server (%s)" % (dummy_message, LOGGLY_SYSLOG_SERVER))
     os.popen("logger -p INFO '%s'" % dummy_message).read()
     search_url = REST_URL_GET_SEARCH_ID % (loggly_subdomain, unique_string)
     # Implement REST APIs to search if dummy message has been sent.
     wait_time = 0
     while wait_time < VERIFICATION_SLEEP_INTERAVAL:
-        printLog("Sending search request. %s" % search_url)
+        Logger.printLog("Sending search request. %s" % search_url)
         data = get_json_data(search_url, loggly_user, loggly_password)
         rsid = data["rsid"]["id"]
         search_result_url = REST_URL_GET_SEARCH_RESULT % (loggly_user, rsid)
-        printLog("Sending search result request. %s" % search_result_url)
+        Logger.printLog("Sending search result request. %s" % search_result_url)
         data = get_json_data(search_result_url, loggly_user, loggly_password)
         total_events = data["total_events"]
         if total_events >= 1:
-            printLog("******* Congratulations! Loggly is configured successfully.")
+            Logger.printLog("******* Congratulations! Loggly is configured successfully.", print_comp = True)
             break
         wait_time += VERIFICATION_SLEEP_INTERAVAL_PER_ITERATION
         time.sleep(VERIFICATION_SLEEP_INTERAVAL_PER_ITERATION)
     if wait_time >= VERIFICATION_SLEEP_INTERAVAL:
-        printLog("!!!!!! Loggly verification failed. Please contact support@loggly.com for more information.")
+        Logger.printLog("!!!!!! Loggly verification failed. Please contact support@loggly.com for more information.", prio = 'crit', print_comp = True)
 
 
 def write_env_details():
@@ -766,10 +836,11 @@ def write_env_details():
             env_file.write("\tNo Syslog version Found......")
 
         env_file.close()
-        printLog("Created environment details file at %s, please forward it to support@loggly.com" % file_path)
-            
+        Logger.printLog("Created environment details file at %s, please forward it to support@loggly.com" % file_path, print_comp = True)
+        printEnvironment(current_environment)
     except Exception as e:
-        printLog ("Error %s" % e)
+        Logger.printLog("Error %s" % e, prio = 'error', print_comp = True)
+        sys_exit(reason = "Error %s" % e)
 
 def version_compatibility_check(minimum_version):
     """
@@ -777,11 +848,9 @@ def version_compatibility_check(minimum_version):
     """
     sys_version = ".".join(map(str, sys.version_info[:2]))
     if sys_version < minimum_version:
-        printLog('Python version check fails: Installed version is ' + sys_version + '. Minimum required version is ' + str(minimum_version))
-        return False
-    
-    printLog('Python version check successful: Installed version is ' + sys_version + '. Minimum required version is ' + str(minimum_version))
-    return True
+        Logger.printLog('Python version check fails: Installed version is ' + sys_version + '. Minimum required version is ' + str(minimum_version), prio = 'crit', print_comp = True)
+        sys_exit(reason = 'Python version check fails: Installed version is ' + sys_version + '. Minimum required version is ' + str(minimum_version))
+    Logger.printLog('Python version check successful: Installed version is ' + sys_version + '. Minimum required version is ' + str(minimum_version))
 
 def log(msg, prio = 'info', facility = 'local0'):
     """
@@ -789,7 +858,6 @@ def log(msg, prio = 'info', facility = 'local0'):
     """
 
     global _LOG_SOCKET
-
     try:
         pri = LOG_PRIORITIES[prio] + LOG_FACILITIES[facility]
     except KeyError as errmsg:
@@ -799,7 +867,7 @@ def log(msg, prio = 'info', facility = 'local0'):
     vals = {}
     vals['pri'] = pri
     vals['version'] = 1
-    vals['timestamp'] = datetime.datetime.isoformat(datetime.datetime.now())
+    vals['timestamp'] = datetime.isoformat(datetime.now())
     vals['hostname'] = socket.gethostname()
     vals['app-name'] = OUR_PROGNAME
     vals['procid'] = os.getpid()
@@ -811,26 +879,28 @@ def log(msg, prio = 'info', facility = 'local0'):
     fullmsg = ("<%(pri)s>%(version)s %(timestamp)s %(hostname)s %(app-name)s %(procid)s %(msgid)s "
                "[%(loggly-auth-token)s@%(loggly-pen)s] %(msg)s") % vals
 
-##  debug("Log: %s" % fullmsg)
-
-    """if not _LOG_SOCKET:  # first time only...
+    if not _LOG_SOCKET:  # first time only...
         _LOG_SOCKET = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
 
-    _LOG_SOCKET.sendto(fullmsg, (LOGGLY_LOG_HOST, LOGGLY_UDP_PORT))"""
+    _LOG_SOCKET.sendto(fullmsg, (LOGGLY_LOG_HOST, LOGGLY_UDP_PORT))
 
-
-def install():
-    
-    # 1. Determine user type.
-    user_type = get_user_type()
-    # 2. Determine the environment in which it was invoked (i.e. which distro, release, and syslog daemon has been deployed)
+def get_env_detailes_and_perform_sanity_check(check_syslog_service = True):
     current_environment = get_environment_details()
     printEnvironment(current_environment)
     perform_sanity_check(current_environment)
-    syslog_name_for_configuration = product_for_configuration(current_environment)  
+    syslog_name_for_configuration = product_for_configuration(current_environment, check_syslog_service = check_syslog_service)
+    current_environment['syslog_name_for_configuration'] = syslog_name_for_configuration
+    return current_environment
 
+def install():
+    Logger.printLog('Installation started', prio = 'debug')
+    # 1. Determine user type.
+    user_type = get_user_type()
+    # 2. Determine the environment in which it was invoked (i.e. which distro, release, and syslog daemon has been deployed)
+    current_environment = get_env_detailes_and_perform_sanity_check()
     loggly_user, loggly_password, loggly_subdomain = login()
     authorization_details = get_auth_token_and_distribution_id(loggly_user, loggly_password, loggly_subdomain)
+    syslog_name_for_configuration = current_environment['syslog_name_for_configuration']
     # 4. If possible, determine the location of the syslog.conf file or the syslog.conf.d/ directory.
     # Provide the location as the default and prompt the user for confirmation.
     
@@ -838,37 +908,54 @@ def install():
     write_configuration(syslog_name_for_configuration, authorization_details, user_type)    
 
     # 6. SIGHUP the syslog daemon.
-    sighup_status = send_sighup_to_syslog(syslog_name_for_configuration, user_type, current_environment['distro_id'])
+    send_sighup_to_syslog(syslog_name_for_configuration, current_environment['distro_id'])
     doverify(loggly_user, loggly_password, loggly_subdomain)
+    Logger.printLog('Installation completed', prio = 'debug')
+    return current_environment
     
 def verify():
-    
-    current_environment = get_environment_details()
-    printEnvironment(current_environment)
-    perform_sanity_check(current_environment)
-    syslog_name_for_configuration = product_for_configuration(current_environment)
+    Logger.printLog('Verification started', prio = 'debug')
+    get_env_detailes_and_perform_sanity_check()
     loggly_user, loggly_password, loggly_subdomain = login()
     doverify(loggly_user, loggly_password, loggly_subdomain)
+    Logger.printLog('Verification completed', prio = 'debug')
 
 def uninstall():
-    
+    Logger.printLog('Uninstall started', prio = 'debug')
     user_type = get_user_type()
     if user_type == NON_ROOT_USER:
-        printLog("Current user in not root user")
+        Logger.printLog("Current user in not root user", prio = 'warning', print_comp = True)
         sys.exit()
     else:
-        current_environment = get_environment_details()
-        printEnvironment(current_environment)
-        perform_sanity_check(current_environment)
-        syslog_name_for_configuration = product_for_configuration(current_environment, check_syslog_service = False)
-        remove_configuration(syslog_name_for_configuration)
-        sighup_status = send_sighup_to_syslog(syslog_name_for_configuration, user_type, current_environment['distro_id'])
+        current_environment = get_env_detailes_and_perform_sanity_check(check_syslog_service = False)
+        remove_configuration(current_environment['syslog_name_for_configuration'])
+        send_sighup_to_syslog(current_environment['syslog_name_for_configuration'], current_environment['distro_id'])
+    Logger.printLog('Uninstall completed', prio = 'debug')
+
+def dryrun():
+    Logger.printLog('Dryrun started', prio = 'debug')
+    current_environment = install()
+    remove_configuration(current_environment['syslog_name_for_configuration'])
+    send_sighup_to_syslog(current_environment['syslog_name_for_configuration'], current_environment['distro_id'])
+    Logger.printLog('Dryrun completed', prio = 'debug')
+
+def loggly_help():
+    print(LOGGLY_HELP)
 
 def parseOptions():
     """
     Parse command line argument
     """
-    usage = "usage: %prog -i|--install "
+    usage = "usage: %prog [option]\n"
+    usage += "Options:\n"
+    usage += "\t-i|--install      Configure the syslog\n"
+    usage += "\t-u|--uninstall    Remove the changes made by the syslog configurator script\n"
+    usage += "\t-v|--verify       Verify the configuration explicitly\n"
+    usage += "\t-s|--sysinfo      Print, write system information\n"
+    usage += "\t-l|--loggly_help  Guideline for users for each step to configure syslog\n"
+    usage += "\t-p|--verbose      Print detailed logs on console\n"
+    usage += "\t-d|--dryrun       Perform configuration steps without modifying anything\n"
+    
     parser = OptionParser(usage=usage, version="Install Sender")
     parser.add_option("-i", "--install", action="store_true", dest="install", default=False,
                       help='Configure the syslog')
@@ -892,34 +979,38 @@ def parseOptions():
 
     return options
 
-
 # Script starts here
 def main():
     printMessage("Starting")
-    
-    if not version_compatibility_check('2.6'):
-        sys.exit(-1)
-        
     options = vars(parseOptions())
-    
+    Logger.is_printLog = options['verbose']
+    version_compatibility_check(MINIMUM_SUPPORTED_PYTHON_VERSION)
+        
     if options['sysinfo']:
         write_env_details()
-        printMessage("Finished")
-        sys.exit()
+
+    elif options['help']:
+        loggly_help()
 
     elif options['uninstall']:
-        printLog("Uninstall")
         uninstall()
         
     elif options['install']:
-        printLog("Install")
         install()
 
     elif options['verify']:
-        printLog("Verify")
         verify()
+
+    elif options['dryrun']:
+        dryrun() 
 
     printMessage("Finished")
 
 if __name__ == "__main__":
-    main()
+
+    try:
+        main()
+    except KeyboardInterrupt:
+        Logger.printLog('KeyboardInterrupt', prio = 'error')
+
+        
