@@ -49,9 +49,9 @@ STR_EXIT_MESSAGE = "\nThis environment (OS) is not supported by the Loggly Syslo
 STR_NO_SYSLOG_MESSAGE = "\nSupported syslog type/version not found."
 STR_ERROR_MESSAGE = "\nCan not automatically re-configure syslog for this Linux distribution.\nUse the help option for instructions to manually re-configure syslog for Loggly."
 STR_SYSLOG_DAEMON_MESSAGE = "\nSyslog daemon (%s) is not running. Please start %s daemon and try again.\n"
-REST_URL_GET_AUTH_TOKEN = "http://%s.frontend.chipper01.loggly.net/chopper/api/customer"
-REST_URL_GET_SEARCH_ID = "http://%s.frontend.chipper01.loggly.net/chopper/api/search?q=%s&from=-2h&until=now&size=10"
-REST_URL_GET_SEARCH_RESULT = "http://%s.frontend.chipper01.loggly.net/chopper/api/events?rsid=%s"
+REST_URL_GET_AUTH_TOKEN = "http://%s.frontend.chipper01.loggly.net/api/customer"
+REST_URL_GET_SEARCH_ID = "http://%s.frontend.chipper01.loggly.net/api/search?q=%s&from=-2h&until=now&size=10"
+REST_URL_GET_SEARCH_RESULT = "http://%s.frontend.chipper01.loggly.net/api/events?rsid=%s"
 REST_URL_PUSH_INFO = "https://logs.frontend.chipper01.loggly.net/inputs/4f476788-f526-4744-a7c0-ff9b4b215689"
 
 _LOG_SOCKET = None
@@ -206,6 +206,7 @@ def sys_exit(reason = None):
     current_environment = get_environment_details()
     data = json.dumps({"operating_system": current_environment['operating_system'], "syslog_versions": current_environment['syslog_versions'], "reason":reason, "username":USER, "subdomain": SUBDOMAIN})
     sendEnvironment(data)
+    printMessage("Aborting")
     sys.exit(-1)
     
 
@@ -309,7 +310,6 @@ def perform_sanity_check(current_environment):
     Logger.printLog("Performing Sanity Check....", prio = 'debug')
     if (current_environment['distro_id'] == OS_UNSUPPORTED):
         printLog(STR_EXIT_MESSAGE)
-        printMessage("Aborting")
         sys_exit(reason = STR_EXIT_MESSAGE)
 
     syslog_versions = {}
@@ -323,7 +323,6 @@ def perform_sanity_check(current_environment):
     if(current_environment['supported_syslog_versions'] == None or len(current_environment['supported_syslog_versions']) <= 0):
         printLog(STR_NO_SYSLOG_MESSAGE)
         printLog(STR_ERROR_MESSAGE)
-        printMessage("Aborting")
         sys_exit(reason = STR_NO_SYSLOG_MESSAGE)
 
     #Check whether multiple syslogd running or not
@@ -345,7 +344,7 @@ def find_syslog_process():
     """Returns the running syslog type (syslog-ng, rsyslog) and the PID of the running process."""
 
     syslog_ps_commands = ["ps -U syslog | grep syslog | grep -v grep",
-                          "ps -ef | grep syslog | grep -v supervising | grep -v python | grep $USER | grep -v grep"]
+                          "ps -ef |  grep -e syslog-ng -e rsyslog -e syslogd | grep -v grep | grep -v supervising"]
 
     for ps_command in syslog_ps_commands:
         errorfname = TEMP_PREFIX + ".cmdout"
@@ -484,7 +483,6 @@ def write_configuration(syslog_name_for_configuration, authorization_details, us
         return
 
     Logger.printLog("\nFailed to read configuration directory path after maximum attempts.\nPlease contact support@loggly.com for more information.\n", prio = 'error', print_comp = True)
-    printMessage("Aborting")
     sys_exit(reason = 'Failed to read configuration directory path after maximum attempts')
 
 def remove_configuration(syslog_name_for_configuration):
@@ -573,6 +571,7 @@ def get_auth_token(loggly_user, loggly_password, loggly_subdomain):
     try:
         if loggly_user and loggly_password:
             url = (REST_URL_GET_AUTH_TOKEN % (loggly_subdomain))
+            
             data = get_json_data(url, loggly_user, loggly_password)
             auth_tokens = data["tokens"]
             user_choice = 0
@@ -629,7 +628,6 @@ def syslog_config_file_content(syslog_id, source, authorization_details):
         content = configuration_text.get(syslog_id) % (source_created, authorization_details.get("token"), authorization_details.get("id"), LOGGLY_SYSLOG_SERVER, LOGGLY_SYSLOG_PORT, configured_source)
     else:
         Logger.printLog("Failed to create content for syslog id %s\n" % syslog_id, prio = 'error', print_comp = True)
-        printMessage("Aborting")
         sys_exit(reason = "Failed to create content for syslog id %s" % syslog_id)
         
     return content + "\n", modify_source_content
@@ -897,8 +895,9 @@ def install(current_environment):
     write_configuration(syslog_name_for_configuration, authorization_details, user_type)    
 
     # 6. SIGHUP the syslog daemon.
-    send_sighup_to_syslog(syslog_name_for_configuration)
-    doverify(loggly_user, loggly_password, loggly_subdomain)
+    sighup_status = send_sighup_to_syslog(syslog_name_for_configuration)
+    if sighup_status:
+        doverify(loggly_user, loggly_password, loggly_subdomain)
     Logger.printLog('Installation completed', prio = 'debug')
     return syslog_name_for_configuration
     
