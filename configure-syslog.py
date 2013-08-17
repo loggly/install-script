@@ -1095,7 +1095,7 @@ def doverify(loggly_user, loggly_password, loggly_subdomain):
         Logger.printLog("Sending search request. %s" % search_url)
         data = get_json_data(search_url, loggly_user, loggly_password)
         rsid = data["rsid"]["id"]
-        search_result_url = REST_URL_GET_SEARCH_RESULT % (loggly_user, rsid)
+        search_result_url = REST_URL_GET_SEARCH_RESULT % (loggly_subdomain, rsid)
         Logger.printLog("Sending search result request. %s" % search_result_url)
         data = get_json_data(search_result_url, loggly_user, loggly_password)
         total_events = data["total_events"]
