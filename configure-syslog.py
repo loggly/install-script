@@ -65,11 +65,11 @@ STR_ERROR_MESSAGE = ("Can not automatically re-configure syslog for "
 STR_SYSLOG_DAEMON_MESSAGE = ("\nSyslog daemon (%s) is not running. "
                              "Please start %s daemon and try again.\n")
 REST_URL_GET_AUTH_TOKEN = ("http://%s.frontend.chipper01.loggly.net"
-                           "/api/customer")
+                           "/apiv2/customer")
 REST_URL_GET_SEARCH_ID = ("http://%s.frontend.chipper01.loggly.net"
-                          "/api/search?q=%s&from=-2h&until=now&size=10")
+                          "/apiv2/search?q=%s&from=-2h&until=now&size=10")
 REST_URL_GET_SEARCH_RESULT = ("http://%s.frontend.chipper01.loggly.net"
-                              "/api/events?rsid=%s")
+                              "/apiv2/events?rsid=%s")
 
 _LOG_SOCKET = None
 OUR_PROGNAME      = "configure-syslog"
