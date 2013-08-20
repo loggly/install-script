@@ -51,9 +51,9 @@ STR_PYTHON_FAIL_MESSAGE = ("Python version check fails: Installed version is "
 STR_MULTIPLE_SYSLOG_MESSAGE = ("Multiple syslogd are running.")
 STR_AUTHTOKEN_NOTFOUND_MESSAGE = ("No Customer Tokens were found.")
 STR_AUTHENTICATION_FAIL_MESSAGE = ("Authentication fail for user %s")
-VERIFICATION_FAIL_MESSAGE = ("!!!!!! Loggly verification failed."
+VERIFICATION_FAIL_MESSAGE = ("Loggly verification failed. "
                              "Please contact support@loggly.com"
-                             "for more information.")
+                             " for more information.")
 STR_EXIT_MESSAGE = ("\nThis environment (OS : %s) is not supported by "
                     "the Loggly Syslog Configuration Script. Please contact "
                     "support@loggly.com for more information.\n")
@@ -793,7 +793,7 @@ def get_auth_token(loggly_user, loggly_password, loggly_subdomain):
             user_choice = 0
             if len(auth_tokens) > 1:
                 Logger.printLog(("Multiple Customer Tokens"
-                                 "received from server."),
+                                 " received from server."),
                                   print_comp = True)
                 for index in range(0, len(auth_tokens)):
                     Logger.printLog("\t%d. %s"%(index + 1, auth_tokens[index]),
@@ -801,7 +801,7 @@ def get_auth_token(loggly_user, loggly_password, loggly_subdomain):
                 for _ in range(0, 5):
                     try:
                         str_msg = ("Please select (1-" + str(index + 1) + ")"
-                                   "to specify which Customer Token"
+                                   "to specify which Customer Token "
                                    "you want to use. (Default is 1): ")
                         user_choice = int(usr_input(str_msg)) - 1
                         if user_choice < 0 or user_choice > (index):
@@ -818,8 +818,8 @@ def get_auth_token(loggly_user, loggly_password, loggly_subdomain):
                                     prio = 'warning', print_comp = True)
                     user_choice = 0
             token = auth_tokens[user_choice]
-            Logger.printLog(('\nLoggly will be configured with '
-                             '\"%s\" Customer Token.\n' % token),
+            Logger.printLog(('\nThis system is now configured to use '
+                             '\"%s\" as its Customer Token.\n' % token),
                             print_comp = True)
             return { "token" : token, "id": DISTRIBUTION_ID }
         else:
