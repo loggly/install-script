@@ -51,7 +51,7 @@ STR_PYTHON_FAIL_MESSAGE = ("Python version check fails: Installed version is "
 STR_MULTIPLE_SYSLOG_MESSAGE = ("Multiple syslogd are running.")
 STR_AUTHTOKEN_NOTFOUND_MESSAGE = ("No Customer Tokens were found.")
 STR_AUTHENTICATION_FAIL_MESSAGE = ("Authentication fail for user %s")
-VERIFICATION_FAIL_MESSAGE = ("Loggly verification failed."
+VERIFICATION_FAIL_MESSAGE = ("Loggly verification failed. "
                              "Please contact support@loggly.com"
                              " for more information.")
 STR_EXIT_MESSAGE = ("\nThis environment (OS : %s) is not supported by "
