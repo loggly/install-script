@@ -978,9 +978,8 @@ def modify_syslog_config_file(syslog_id, syslog_configuration_details,
                                 % (default_config_file_name.get(syslog_id),
                                 datetime.now().strftime('%Y-%m-%dT%H:%M:%S')))
 
-                    temp_file = tempfile.NamedTemporaryFile(delete=False)
-                    temp_file.write(content.encode('utf-8'))
-                    temp_file.close()
+                    with tempfile.NamedTemporaryFile(delete=False) as temp_file:
+                        temp_file.write(content.encode('utf-8'))
                     if user_type == ROOT_USER:
                         os.popen(("cp -p %s %s"
                                   % (default_config_file_name.get(syslog_id),
