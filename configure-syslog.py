@@ -1167,17 +1167,18 @@ def log(msg, prio = 'info', facility = 'local0'):
     except KeyError as errmsg:
         pass
 
-    vals = {}
-    vals['pri'] = pri
-    vals['version'] = 1
-    vals['timestamp'] = datetime.isoformat(datetime.now())
-    vals['hostname'] = socket.gethostname()
-    vals['app-name'] = OUR_PROGNAME
-    vals['procid'] = os.getpid()
-    vals['msgid'] = '-'
-    vals['loggly-auth-token'] = LOGGLY_AUTH_TOKEN
-    vals['loggly-pen'] = int(DISTRIBUTION_ID)
-    vals['msg'] = msg
+    vals = {
+      'pri':                pri,
+      'version':            1,
+      'timestamp':          datetime.isoformat(datetime.now()),
+      'hostname':           socket.gethostname(),
+      'app-name':           OUR_PROGNAME,
+      'procid':             os.getpid(),
+      'msgid':              '-',
+      'loggly-auth-token':  LOGGLY_AUTH_TOKEN,
+      'loggly-pen':         int(DISTRIBUTION_ID),
+      'msg':                msg,
+    }
 
     fullmsg = ("<%(pri)s>%(version)s %(timestamp)s %(hostname)s "
                "%(app-name)s %(procid)s %(msgid)s "
