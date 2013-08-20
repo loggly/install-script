@@ -818,8 +818,8 @@ def get_auth_token(loggly_user, loggly_password, loggly_subdomain):
                                     prio = 'warning', print_comp = True)
                     user_choice = 0
             token = auth_tokens[user_choice]
-            Logger.printLog(('\nLoggly will be configured with '
-                             '\"%s\" Customer Token.\n' % token),
+            Logger.printLog(('\nThis system is now configured to use '
+                             '\"%s\" as its Customer Token.\n' % token),
                             print_comp = True)
             return { "token" : token, "id": DISTRIBUTION_ID }
         else:
