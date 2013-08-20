@@ -530,7 +530,7 @@ def product_for_configuration(current_environment,
                             (index, syslog_name, syslog_version),
                             print_comp = True)
 
-        for _ in range(0, 5):
+        for _ in range(5):
             try:
                 str_msg = ("Please select (1-" + str(index) + ") to specify "
                            "which version of syslog you'd like configured. "
@@ -720,7 +720,7 @@ def login():
     if user:
         pprompt = lambda: (getpass.getpass("Password for %s: " % user))
         password = pprompt()
-        for _ in range(0, 2):
+        for _ in range(2):
             if not password:
                 password = pprompt()
             else:
@@ -920,7 +920,7 @@ def create_loggly_config_file(syslog_id, syslog_configuration_details,
                        % os.path.join(syslog_configuration_details.get("path"),
                                       LOGGLY_CONFIG_FILE))
 
-                for _ in range(0, 5):
+                for _ in range(5):
                     user_input = usr_input(msg).lower()
                     if len(user_input) > 0:
                         if user_input in yes:
@@ -969,7 +969,7 @@ def modify_syslog_config_file(syslog_id, syslog_configuration_details,
                     "\n\nDo you want this installer to modify "
                     "the configuration file? [Yes|No]: "
                     % default_config_file_name.get(syslog_id))
-        for _ in range(0, 5):
+        for _ in range(5):
             user_input = usr_input(question).lower()
             if len(user_input) > 0:
                 if  user_input in yes:
@@ -1012,7 +1012,7 @@ def modify_syslog_config_file(syslog_id, syslog_configuration_details,
         question = ("\nLoggly is already configured with %s Customer Token. "
                     "Do you want to overwrite it? [Yes|No]: "
                     % syslog_configuration_details.get("token"))
-        for _ in range(0, 5):
+        for _ in range(5):
             user_input = usr_input(question).lower()
             if len(user_input) > 0:
                 if  user_input in yes:
@@ -1050,7 +1050,7 @@ def send_sighup_to_syslog(syslog_type):
     if PROCESS_ID != -1:
         question = ("Do you want the Loggly Syslog Configuration Script "
                     "to restart (SIGHUP) the syslog daemon. [Yes|No]: ")
-        for _ in range(0, 5):
+        for _ in range(5):
             user_input = usr_input(question).lower()
             if len(user_input) > 0:
                 if  user_input in yes:
