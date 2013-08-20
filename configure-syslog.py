@@ -801,7 +801,7 @@ def get_auth_token(loggly_user, loggly_password, loggly_subdomain):
                 for _ in range(0, 5):
                     try:
                         str_msg = ("Please select (1-" + str(index + 1) + ")"
-                                   "to specify which Customer Token"
+                                   "to specify which Customer Token "
                                    "you want to use. (Default is 1): ")
                         user_choice = int(usr_input(str_msg)) - 1
                         if user_choice < 0 or user_choice > (index):
