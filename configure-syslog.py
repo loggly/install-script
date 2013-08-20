@@ -262,12 +262,10 @@ def printEnvironment(current_environment):
                      print_comp = True)
 
     Logger.printLog("Syslog versions:", print_comp = True)
-    if len(current_environment['syslog_versions']) > 0:
-        for index in range(0, len(current_environment['syslog_versions'])):
-            Logger.printLog("\t%d.   %s(%s)" % (index + 1,
-                        current_environment['syslog_versions'][index][0],
-                        current_environment['syslog_versions'][index][1]),
-                        print_comp = True)
+    if current_environment['syslog_versions']:
+        for i, version in enumerate(current_environment['syslog_versions']):
+            line = "\t%d.   %s(%s)" % (i + 1, version[0], version[1])
+            Logger.printLog(line, print_comp = True)
     else:
         Logger.printLog("\tNo Syslog Version Found......", prio = 'crit',
                         print_comp = True)
@@ -532,7 +530,7 @@ def product_for_configuration(current_environment,
                             (index, syslog_name, syslog_version),
                             print_comp = True)
 
-        for _ in range(0, 5):
+        for _ in range(5):
             try:
                 str_msg = ("Please select (1-" + str(index) + ") to specify "
                            "which version of syslog you'd like configured. "
@@ -722,7 +720,7 @@ def login():
     if user:
         pprompt = lambda: (getpass.getpass("Password for %s: " % user))
         password = pprompt()
-        for _ in range(0, 2):
+        for _ in range(2):
             if not password:
                 password = pprompt()
             else:
@@ -791,20 +789,21 @@ def get_auth_token(loggly_user, loggly_password, loggly_subdomain):
                                    loggly_subdomain)
 
             user_choice = 0
-            if len(auth_tokens) > 1:
+            num_tokens = len(auth_tokens)
+            if num_tokens > 1:
                 Logger.printLog(("Multiple Customer Tokens"
                                  " received from server."),
                                   print_comp = True)
-                for index in range(0, len(auth_tokens)):
-                    Logger.printLog("\t%d. %s"%(index + 1, auth_tokens[index]),
+                for i, token in enumerate(auth_tokens):
+                    Logger.printLog("\t%d. %s"%(i + 1, token),
                                     print_comp = True)
-                for _ in range(0, 5):
+                for _ in range(5):
                     try:
-                        str_msg = ("Please select (1-" + str(index + 1) + ")"
+                        str_msg = ("Please select (1-" + str(num_tokens) + ")"
                                    "to specify which Customer Token "
                                    "you want to use. (Default is 1): ")
                         user_choice = int(usr_input(str_msg)) - 1
-                        if user_choice < 0 or user_choice > (index):
+                        if user_choice < 0 or user_choice >= num_tokens:
                             Logger.printLog("Invalid choice entered.",
                                             prio = 'error', print_comp = True)
                             continue
@@ -812,7 +811,7 @@ def get_auth_token(loggly_user, loggly_password, loggly_subdomain):
                     except ValueError:
                         Logger.printLog("Not a valid selection. Please retry.",
                                          prio = 'warning', print_comp = True)
-                if user_choice < 0 or user_choice > (index):
+                if user_choice < 0 or user_choice >= num_tokens:
                     Logger.printLog(("Invalid choice entered. "
                                     "Continue with default value."),
                                     prio = 'warning', print_comp = True)
@@ -921,7 +920,7 @@ def create_loggly_config_file(syslog_id, syslog_configuration_details,
                        % os.path.join(syslog_configuration_details.get("path"),
                                       LOGGLY_CONFIG_FILE))
 
-                for _ in range(0, 5):
+                for _ in range(5):
                     user_input = usr_input(msg).lower()
                     if len(user_input) > 0:
                         if user_input in yes:
@@ -970,7 +969,7 @@ def modify_syslog_config_file(syslog_id, syslog_configuration_details,
                     "\n\nDo you want this installer to modify "
                     "the configuration file? [Yes|No]: "
                     % default_config_file_name.get(syslog_id))
-        for _ in range(0, 5):
+        for _ in range(5):
             user_input = usr_input(question).lower()
             if len(user_input) > 0:
                 if  user_input in yes:
@@ -979,9 +978,8 @@ def modify_syslog_config_file(syslog_id, syslog_configuration_details,
                                 % (default_config_file_name.get(syslog_id),
                                 datetime.now().strftime('%Y-%m-%dT%H:%M:%S')))
 
-                    temp_file = tempfile.NamedTemporaryFile(delete=False)
-                    temp_file.write(content.encode('utf-8'))
-                    temp_file.close()
+                    with tempfile.NamedTemporaryFile(delete=False) as temp_file:
+                        temp_file.write(content.encode('utf-8'))
                     if user_type == ROOT_USER:
                         os.popen(("cp -p %s %s"
                                   % (default_config_file_name.get(syslog_id),
@@ -1013,7 +1011,7 @@ def modify_syslog_config_file(syslog_id, syslog_configuration_details,
         question = ("\nLoggly is already configured with %s Customer Token. "
                     "Do you want to overwrite it? [Yes|No]: "
                     % syslog_configuration_details.get("token"))
-        for _ in range(0, 5):
+        for _ in range(5):
             user_input = usr_input(question).lower()
             if len(user_input) > 0:
                 if  user_input in yes:
@@ -1051,7 +1049,7 @@ def send_sighup_to_syslog(syslog_type):
     if PROCESS_ID != -1:
         question = ("Do you want the Loggly Syslog Configuration Script "
                     "to restart (SIGHUP) the syslog daemon. [Yes|No]: ")
-        for _ in range(0, 5):
+        for _ in range(5):
             user_input = usr_input(question).lower()
             if len(user_input) > 0:
                 if  user_input in yes:
@@ -1123,12 +1121,9 @@ def write_env_details(current_environment):
                        (current_environment['operating_system']))
         env_file.write("\nSyslog versions:\n")
         if len(current_environment['syslog_versions']) > 0:
-            for index in range(0, len(current_environment['syslog_versions'])):
+            for i, version in enumerate(current_environment['syslog_versions']):
                 env_file.write("\t%d.   %s(%s)" %
-                            (index + 1,
-                            current_environment['syslog_versions'][index][0],
-                            current_environment['syslog_versions'][index][1]
-                            ))
+                            (i + 1, version[0], version[1]))
 
         else:
             env_file.write("\tNo Syslog version Found......")
@@ -1171,17 +1166,18 @@ def log(msg, prio = 'info', facility = 'local0'):
     except KeyError as errmsg:
         pass
 
-    vals = {}
-    vals['pri'] = pri
-    vals['version'] = 1
-    vals['timestamp'] = datetime.isoformat(datetime.now())
-    vals['hostname'] = socket.gethostname()
-    vals['app-name'] = OUR_PROGNAME
-    vals['procid'] = os.getpid()
-    vals['msgid'] = '-'
-    vals['loggly-auth-token'] = LOGGLY_AUTH_TOKEN
-    vals['loggly-pen'] = int(DISTRIBUTION_ID)
-    vals['msg'] = msg
+    vals = {
+      'pri':                pri,
+      'version':            1,
+      'timestamp':          datetime.isoformat(datetime.now()),
+      'hostname':           socket.gethostname(),
+      'app-name':           OUR_PROGNAME,
+      'procid':             os.getpid(),
+      'msgid':              '-',
+      'loggly-auth-token':  LOGGLY_AUTH_TOKEN,
+      'loggly-pen':         int(DISTRIBUTION_ID),
+      'msg':                msg,
+    }
 
     fullmsg = ("<%(pri)s>%(version)s %(timestamp)s %(hostname)s "
                "%(app-name)s %(procid)s %(msgid)s "
