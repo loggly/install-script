@@ -262,12 +262,10 @@ def printEnvironment(current_environment):
                      print_comp = True)
 
     Logger.printLog("Syslog versions:", print_comp = True)
-    if len(current_environment['syslog_versions']) > 0:
-        for index in range(0, len(current_environment['syslog_versions'])):
-            Logger.printLog("\t%d.   %s(%s)" % (index + 1,
-                        current_environment['syslog_versions'][index][0],
-                        current_environment['syslog_versions'][index][1]),
-                        print_comp = True)
+    if current_environment['syslog_versions']:
+        for i, version in enumerate(current_environment['syslog_versions']):
+            line = "\t%d.   %s(%s)" % (i + 1, version[0], version[1])
+            Logger.printLog(line, print_comp = True)
     else:
         Logger.printLog("\tNo Syslog Version Found......", prio = 'crit',
                         print_comp = True)
@@ -791,20 +789,21 @@ def get_auth_token(loggly_user, loggly_password, loggly_subdomain):
                                    loggly_subdomain)
 
             user_choice = 0
-            if len(auth_tokens) > 1:
+            num_tokens = len(auth_tokens)
+            if num_tokens > 1:
                 Logger.printLog(("Multiple Customer Tokens"
                                  " received from server."),
                                   print_comp = True)
-                for index in range(0, len(auth_tokens)):
-                    Logger.printLog("\t%d. %s"%(index + 1, auth_tokens[index]),
+                for i, token in enumerate(auth_tokens):
+                    Logger.printLog("\t%d. %s"%(i + 1, token),
                                     print_comp = True)
-                for _ in range(0, 5):
+                for _ in range(5):
                     try:
-                        str_msg = ("Please select (1-" + str(index + 1) + ")"
+                        str_msg = ("Please select (1-" + str(num_tokens) + ")"
                                    "to specify which Customer Token "
                                    "you want to use. (Default is 1): ")
                         user_choice = int(usr_input(str_msg)) - 1
-                        if user_choice < 0 or user_choice > (index):
+                        if user_choice < 0 or user_choice >= num_tokens:
                             Logger.printLog("Invalid choice entered.",
                                             prio = 'error', print_comp = True)
                             continue
@@ -812,7 +811,7 @@ def get_auth_token(loggly_user, loggly_password, loggly_subdomain):
                     except ValueError:
                         Logger.printLog("Not a valid selection. Please retry.",
                                          prio = 'warning', print_comp = True)
-                if user_choice < 0 or user_choice > (index):
+                if user_choice < 0 or user_choice >= num_tokens:
                     Logger.printLog(("Invalid choice entered. "
                                     "Continue with default value."),
                                     prio = 'warning', print_comp = True)
@@ -1123,12 +1122,9 @@ def write_env_details(current_environment):
                        (current_environment['operating_system']))
         env_file.write("\nSyslog versions:\n")
         if len(current_environment['syslog_versions']) > 0:
-            for index in range(0, len(current_environment['syslog_versions'])):
+            for i, version in enumerate(current_environment['syslog_versions']):
                 env_file.write("\t%d.   %s(%s)" %
-                            (index + 1,
-                            current_environment['syslog_versions'][index][0],
-                            current_environment['syslog_versions'][index][1]
-                            ))
+                            (i + 1, version[0], version[1]))
 
         else:
             env_file.write("\tNo Syslog version Found......")
