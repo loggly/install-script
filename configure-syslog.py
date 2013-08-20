@@ -793,7 +793,7 @@ def get_auth_token(loggly_user, loggly_password, loggly_subdomain):
             user_choice = 0
             if len(auth_tokens) > 1:
                 Logger.printLog(("Multiple Customer Tokens"
-                                 "received from server."),
+                                 " received from server."),
                                   print_comp = True)
                 for index in range(0, len(auth_tokens)):
                     Logger.printLog("\t%d. %s"%(index + 1, auth_tokens[index]),
