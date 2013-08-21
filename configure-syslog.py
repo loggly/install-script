@@ -83,16 +83,10 @@ SYSLOG_NG_PROCESS = "syslog-ng"
 
 
 
-supported_syslog_versions = {
-
-PROD_SYSLOG_NG: [
-    "1.6", "2.0", "2.1", "3.1", "3.2", "3.3", "3.4", "3.5"
-    ],
-PROD_RSYSLOG: [
-    "1.19", "2.0", "3.14", "3.21", "3.22", "4.2", "4.4", "4.6",
-    "5.7", "5.8", "7.2", "7.3",
-    ],
-                            }
+min_supported_syslog_versions = {
+    PROD_SYSLOG_NG: "1.6",
+    PROD_RSYSLOG: "1.19",
+}
 
 default_config_file_name = {
                             PROD_SYSLOG_NG: "/etc/syslog-ng/syslog-ng.conf",
@@ -378,6 +372,18 @@ def get_user_type():
         Logger.printLog("Script not started as root", print_comp = True)
         return NON_ROOT_USER
 
+def try_int(x):
+    try:
+        return int(x)
+    except ValueError:
+        return x
+
+def version_tuple(v):
+    return map(try_int, v.split('.'))
+
+def greater_version(minimum, version):
+    return version_tuple(version) >= version_tuple(minimum)
+
 def get_environment_details():
     """
     Get Distro Name, Distro ID, Version and ID.
@@ -413,7 +419,8 @@ def perform_sanity_check(current_environment):
     for (syslog_type, syslog_version)\
         in current_environment['syslog_versions']:
         syslog_id = get_syslog_id(syslog_type)
-        if syslog_version in supported_syslog_versions.get(syslog_id):
+        if greater_version(min_supported_syslog_versions.get(syslog_id),
+                syslog_version):
             syslog_versions[syslog_type] = syslog_version
 
     current_environment['supported_syslog_versions'] = syslog_versions
