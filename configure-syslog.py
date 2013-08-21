@@ -389,19 +389,18 @@ def get_environment_details():
     Get Distro Name, Distro ID, Version and ID.
     """
     Logger.printLog("Reading Environment Details....", prio = 'debug')
-    environment = {}
     distribution = platform.linux_distribution()
-    environment['distro_name'] = distribution[0]
-    environment['distro_id'] = get_os_id(distribution[0])
-    environment['version'] = distribution[1]
-    environment['id'] = distribution[2]
-    environment['syslog_versions'] = get_syslog_version\
-                                     (environment['distro_id'])
-    environment['supported_syslog_versions'] = {}
-    environment['operating_system'] = "%s-%s(%s)"% (environment['distro_name'],
-                                                    environment['version'],
-                                                    environment['id'])
-    return environment
+    distro_name, version, version_id = distribution
+    distro_id = get_os_id(distro_name)
+    return {
+        'distro_name': distro_name,
+        'distro_id': distro_id,
+        'version': version,
+        'id': version_id,
+        'syslog_versions': get_syslog_version(distro_id),
+        'supported_syslog_versions': {},
+        'operating_system': "%s-%s(%s)" % distribution
+    }
 
 def perform_sanity_check(current_environment):
     """
