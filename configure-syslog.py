@@ -102,29 +102,31 @@ default_config_file_name = {
 configuration_text = {
 
                                 PROD_SYSLOG_NG:
-('#          -------------------------------------------------------\n'
-'#          Syslog Logging Directives for Loggly (%s.loggly.com)\n'
-'#          -------------------------------------------------------\n'
-'%s\n'
-'template t_LogglyFormat { template("<${PRI}>1 ${ISODATE} ${HOST} ${PROGRAM} '
-'${PID} ${MSGID} [%s@%s tag=\\"Example1\\"] $MSG\\n");};\n'
-'destination d_loggly {tcp("%s" port(%s) template(t_LogglyFormat));};\n'
-'log { source(%s); destination(d_loggly); };\n'
-'#          -------------------------------------------------------\n'),
+'''
+#          -------------------------------------------------------
+#          Syslog Logging Directives for Loggly (%s.loggly.com)
+#          -------------------------------------------------------
+%s
+template t_LogglyFormat { template("<${PRI}>1 ${ISODATE} ${HOST} ${PROGRAM} ${PID} ${MSGID} [%s@%s tag=\\"Example1\\"] $MSG\\n");};
+destination d_loggly {tcp("%s" port(%s) template(t_LogglyFormat));};
+log { source(%s); destination(d_loggly); };
+#          -------------------------------------------------------
+''',
 
                                 PROD_RSYSLOG:
-('#          -------------------------------------------------------\n'
-'#          Syslog Logging Directives for Loggly (%s.loggly.com)\n'
-'#          -------------------------------------------------------\n'
-'#$template - Define logging format // $template <template_name> '
- '<logging_format>'
-'#\n'
-'$template LogglyFormat,"<%%pri%%>%%protocol-version%% '
- '%%timestamp:::date-rfc3339%% %%HOSTNAME%% %%app-name%% '
- '%%procid%% %%msgid%% [%s@%s tag=\\"Example1\\"] %%msg%%"\n'
-'# Send messages to syslog server listening on TCP port using template\n\n'
-'*.*             @@%s:%s;LogglyFormat\n\n'
-'#          -------------------------------------------------------\n')
+'''
+#          -------------------------------------------------------
+#          Syslog Logging Directives for Loggly (%s.loggly.com)
+#          -------------------------------------------------------
+#$template - Define logging format // $template <template_name> <logging_format>
+#
+$template LogglyFormat,"<%%pri%%>%%protocol-version%% %%timestamp:::date-rfc3339%% %%HOSTNAME%% %%app-name%% %%procid%% %%msgid%% [%s@%s tag=\\"Example1\\"] %%msg%%"
+# Send messages to syslog server listening on TCP port using template
+
+*.*             @@%s:%s;LogglyFormat
+
+#          -------------------------------------------------------
+'''
                             }
 USER = None
 SUBDOMAIN = None
