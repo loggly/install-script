@@ -96,92 +96,114 @@ default_config_file_name = {
 configuration_text = {
 
                                 PROD_SYSLOG_NG:
-('#          -------------------------------------------------------\n'
-'#          Syslog Logging Directives for Loggly (%s.loggly.com)\n'
-'#          -------------------------------------------------------\n'
-'%s\n'
-'template t_LogglyFormat { template("<${PRI}>1 ${ISODATE} ${HOST} ${PROGRAM} '
-'${PID} ${MSGID} [%s@%s tag=\\"Example1\\"] $MSG\\n");};\n'
-'destination d_loggly {tcp("%s" port(%s) template(t_LogglyFormat));};\n'
-'log { source(%s); destination(d_loggly); };\n'
-'#          -------------------------------------------------------\n'),
+'''
+#          -------------------------------------------------------
+#          Syslog Logging Directives for Loggly (%s.loggly.com)
+#          -------------------------------------------------------
+%s
+template t_LogglyFormat { template("<${PRI}>1 ${ISODATE} ${HOST} ${PROGRAM} \
+${PID} ${MSGID} [%s@%s tag=\\"Example1\\"] $MSG\\n");};
+destination d_loggly {tcp("%s" port(%s) template(t_LogglyFormat));};
+log { source(%s); destination(d_loggly); };
+#          -------------------------------------------------------
+''',
 
                                 PROD_RSYSLOG:
-('#          -------------------------------------------------------\n'
-'#          Syslog Logging Directives for Loggly (%s.loggly.com)\n'
-'#          -------------------------------------------------------\n'
-'#$template - Define logging format // $template <template_name> '
- '<logging_format>'
-'#\n'
-'$template LogglyFormat,"<%%pri%%>%%protocol-version%% '
- '%%timestamp:::date-rfc3339%% %%HOSTNAME%% %%app-name%% '
- '%%procid%% %%msgid%% [%s@%s tag=\\"Example1\\"] %%msg%%"\n'
-'# Send messages to syslog server listening on TCP port using template\n\n'
-'*.*             @@%s:%s;LogglyFormat\n\n'
-'#          -------------------------------------------------------\n')
+'''
+#          -------------------------------------------------------
+#          Syslog Logging Directives for Loggly (%s.loggly.com)
+#          -------------------------------------------------------
+#$template - Define logging format // $template <template_name> <logging_format>
+#
+$template LogglyFormat,"<%%pri%%>%%protocol-version%% %%timestamp:::date-rfc3339%% \
+%%HOSTNAME%% %%app-name%% %%procid%% %%msgid%% [%s@%s tag=\\"Example1\\"] %%msg%%"
+# Send messages to syslog server listening on TCP port using template
+
+*.*             @@%s:%s;LogglyFormat
+
+#          -------------------------------------------------------
+'''
                             }
 USER = None
 SUBDOMAIN = None
 SYSLOG_NG_SOURCE = 's_loggly'
-SYSLOG_NG_SOURCE_TEXT_3_2 = ('source %s { \n'
-                             '\tunix-stream("/dev/log"); \n'
-                             '\tinternal(); \n'
-                      '\tfile("/proc/kmsg" program_override("kernel: "));\n};')
-SYSLOG_NG_SOURCE_TEXT_ABOVE_3_2 = ('source %s { \n\tsystem(); \n'
-                                   '\tinternal();\n};')
+
+SYSLOG_NG_SOURCE_TEXT_3_2 = '''
+source %s {
+\tunix-stream("/dev/log");
+\tinternal();
+\tfile("/proc/kmsg" program_override("kernel: "));
+};
+'''.strip()
+
+SYSLOG_NG_SOURCE_TEXT_ABOVE_3_2 = '''
+source %s {
+\tsystem();
+\tinternal();
+};
+'''.strip()
 
 yes = ['yes', 'ye', 'y']
 no = ['no', 'n']
 
-LOGGLY_HELP = ('Instructions to manually re-configure syslog for Loggly\n'
-'=======================================================\n\n'
-'1.Modification in configuration file\n'
-' rsyslog\n'
-' -------\n\n'
-' -Edit your rsyslog.conf file, usually found in /etc/rsyslog.conf, '
-'and add following lines at bottom of the configuration file:\n\n'
-' ### Syslog Logging Directives for Loggly (%s.loggly.com) ###\n'
-'  $template LogglyFormat,"<%%pri%%>%%protocol-version%% '
-'%%timestamp:::date-rfc3339%% %%HOSTNAME%% %%app-name%% %%procid%% %%msgid%% '
-'[%s@%s tag=\\"Example1\\"] %%msg%%"\n'
-' *.*             @@%s:%s;LogglyFormat\n'
-' ### END Syslog Logging Directives for Loggly (%s.loggly.com) ###\n\n'
-' syslog-ng\n'
-' ---------\n\n'
-'1. Edit your syslog-ng.conf file, '
-'usually found in /etc/syslog-ng/syslog-ng.conf:\n\n'
-' - Instructions for syslog-ng version above 3.2\n'
-' -- Look for source with internal() directive. '
-'If no source found with internal() directive then '
-'add following lines at bottom of the file:\n'
-' ### Syslog Logging Directives for Loggly (%s.loggly.com) ###\n'
-'\tsource %s {\n'
-'\t\tsystem();\n'
-'\t\tinternal();\n'
-'\t};\n\n'
-' -If version of syslog-ng is 3.2 or below and '
-'source with internal() is not present then '
-'add the following lines at the bottom of the file\n'
-' ### Syslog Logging Directives for Loggly (%s.loggly.com) ###\n'
-'\tsource %s {\n'
-'\t\tinternal();\n'
-'\t\tunix-stream("/dev/log");\n'
-'\t\tfile("/path/to/your/file" follow_freq(1) flags(no-parse));\n'
-'\t};\n\n'
-' -Append following settings at the end of configuration file. '
-'Here source_name should be name of source with internal().\n'
-' template t_LogglyFormat { template("<${PRI}>1 ${ISODATE} '
-'${HOST} ${PROGRAM} ${PID} ${MSGID} [%s@%s tag=\\"Example1\\"] $MSG\\n");};\n'
-' destination d_loggly {tcp("%s" port(%s) template(t_LogglyFormat));};\n'
-' log { source(source_name); destination(d_loggly); };\n'
-' ### END Syslog Logging Directives for Loggly (%s.loggly.com) ###\n\n'
-' -WARNING: if source with internal() is already present then '
-'do not add new source. The new source will break configurations.\n\n'
-'2. Once you are done configuring syslog-ng or rsyslog, restart it\n'
-'   Example:  /etc/init.d/syslog-ng restart\n\n'
-'3. Send some data through syslog-ng or '
-'rsyslog to have it forwarded to your Loggly account\n'
-'   logger "loggly is better than a bee in your aunt\'s bonnet"')
+LOGGLY_HELP = '''
+Instructions to manually re-configure syslog for Loggly
+=======================================================
+
+1.Modification in configuration file
+ rsyslog
+ -------
+
+ -Edit your rsyslog.conf file, usually found in /etc/rsyslog.conf, \
+and add following lines at bottom of the configuration file:
+
+ ### Syslog Logging Directives for Loggly (%s.loggly.com) ###
+  $template LogglyFormat,"<%%pri%%>%%protocol-version%% \
+%%timestamp:::date-rfc3339%% %%HOSTNAME%% %%app-name%% %%procid%% %%msgid%% \
+[%s@%s tag=\\"Example1\\"] %%msg%%"
+ *.*             @@%s:%s;LogglyFormat
+ ### END Syslog Logging Directives for Loggly (%s.loggly.com) ###
+
+ syslog-ng
+ ---------
+
+1. Edit your syslog-ng.conf file, usually found in /etc/syslog-ng/syslog-ng.conf:
+
+ - Instructions for syslog-ng version above 3.2
+ -- Look for source with internal() directive. If no source found with \
+internal() directive then add following lines at bottom of the file:
+ ### Syslog Logging Directives for Loggly (%s.loggly.com) ###
+\tsource %s {
+\t\tsystem();
+\t\tinternal();
+\t};
+
+ -If version of syslog-ng is 3.2 or below and source with internal() is not \
+present then add the following lines at the bottom of the file
+ ### Syslog Logging Directives for Loggly (%s.loggly.com) ###
+\tsource %s {
+\t\tinternal();
+\t\tunix-stream("/dev/log");
+\t\tfile("/path/to/your/file" follow_freq(1) flags(no-parse));
+\t};
+
+ -Append following settings at the end of configuration file. Here \
+source_name should be name of source with internal().
+ template t_LogglyFormat { template("<${PRI}>1 ${ISODATE} ${HOST} ${PROGRAM} \
+${PID} ${MSGID} [%s@%s tag=\\"Example1\\"] $MSG\\n");};
+ destination d_loggly {tcp("%s" port(%s) template(t_LogglyFormat));};
+ log { source(source_name); destination(d_loggly); };
+ ### END Syslog Logging Directives for Loggly (%s.loggly.com) ###
+
+ -WARNING: if source with internal() is already present then do not add new \
+source. The new source will break configurations.
+
+2. Once you are done configuring syslog-ng or rsyslog, restart it
+   Example:  /etc/init.d/syslog-ng restart
+
+3. Send some data through syslog-ng or rsyslog to have it forwarded to your Loggly account
+   logger "loggly is better than a bee in your aunt\'s bonnet"
+'''.strip()
 
 # log priorities...
 LOG_PRIORITIES = {
