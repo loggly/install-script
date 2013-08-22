@@ -171,12 +171,12 @@ Instructions to manually re-configure syslog for Loggly
  -Edit your rsyslog.conf file, usually found in /etc/rsyslog.conf, \
 and add following lines at bottom of the configuration file:
 
- ### Syslog Logging Directives for Loggly (%s.loggly.com) ###
+ ### Syslog Logging Directives for Loggly (%(subdomain)s.loggly.com) ###
   $template LogglyFormat,"<%%pri%%>%%protocol-version%% \
 %%timestamp:::date-rfc3339%% %%HOSTNAME%% %%app-name%% %%procid%% %%msgid%% \
-[%s@%s tag=\\"Example1\\"] %%msg%%"
- *.*             @@%s:%s;LogglyFormat
- ### END Syslog Logging Directives for Loggly (%s.loggly.com) ###
+[%(token)s@%(dist_id)s tag=\\"Example1\\"] %%msg%%"
+ *.*             @@%(syslog_server)s:%(syslog_port)s;LogglyFormat
+ ### END Syslog Logging Directives for Loggly (%(subdomain)s.loggly.com) ###
 
  syslog-ng
  ---------
@@ -186,16 +186,16 @@ and add following lines at bottom of the configuration file:
  - Instructions for syslog-ng version above 3.2
  -- Look for source with internal() directive. If no source found with \
 internal() directive then add following lines at bottom of the file:
- ### Syslog Logging Directives for Loggly (%s.loggly.com) ###
-\tsource %s {
+ ### Syslog Logging Directives for Loggly (%(subdomain)s.loggly.com) ###
+\tsource %(syslog_source)s {
 \t\tsystem();
 \t\tinternal();
 \t};
 
  -If version of syslog-ng is 3.2 or below and source with internal() is not \
 present then add the following lines at the bottom of the file
- ### Syslog Logging Directives for Loggly (%s.loggly.com) ###
-\tsource %s {
+ ### Syslog Logging Directives for Loggly (%(subdomain)s.loggly.com) ###
+\tsource %(syslog_source)s {
 \t\tinternal();
 \t\tunix-stream("/dev/log");
 \t\tfile("/path/to/your/file" follow_freq(1) flags(no-parse));
@@ -204,10 +204,10 @@ present then add the following lines at the bottom of the file
  -Append following settings at the end of configuration file. Here \
 source_name should be name of source with internal().
  template LogglyFormat { template("<${PRI}>1 ${ISODATE} ${HOST} ${PROGRAM} \
-${PID} ${MSGID} [%s@%s tag=\\"Example1\\"] $MSG\\n");};
- destination d_loggly {tcp("%s" port(%s) template(LogglyFormat));};
+${PID} ${MSGID} [%(token)s@%(dist_id)s tag=\\"Example1\\"] $MSG\\n");};
+ destination d_loggly {tcp("%(syslog_server)s" port(%(syslog_port)s) template(LogglyFormat));};
  log { source(source_name); destination(d_loggly); };
- ### END Syslog Logging Directives for Loggly (%s.loggly.com) ###
+ ### END Syslog Logging Directives for Loggly (%(subdomain)s.loggly.com) ###
 
  -WARNING: if source with internal() is already present then do not add new \
 source. The new source will break configurations.
@@ -1299,21 +1299,14 @@ def call_module(module_name, arg):
 def loggly_help():
     loggly_user, loggly_password, loggly_subdomain = login()
     auth_tokens = get_auth(loggly_user, loggly_password, loggly_subdomain)
-    logglyhelp = LOGGLY_HELP % (loggly_subdomain,
-                                auth_tokens[-1],
-                                DISTRIBUTION_ID,
-                                LOGGLY_SYSLOG_SERVER,
-                                LOGGLY_SYSLOG_PORT,
-                                loggly_subdomain,
-                                loggly_subdomain,
-                                SYSLOG_NG_SOURCE,
-                                loggly_subdomain,
-                                SYSLOG_NG_SOURCE,
-                                auth_tokens[-1],
-                                DISTRIBUTION_ID,
-                                LOGGLY_SYSLOG_SERVER,
-                                LOGGLY_SYSLOG_PORT,
-                                loggly_subdomain)
+    logglyhelp = LOGGLY_HELP %  {
+        'subdomain': loggly_subdomain,
+        'token': auth_tokens[-1],
+        'dist_id': DISTRIBUTION_ID,
+        'syslog_server': LOGGLY_SYSLOG_SERVER,
+        'syslog_port': LOGGLY_SYSLOG_PORT,
+        'syslog_source': SYSLOG_NG_SOURCE,
+    }
 
     print(logglyhelp)
 
