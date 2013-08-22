@@ -1256,14 +1256,13 @@ def install(current_environment):
 
     # 6. SIGHUP the syslog daemon.
     if user_type == ROOT_USER:
-        sighup_status = send_sighup_to_syslog(syslog_name_for_configuration)
-        if sighup_status:
-            doverify(loggly_user, loggly_password, loggly_subdomain)
+        send_sighup_to_syslog(syslog_name_for_configuration)
 
     Logger.printLog(AUTHTOKEN_MODIFICATION_TEXT %
                     (authorization_details['token'],
                      modified_config_file), print_comp = True, prio = 'debug')
     Logger.printLog("Installation completed", prio = 'debug')
+    print("You may verify installation by rerunning with action 'verify'")
     return syslog_name_for_configuration
 
 def verify(current_environment):
