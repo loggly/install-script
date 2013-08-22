@@ -1327,7 +1327,7 @@ class PAOptionParser(OptionParser, object):
     def add_posarg(self, *args, **kw):
         pa_help = kw.get("help", "")
         kw["help"] = SUPPRESS_HELP
-        o = self.add_option("--%s" % args[0], *args[1:], **kw)
+        self.add_option("--%s" % args[0], *args[1:], **kw)
         self.posargs.append((args[0], pa_help))
 
     def get_usage(self, *args, **kwargs):
