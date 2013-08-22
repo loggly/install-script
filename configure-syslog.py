@@ -70,6 +70,14 @@ REST_URL_GET_SEARCH_ID = ("http://%s.frontend.chipper01.loggly.net"
                           "/apiv2/search?q=%s&from=-2h&until=now&size=10")
 REST_URL_GET_SEARCH_RESULT = ("http://%s.frontend.chipper01.loggly.net"
                               "/apiv2/events?rsid=%s")
+USER_NAME_TEXT = ("Enter your username that you use to log into your account.")
+ACCOUNT_NAME_TEXT = ("Enter your Loggly account name. This is your subdomain. "
+                     "For example if you login at mycompany.loggly.com, "
+                     "your account name is mycompany.")
+AUTHTOKEN_MODIFICATION_TEXT = ("\nIf you wish to use a different auth-token, "
+                               "you need to replace %s with auth-token"
+                               "(that you want to use) in "
+                               "template LogglyFormat in %s.\n")
 
 _LOG_SOCKET = None
 OUR_PROGNAME      = "configure-syslog"
@@ -100,11 +108,15 @@ configuration_text = {
 #          -------------------------------------------------------
 #          Syslog Logging Directives for Loggly (%s.loggly.com)
 #          -------------------------------------------------------
+
 %s
-template t_LogglyFormat { template("<${PRI}>1 ${ISODATE} ${HOST} ${PROGRAM} \
+template LogglyFormat { template("<${PRI}>1 ${ISODATE} ${HOST} ${PROGRAM} \
 ${PID} ${MSGID} [%s@%s] $MSG\\n");};
-destination d_loggly {tcp("%s" port(%s) template(t_LogglyFormat));};
+destination d_loggly {tcp("%s" port(%s) template(LogglyFormat));};
 log { source(%s); destination(d_loggly); };
+
+#          -------------------------------------------------------
+#          End of Syslog Logging Directives for Loggly
 #          -------------------------------------------------------
 ''',
 
@@ -113,14 +125,16 @@ log { source(%s); destination(d_loggly); };
 #          -------------------------------------------------------
 #          Syslog Logging Directives for Loggly (%s.loggly.com)
 #          -------------------------------------------------------
-#$template - Define logging format // $template <template_name> <logging_format>
-#
+
+# Define the template used for sending logs to Loggly. Do not change this format.
 $template LogglyFormat,"<%%pri%%>%%protocol-version%% %%timestamp:::date-rfc3339%% \
 %%HOSTNAME%% %%app-name%% %%procid%% %%msgid%% [%s@%s] %%msg%%"
 # Send messages to syslog server listening on TCP port using template
 
 *.*             @@%s:%s;LogglyFormat
 
+#          -------------------------------------------------------
+#          End of Syslog Logging Directives for Loggly
 #          -------------------------------------------------------
 '''
                             }
@@ -189,9 +203,9 @@ present then add the following lines at the bottom of the file
 
  -Append following settings at the end of configuration file. Here \
 source_name should be name of source with internal().
- template t_LogglyFormat { template("<${PRI}>1 ${ISODATE} ${HOST} ${PROGRAM} \
+ template LogglyFormat { template("<${PRI}>1 ${ISODATE} ${HOST} ${PROGRAM} \
 ${PID} ${MSGID} [%s@%s tag=\\"Example1\\"] $MSG\\n");};
- destination d_loggly {tcp("%s" port(%s) template(t_LogglyFormat));};
+ destination d_loggly {tcp("%s" port(%s) template(LogglyFormat));};
  log { source(source_name); destination(d_loggly); };
  ### END Syslog Logging Directives for Loggly (%s.loggly.com) ###
 
@@ -671,22 +685,25 @@ def write_configuration(syslog_name_for_configuration,
     Logger.printLog("Reading configuration directory path....", prio = 'debug')
     syslog_id = get_syslog_id(syslog_name_for_configuration)
     syslog_configuration_details = get_installed_syslog_configuration(syslog_id)
+    config_file = default_config_file_name.get(syslog_id)
 
     if len(syslog_configuration_details.get("path")) > 0:
+        config_file = os.path.join(syslog_configuration_details.get("path"),
+                                   LOGGLY_CONFIG_FILE)
         Logger.printLog(("The Loggly Syslog Configuration Script will "
-                         "create a new configuration file %s") %
-                         (os.path.join
-                          (syslog_configuration_details.get("path"),
-                                       LOGGLY_CONFIG_FILE)))
+                         "create a new configuration file %s") % config_file)
+                         #(os.path.join
+                         # (syslog_configuration_details.get("path"),
+                         #              LOGGLY_CONFIG_FILE)))
         create_loggly_config_file(syslog_id,
                                   syslog_configuration_details,
                                   authorization_details, user_type)
-        return
+        return config_file
     else:
         modify_syslog_config_file(syslog_id,
                                   syslog_configuration_details,
                                   authorization_details, user_type)
-        return
+        return config_file
 
 def remove_syslog_ng_source(default_config_file):
 
@@ -724,8 +741,8 @@ def remove_configuration(syslog_name_for_configuration):
                        LOGGLY_SYSLOG_SERVER, LOGGLY_SYSLOG_PORT)
         os.popen("sed -i '%s' %s" % (pattern, default_config_file))
     elif syslog_name_for_configuration == 'syslog-ng':
-        os.popen(("sed -i 's/^\s*template\s\s*t_LogglyFormat/"
-                  "#template t_LogglyFormat/g' %s" % default_config_file))
+        os.popen(("sed -i 's/^\s*template\s\s*LogglyFormat/"
+                  "#template LogglyFormat/g' %s" % default_config_file))
         os.popen(("sed -i 's/^\s*destination\s\s*d_loggly/"
                   "#destination d_loggly/g' %s" % default_config_file))
         output = os.popen(('grep -P "^\s*log\s*{\s*source\(.*\);'
@@ -741,6 +758,7 @@ def login():
     Ask for Loggly credentials
     """
     Logger.printLog("Reading Loggly credentials from user....", prio = 'debug')
+    Logger.printLog(USER_NAME_TEXT, prio = 'debug', print_comp = True)
     user = usr_input("Loggly Username [%s]: " % getpass.getuser())
     if not user:
         user = getpass.getuser()
@@ -752,6 +770,8 @@ def login():
             if not password:
                 password = pprompt()
             else:
+                Logger.printLog(ACCOUNT_NAME_TEXT, prio = 'debug',
+                                print_comp = True)
                 msg = "Loggly Account Name [%s]:" % user
                 subdomain = usr_input(msg).lower()
                 if len(subdomain) <= 0 :
@@ -888,8 +908,6 @@ def create_bash_script(content):
                      "restart syslog service and then "
                      "run configure-syslog.py again with 'verify'"
                      % file_path), prio = 'crit', print_comp = True)
-    printMessage("Finished")
-    sys.exit()
 
 def create_loggly_config_file(syslog_id, syslog_configuration_details,
                               authorization_details, user_type):
@@ -1219,13 +1237,18 @@ def install(current_environment):
     # 5. Create custom configuration file and
     #place it in configuration directory path ($IncludeConfig),
     #default path for rsyslog will be /etc/rsyslog.d/
-    write_configuration(syslog_name_for_configuration,
+    modified_config_file = write_configuration(syslog_name_for_configuration,
                         authorization_details, user_type)
 
     # 6. SIGHUP the syslog daemon.
-    sighup_status = send_sighup_to_syslog(syslog_name_for_configuration)
-    if sighup_status:
-        doverify(loggly_user, loggly_password, loggly_subdomain)
+    if user_type == ROOT_USER:
+        sighup_status = send_sighup_to_syslog(syslog_name_for_configuration)
+        if sighup_status:
+            doverify(loggly_user, loggly_password, loggly_subdomain)
+
+    Logger.printLog(AUTHTOKEN_MODIFICATION_TEXT %
+                    (authorization_details['token'],
+                     modified_config_file), print_comp = True, prio = 'debug')
     Logger.printLog("Installation completed", prio = 'debug')
     return syslog_name_for_configuration
 
@@ -1277,7 +1300,7 @@ def loggly_help():
     loggly_user, loggly_password, loggly_subdomain = login()
     auth_tokens = get_auth(loggly_user, loggly_password, loggly_subdomain)
     logglyhelp = LOGGLY_HELP % (loggly_subdomain,
-                                auth_tokens[0],
+                                auth_tokens[-1],
                                 DISTRIBUTION_ID,
                                 LOGGLY_SYSLOG_SERVER,
                                 LOGGLY_SYSLOG_PORT,
@@ -1286,7 +1309,7 @@ def loggly_help():
                                 SYSLOG_NG_SOURCE,
                                 loggly_subdomain,
                                 SYSLOG_NG_SOURCE,
-                                auth_tokens[0],
+                                auth_tokens[-1],
                                 DISTRIBUTION_ID,
                                 LOGGLY_SYSLOG_SERVER,
                                 LOGGLY_SYSLOG_PORT,
