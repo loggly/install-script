@@ -226,14 +226,14 @@ LOG_PRIORITIES = {
     }
 
 # log facilities...
-LOG_FACILITIES = {
-    "kern": 0 << 3, "user": 1 << 3, "mail": 2 << 3, "daemon": 3 << 3,
-    "auth": 4 << 3, "syslog": 5 << 3, "lpr": 6 << 3, "news": 7 << 3,
-    "uucp": 8 << 3, "cron": 9 << 3, "security": 10 << 3, "ftp": 11 << 3,
-    "ntp": 12 << 3, "logaudit": 13 << 3, "logalert": 14 << 3, "clock": 15 << 3,
-    "local0": 16 << 3, "local1": 17 << 3, "local2": 18 << 3, "local3": 19 << 3,
-    "local4": 20 << 3, "local5": 21 << 3, "local6": 22 << 3, "local7": 23 << 3
-    }
+LOG_FACILITIES = dict([(k, v << 3) for k,v in {
+    "kern": 0, "user": 1, "mail": 2, "daemon": 3,
+    "auth": 4, "syslog": 5, "lpr": 6, "news": 7,
+    "uucp": 8, "cron": 9, "security": 10, "ftp": 11,
+    "ntp": 12, "logaudit": 13, "logalert": 14, "clock": 15,
+    "local0": 16, "local1": 17, "local2": 18, "local3": 19,
+    "local4": 20, "local5": 21, "local6": 22, "local7": 23
+}.items()])
 
 PYTHON_FAIL = "pythonfail"
 PS_FAIL = "psfail"
