@@ -651,7 +651,6 @@ def get_installed_syslog_configuration(syslog_id):
     source = ''
     Logger.printLog("Reading default configuration directory path from (%s)."
                     % default_config_file_name.get(syslog_id), prio = 'debug')
-    text_file = open(default_config_file_name.get(syslog_id), "r")
 
     if syslog_id == PROD_RSYSLOG:
         include_pattern = r"^\s*[^#]\s*IncludeConfig\s+([\S]+/)"
@@ -673,18 +672,19 @@ def get_installed_syslog_configuration(syslog_id):
     auth_token_compiled_regex = re.compile(auth_token_pattern,
                                            re.MULTILINE | re.IGNORECASE)
 
-    for line in text_file:
-        if len(default_directory) <= 0:
-            include_match_grp = include_compiled_regex.match(line.rstrip('\n'))
-            if include_match_grp:
-                default_directory = include_match_grp.group(1)
-                default_directory = default_directory.lstrip('"').rstrip('"')
+    with open(default_config_file_name.get(syslog_id), "r") as text_file:
+        for line in text_file:
+            if not default_directory:
+                include_match_grp = include_compiled_regex.match(line.rstrip('\n'))
+                if include_match_grp:
+                    default_directory = include_match_grp.group(1)
+                    default_directory = default_directory.lstrip('"').rstrip('"')
 
-        if len(auth_token) <= 0:
-            auth_token_match_grp = auth_token_compiled_regex.match\
-                                   (line.rstrip('\n'))
-            if auth_token_match_grp:
-                auth_token = auth_token_match_grp.group(1)
+            if not auth_token:
+                auth_token_match_grp = auth_token_compiled_regex.match\
+                                       (line.rstrip('\n'))
+                if auth_token_match_grp:
+                    auth_token = auth_token_match_grp.group(1)
 
     if syslog_id == PROD_SYSLOG_NG:
         source = get_syslog_ng_source(default_config_file_name.get(syslog_id))
