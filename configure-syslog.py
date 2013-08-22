@@ -102,7 +102,7 @@ configuration_text = {
 #          -------------------------------------------------------
 %s
 template t_LogglyFormat { template("<${PRI}>1 ${ISODATE} ${HOST} ${PROGRAM} \
-${PID} ${MSGID} [%s@%s tag=\\"Example1\\"] $MSG\\n");};
+${PID} ${MSGID} [%s@%s] $MSG\\n");};
 destination d_loggly {tcp("%s" port(%s) template(t_LogglyFormat));};
 log { source(%s); destination(d_loggly); };
 #          -------------------------------------------------------
@@ -116,7 +116,7 @@ log { source(%s); destination(d_loggly); };
 #$template - Define logging format // $template <template_name> <logging_format>
 #
 $template LogglyFormat,"<%%pri%%>%%protocol-version%% %%timestamp:::date-rfc3339%% \
-%%HOSTNAME%% %%app-name%% %%procid%% %%msgid%% [%s@%s tag=\\"Example1\\"] %%msg%%"
+%%HOSTNAME%% %%app-name%% %%procid%% %%msgid%% [%s@%s] %%msg%%"
 # Send messages to syslog server listening on TCP port using template
 
 *.*             @@%s:%s;LogglyFormat
