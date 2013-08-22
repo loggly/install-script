@@ -854,7 +854,7 @@ def get_auth_token(loggly_user, loggly_password, loggly_subdomain):
             Logger.printLog(('\nThis system is now configured to use '
                              '\"%s\" as its Customer Token.\n' % token),
                             print_comp = True)
-            return { "token" : token, "id": DISTRIBUTION_ID }
+            return token
         else:
             Logger.printLog("Loggly credentials could not be verified.",
                             prio = 'crit', print_comp = True)
@@ -1242,8 +1242,8 @@ def install(current_environment):
     perform_sanity_check_and_get_product_for_configuration(current_environment)
 
     loggly_user, loggly_password, loggly_subdomain = login()
-    authorization_details = get_auth_token(loggly_user,
-                                           loggly_password, loggly_subdomain)
+    token = get_auth_token(loggly_user, loggly_password, loggly_subdomain)
+    authorization_details = {'token': token, 'id': DISTRIBUTION_ID}
     # 4. If possible, determine the location of the syslog.conf file or
     #the syslog.conf.d/ directory.
     # Provide the location as the default and prompt the user for confirmation.
