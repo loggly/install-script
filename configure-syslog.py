@@ -219,6 +219,19 @@ source. The new source will break configurations.
    logger "loggly is better than a bee in your aunt\'s bonnet"
 '''.strip()
 
+CMD_USAGE = '''
+%prog <action> [option]
+Action:
+\tinstall      Configure the syslog
+\tuninstall    Remove changes made by the syslog configuration script
+\tverify       Verify the configuration explicitly
+\tsysinfo      Print, write system information
+\tloggly_help  Guideline for users for each step to configure syslog
+\tdryrun       Perform configuration steps without modifying anything
+Option:
+\t-v|--verbose Print detailed logs on console
+'''.lstrip()
+
 # log priorities...
 LOG_PRIORITIES = {
     "emerg":   0,  "alert":  1,  "crit": 2,   "error": 3,
@@ -1354,18 +1367,8 @@ def parse_options():
     """
     Parse command line argument
     """
-    usage = ("%prog <action> [option]\n"
-    "Action:\n"
-    "\tinstall      Configure the syslog\n"
-    "\tuninstall    Remove changes made by the syslog configuration script\n"
-    "\tverify       Verify the configuration explicitly\n"
-    "\tsysinfo      Print, write system information\n"
-    "\tloggly_help  Guideline for users for each step to configure syslog\n"
-    "\tdryrun       Perform configuration steps without modifying anything\n"
-    "Option:\n"
-    "\t-v|--verbose Print detailed logs on console\n")
 
-    parser = PAOptionParser(usage=usage)
+    parser = PAOptionParser(usage=CMD_USAGE)
     parser.add_posarg("action", dest='action', type="choice",
                       choices=('install', 'uninstall', 'verify',
                                'sysinfo', 'loggly_help', 'dryrun'))
