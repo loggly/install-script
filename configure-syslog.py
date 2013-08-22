@@ -226,6 +226,7 @@ LOG_PRIORITIES = {
     }
 
 # log facilities...
+# (avoiding a dict comprehension for Python 2.6 compat)
 LOG_FACILITIES = dict([(k, v << 3) for k,v in {
     "kern": 0, "user": 1, "mail": 2, "daemon": 3,
     "auth": 4, "syslog": 5, "lpr": 6, "news": 7,
