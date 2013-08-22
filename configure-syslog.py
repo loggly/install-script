@@ -488,7 +488,7 @@ def perform_sanity_check(current_environment):
         index = 0
         running_syslog_count = 0
         for (syslog_name, syslog_version)\
-            in current_environment['supported_syslog_versions'].iteritems():
+            in current_environment['supported_syslog_versions'].items():
             if check_syslog_service_status(
                 list(
                     current_environment['supported_syslog_versions'].keys()
