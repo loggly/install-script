@@ -1241,8 +1241,12 @@ def install(current_environment):
     syslog_name_for_configuration = \
     perform_sanity_check_and_get_product_for_configuration(current_environment)
 
-    loggly_user, loggly_password, loggly_subdomain = login()
-    token = get_auth_token(loggly_user, loggly_password, loggly_subdomain)
+    options = current_environment['options']
+    if options.token:
+        token = options.token
+    else:
+        loggly_user, loggly_password, loggly_subdomain = login()
+        token = get_auth_token(loggly_user, loggly_password, loggly_subdomain)
     authorization_details = {'token': token, 'id': DISTRIBUTION_ID}
     # 4. If possible, determine the location of the syslog.conf file or
     #the syslog.conf.d/ directory.
@@ -1366,6 +1370,7 @@ def parse_options():
                                'sysinfo', 'loggly_help', 'dryrun'))
     parser.add_option("-v", "--verbose", action="store_true",
                       dest="verbose", default=False)
+    parser.add_option("-t", "--token")
     (options, args) = parser.parse_args()
     return options
 
@@ -1383,6 +1388,7 @@ def main():
         sys.exit()
 
     current_environment = get_environment_details()
+    current_environment['options'] = options
     data = json.dumps({
         "operating_system": current_environment['operating_system'],
         "syslog_versions": current_environment['syslog_versions']
