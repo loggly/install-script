@@ -393,17 +393,17 @@ def get_syslog_version(distro_id):
     """
     Logger.printLog("Reading Installed Syslog Versions....", prio = 'debug')
     if distro_id == OS_UBUNTU:
-        command = "dpkg -l \*sys\*log\* | grep ^ii"
-        pattern = 'ii\s+(rsyslog|syslog-ng)\s+(\d+\.\d+)'
+        command = r"dpkg -l \*sys\*log\* | grep ^ii"
+        pattern = r'ii\s+(rsyslog|syslog-ng)\s+(\d+\.\d+)'
     elif distro_id == OS_FEDORA:
         command = "rpm -qa | grep -i 'sys' | grep -i 'log'"
-        pattern = '(rsyslog|syslog-ng)-(\d+\.\d+)'
+        pattern = r'(rsyslog|syslog-ng)-(\d+\.\d+)'
     elif distro_id == OS_RHEL:
         command = "rpm -qa | grep -i 'sys' | grep -i 'log'"
-        pattern = '(rsyslog|syslog-ng)-(\d+\.\d+)'
+        pattern = r'(rsyslog|syslog-ng)-(\d+\.\d+)'
     elif distro_id == OS_CENTOS:
         command = "rpm -qa | grep -i 'sys' | grep -i 'log'"
-        pattern = '(rsyslog|syslog-ng)-(\d+\.\d+)'
+        pattern = r'(rsyslog|syslog-ng)-(\d+\.\d+)'
     else:
         return []
 
@@ -627,14 +627,14 @@ def get_syslog_ng_source(default_config_file_path):
     get source[that contain internal()] from config_file of syslog-ng.
     """
     source = ''
-    command = "sed -n -e '/[^#]internal\(\)/p' %s" % default_config_file_path
+    command = r"sed -n -e '/[^#]internal\(\)/p' %s" % default_config_file_path
     output = os.popen(command).read()
     if output and len(output) > 0:
-        command = ("sed -n -e '/^\s*source\s*.*"
-                   "{/,/internal\(\)/p' %s" % default_config_file_path)
+        command = (r"sed -n -e '/^\s*source\s*.*"
+                   r"{/,/internal\(\)/p' %s" % default_config_file_path)
         output = os.popen(command).read()
         if output and len(output) > 0:
-            compiled_regex = re.compile('source\s+(\S+).*[^#]\s*internal',
+            compiled_regex = re.compile(r'source\s+(\S+).*[^#]\s*internal',
                                         re.MULTILINE | re.IGNORECASE)
             output_list = output.split('}')
             for st in output_list:
@@ -654,15 +654,15 @@ def get_installed_syslog_configuration(syslog_id):
     text_file = open(default_config_file_name.get(syslog_id), "r")
 
     if syslog_id == PROD_RSYSLOG:
-        include_pattern = "^\s*[^#]\s*IncludeConfig\s+([\S]+/)"
-        auth_token_pattern = ("^\s*[^#]*\s*template\sLogglyFormat.*"
-                              "\[([a-z0-9]{8}-[a-z0-9]{4}-[a-z0-9]"
-                              "{4}-[a-z0-9]{4}-[a-z0-9]{12}).*")
+        include_pattern = r"^\s*[^#]\s*IncludeConfig\s+([\S]+/)"
+        auth_token_pattern = (r"^\s*[^#]*\s*template\sLogglyFormat.*"
+                              r"\[([a-z0-9]{8}-[a-z0-9]{4}-[a-z0-9]"
+                              r"{4}-[a-z0-9]{4}-[a-z0-9]{12}).*")
     elif syslog_id == PROD_SYSLOG_NG:
-        include_pattern = "^\s*[^#]\s*Include\s+([\S]+/)"
-        auth_token_pattern = ("^\s*template\s+t_LogglyFormat\s*.*"
-                              "\[([a-z0-9]{8}-[a-z0-9]{4}-[a-z0-9]"
-                              "{4}-[a-z0-9]{4}-[a-z0-9]{12}).*\}")
+        include_pattern = r"^\s*[^#]\s*Include\s+([\S]+/)"
+        auth_token_pattern = (r"^\s*template\s+t_LogglyFormat\s*.*"
+                              r"\[([a-z0-9]{8}-[a-z0-9]{4}-[a-z0-9]"
+                              r"{4}-[a-z0-9]{4}-[a-z0-9]{12}).*\}")
     else:
         return { "path": default_directory,
                  "token": auth_token,
@@ -721,12 +721,12 @@ def write_configuration(syslog_name_for_configuration,
 
 def remove_syslog_ng_source(default_config_file):
 
-    command = ("sed -n -e '/^\s*source\s\s*%s\s*{/,/};/p' %s" %
+    command = (r"sed -n -e '/^\s*source\s\s*%s\s*{/,/};/p' %s" %
                (SYSLOG_NG_SOURCE, default_config_file))
     output = os.popen(command).read()
     if output and len(output) > 0:
         st = output.rstrip().replace('\n', '\\n#')
-        os.popen(("sed -i '/^\s*source\s\s*%s\s*{/,/};/c #%s' %s" %
+        os.popen((r"sed -i '/^\s*source\s\s*%s\s*{/,/};/c #%s' %s" %
                   (SYSLOG_NG_SOURCE, st, default_config_file)))
 
 def remove_configuration(syslog_name_for_configuration):
@@ -748,22 +748,22 @@ def remove_configuration(syslog_name_for_configuration):
     Logger.printLog("Removing configuration settings from file %s for %s" % (
         default_config_file, syslog_name_for_configuration), print_comp = True)
     if syslog_name_for_configuration == 'rsyslog':
-        os.popen(("sed -i 's/^\s*$template\s\s*LogglyFormat/"
+        os.popen((r"sed -i 's/^\s*$template\s\s*LogglyFormat/"
                   "#$template LogglyFormat/g' %s" % default_config_file))
-        pattern = ("s/^\s*\*\.\*.*@@{0}:{1};LogglyFormat/"
-                   "#*.* @@{0}:{1};LogglyFormat/g").format(
+        pattern = (r"s/^\s*\*\.\*.*@@{0}:{1};LogglyFormat/"
+                   r"#*.* @@{0}:{1};LogglyFormat/g").format(
                        LOGGLY_SYSLOG_SERVER, LOGGLY_SYSLOG_PORT)
         os.popen("sed -i '%s' %s" % (pattern, default_config_file))
     elif syslog_name_for_configuration == 'syslog-ng':
-        os.popen(("sed -i 's/^\s*template\s\s*LogglyFormat/"
-                  "#template LogglyFormat/g' %s" % default_config_file))
-        os.popen(("sed -i 's/^\s*destination\s\s*d_loggly/"
-                  "#destination d_loggly/g' %s" % default_config_file))
-        output = os.popen(('grep -P "^\s*log\s*{\s*source\(.*\);'
-                           '\s*destination\(d_loggly\);\s*};" -o %s'
+        os.popen((r"sed -i 's/^\s*template\s\s*LogglyFormat/"
+                  r"#template LogglyFormat/g' %s" % default_config_file))
+        os.popen((r"sed -i 's/^\s*destination\s\s*d_loggly/"
+                  r"#destination d_loggly/g' %s" % default_config_file))
+        output = os.popen((r'grep -P "^\s*log\s*{\s*source\(.*\);'
+                           r'\s*destination\(d_loggly\);\s*};" -o %s'
                            % default_config_file)).read().rstrip()
         if output and len(output) > 0:
-            os.popen(("sed -i 's/^\s*{0}/#{0}/g' {1}".format
+            os.popen((r"sed -i 's/^\s*{0}/#{0}/g' {1}".format
                       (output, default_config_file)))
         remove_syslog_ng_source(default_config_file)
 
@@ -1047,8 +1047,8 @@ def modify_syslog_config_file(syslog_id, syslog_configuration_details,
             user_input = usr_input(question).lower()
             if len(user_input) > 0:
                 if  user_input in yes:
-                    pattern = ("s/[a-z0-9]\{8\}\-[a-z0-9]\{4\}\-[a-z0-9]"
-                               "\{4\}\-[a-z0-9]\{4\}\-[a-z0-9]\{12\}/%s/g"
+                    pattern = (r"s/[a-z0-9]\{8\}\-[a-z0-9]\{4\}\-[a-z0-9]"
+                               r"\{4\}\-[a-z0-9]\{4\}\-[a-z0-9]\{12\}/%s/g"
                                % authorization_details.get("token"))
                     if user_type == ROOT_USER:
                         os.popen("sed -i '%s' %s" % (pattern,
