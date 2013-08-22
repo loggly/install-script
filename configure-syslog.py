@@ -174,7 +174,7 @@ and add following lines at bottom of the configuration file:
  ### Syslog Logging Directives for Loggly (%(subdomain)s.loggly.com) ###
   $template LogglyFormat,"<%%pri%%>%%protocol-version%% \
 %%timestamp:::date-rfc3339%% %%HOSTNAME%% %%app-name%% %%procid%% %%msgid%% \
-[%(token)s@%(dist_id)s tag=\\"Example1\\"] %%msg%%"
+[%(token)s@%(dist_id)s] %%msg%%"
  *.*             @@%(syslog_server)s:%(syslog_port)s;LogglyFormat
  ### END Syslog Logging Directives for Loggly (%(subdomain)s.loggly.com) ###
 
@@ -204,7 +204,7 @@ present then add the following lines at the bottom of the file
  -Append following settings at the end of configuration file. Here \
 source_name should be name of source with internal().
  template LogglyFormat { template("<${PRI}>1 ${ISODATE} ${HOST} ${PROGRAM} \
-${PID} ${MSGID} [%(token)s@%(dist_id)s tag=\\"Example1\\"] $MSG\\n");};
+${PID} ${MSGID} [%(token)s@%(dist_id)s] $MSG\\n");};
  destination d_loggly {tcp("%(syslog_server)s" port(%(syslog_port)s) template(LogglyFormat));};
  log { source(source_name); destination(d_loggly); };
  ### END Syslog Logging Directives for Loggly (%(subdomain)s.loggly.com) ###
