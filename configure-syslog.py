@@ -1292,7 +1292,7 @@ def dryrun(current_environment):
     Logger.printLog("Dryrun started", prio = 'debug')
     user_type = get_user_type()
     if user_type == NON_ROOT_USER:
-        Logger.printLog("Current user in not root user", prio = 'warning',
+        Logger.printLog("Current user is not root user", prio = 'warning',
                         print_comp = True)
         sys.exit()
     syslog_name_for_configuration = install(current_environment)
