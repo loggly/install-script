@@ -793,36 +793,8 @@ def get_auth_token(loggly_user, loggly_password, loggly_subdomain):
             auth_tokens = get_auth(loggly_user,
                                    loggly_password,
                                    loggly_subdomain)
-
-            user_choice = 0
-            num_tokens = len(auth_tokens)
-            if num_tokens > 1:
-                Logger.printLog(("Multiple Customer Tokens"
-                                 " received from server."),
-                                  print_comp = True)
-                for i, token in enumerate(auth_tokens):
-                    Logger.printLog("\t%d. %s"%(i + 1, token),
-                                    print_comp = True)
-                for _ in range(5):
-                    try:
-                        str_msg = ("Please select (1-" + str(num_tokens) + ")"
-                                   "to specify which Customer Token "
-                                   "you want to use. (Default is 1): ")
-                        user_choice = int(usr_input(str_msg)) - 1
-                        if user_choice < 0 or user_choice >= num_tokens:
-                            Logger.printLog("Invalid choice entered.",
-                                            prio = 'error', print_comp = True)
-                            continue
-                        break
-                    except ValueError:
-                        Logger.printLog("Not a valid selection. Please retry.",
-                                         prio = 'warning', print_comp = True)
-                if user_choice < 0 or user_choice >= num_tokens:
-                    Logger.printLog(("Invalid choice entered. "
-                                    "Continue with default value."),
-                                    prio = 'warning', print_comp = True)
-                    user_choice = 0
-            token = auth_tokens[user_choice]
+            # use the last token returned
+            token = auth_tokens[-1]
             Logger.printLog(('\nThis system is now configured to use '
                              '\"%s\" as its Customer Token.\n' % token),
                             print_comp = True)
