@@ -38,7 +38,7 @@ PROD_SYSLOG_NG = 1
 PROD_RSYSLOG = 2
 PROD_UNSUPPORTED = -1
 
-LOGGLY_SYSLOG_SERVER = "collector01.chipper01.loggly.net"
+LOGGLY_SYSLOG_SERVER = "logs-01.loggly.com"
 LOGGLY_SYSLOG_PORT = 514
 DISTRIBUTION_ID = "41058"
 LOGGLY_CONFIG_FILE = "22-loggly.conf"
@@ -64,12 +64,10 @@ STR_ERROR_MESSAGE = ("Can not automatically re-configure syslog for "
                      "to manually re-configure syslog for Loggly.")
 STR_SYSLOG_DAEMON_MESSAGE = ("\nSyslog daemon (%s) is not running. "
                              "Please start %s daemon and try again.\n")
-REST_URL_GET_AUTH_TOKEN = ("http://%s.frontend.chipper01.loggly.net"
-                           "/apiv2/customer")
-REST_URL_GET_SEARCH_ID = ("http://%s.frontend.chipper01.loggly.net"
+REST_URL_GET_AUTH_TOKEN = ("http://%s.loggly.com/apiv2/customer")
+REST_URL_GET_SEARCH_ID = ("http://%s.loggly.com"
                           "/apiv2/search?q=%s&from=-2h&until=now&size=10")
-REST_URL_GET_SEARCH_RESULT = ("http://%s.frontend.chipper01.loggly.net"
-                              "/apiv2/events?rsid=%s")
+REST_URL_GET_SEARCH_RESULT = ("http://%s.loggly.com/apiv2/events?rsid=%s")
 USER_NAME_TEXT = ("Enter your username that you use to log into your account.")
 ACCOUNT_NAME_TEXT = ("Enter your Loggly account name. This is your subdomain. "
                      "For example if you login at mycompany.loggly.com, "
@@ -82,14 +80,9 @@ AUTHTOKEN_MODIFICATION_TEXT = ("\nIf you wish to use a different auth-token, "
 _LOG_SOCKET = None
 OUR_PROGNAME      = "configure-syslog"
 LOGGLY_AUTH_TOKEN = "f5b38b8c-ed99-11e2-8ee8-3c07541ea376"
-LOGGLY_LOG_HOST = "logs-01.loggly.com"
-LOGGLY_UDP_PORT = 514
-
 
 RSYSLOG_PROCESS = "rsyslogd"
 SYSLOG_NG_PROCESS = "syslog-ng"
-
-
 
 min_supported_syslog_versions = {
     PROD_SYSLOG_NG: "1.6",
@@ -1220,7 +1213,7 @@ def log(msg, prio = 'info', facility = 'local0'):
         _LOG_SOCKET = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
 
     _LOG_SOCKET.sendto(fullmsg.encode('utf-8'),
-                       (LOGGLY_LOG_HOST, LOGGLY_UDP_PORT))
+                       (LOGGLY_SYSLOG_SERVER, LOGGLY_SYSLOG_PORT))
 
 def perform_sanity_check_and_get_product_for_configuration(current_environment,
                                                 check_syslog_service = True):
