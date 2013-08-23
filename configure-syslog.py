@@ -638,8 +638,9 @@ def get_syslog_ng_source(default_config_file_path):
                                         re.MULTILINE | re.IGNORECASE)
             output_list = output.split('}')
             for st in output_list:
-                if len(compiled_regex.findall(st.replace('\n',''))) > 0:
-                    return compiled_regex.findall(st.replace('\n',''))[0]
+                result = compiled_regex.findall(st.replace('\n',''))
+                if result:
+                    return result[0]
     return source
 
 def get_installed_syslog_configuration(syslog_id):
