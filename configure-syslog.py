@@ -315,12 +315,12 @@ def printEnvironment(current_environment):
                         print_comp = True)
 
 def sendEnvironment(data):
-    Logger.printLog("Sending Environment Details to Loggly Server.")
+    Logger.printLog("Sending environment details to Loggly Server.")
     log(data)
 
 def sys_exit(reason = None):
     """
-    If script fail, send environment details with reason of fail to loggly
+    If script fails, send environment details with reason for failure to loggly
     """
     current_environment = get_environment_details()
     data = json.dumps({
@@ -389,9 +389,9 @@ def get_syslog_process_name(product_name):
 
 def get_syslog_version(distro_id):
     """
-    Derive which syslog version is installed
+    Determine which syslog version is installed
     """
-    Logger.printLog("Reading Installed Syslog Versions....", prio = 'debug')
+    Logger.printLog("Reading installed Syslog versions....", prio = 'debug')
     if distro_id == OS_UBUNTU:
         command = r"dpkg -l \*sys\*log\* | grep ^ii"
         pattern = r'ii\s+(rsyslog|syslog-ng)\s+(\d+\.\d+)'
@@ -438,7 +438,7 @@ def get_environment_details():
     """
     Get Distro Name, Distro ID, Version and ID.
     """
-    Logger.printLog("Reading Environment Details....", prio = 'debug')
+    Logger.printLog("Reading environment details....", prio = 'debug')
     distribution = platform.linux_distribution()
     distro_name, version, version_id = distribution
     distro_id = get_os_id(distro_name)
@@ -454,9 +454,9 @@ def get_environment_details():
 
 def perform_sanity_check(current_environment):
     """
-    Performing quick check for OS and Syslog
+    Performing quick check of OS and Syslog
     """
-    Logger.printLog("Performing Sanity Check....", prio = 'debug')
+    Logger.printLog("Performing sanity check....", prio = 'debug')
     if (current_environment['distro_id'] == OS_UNSUPPORTED\
         or OS_FAIL in LOGGLY_QA):
         printLog(STR_EXIT_MESSAGE % current_environment['operating_system'])
@@ -1041,7 +1041,7 @@ def modify_syslog_config_file(syslog_id, syslog_configuration_details,
                     printMessage("Finished")
                     sys.exit(0)
     else:
-        question = ("\nLoggly is already configured with %s Customer Token. "
+        question = ("\nThis configuration currently uses \"%s\" as its Customer Token. "
                     "Do you want to overwrite it? [Yes|No]: "
                     % syslog_configuration_details.get("token"))
         for _ in range(5):
@@ -1267,7 +1267,7 @@ def install(current_environment):
                     (authorization_details['token'],
                      modified_config_file), print_comp = True, prio = 'debug')
     Logger.printLog("Installation completed", prio = 'debug')
-    print("You may verify installation by rerunning with action 'verify'")
+    print("You may verify installation by re-running with action 'verify'")
     return syslog_name_for_configuration
 
 def verify(current_environment):
