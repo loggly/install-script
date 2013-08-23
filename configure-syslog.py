@@ -855,7 +855,7 @@ def get_auth_token(loggly_user, loggly_password, loggly_subdomain):
             Logger.printLog(('\nThis system is now configured to use '
                              '\"%s\" as its Customer Token.\n' % token),
                             print_comp = True)
-            return { "token" : token, "id": DISTRIBUTION_ID }
+            return token
         else:
             Logger.printLog("Loggly credentials could not be verified.",
                             prio = 'crit', print_comp = True)
@@ -1242,9 +1242,13 @@ def install(current_environment):
     syslog_name_for_configuration = \
     perform_sanity_check_and_get_product_for_configuration(current_environment)
 
-    loggly_user, loggly_password, loggly_subdomain = login()
-    authorization_details = get_auth_token(loggly_user,
-                                           loggly_password, loggly_subdomain)
+    options = current_environment['options']
+    if options.token:
+        token = options.token
+    else:
+        loggly_user, loggly_password, loggly_subdomain = login()
+        token = get_auth_token(loggly_user, loggly_password, loggly_subdomain)
+    authorization_details = {'token': token, 'id': DISTRIBUTION_ID}
     # 4. If possible, determine the location of the syslog.conf file or
     #the syslog.conf.d/ directory.
     # Provide the location as the default and prompt the user for confirmation.
@@ -1257,14 +1261,13 @@ def install(current_environment):
 
     # 6. SIGHUP the syslog daemon.
     if user_type == ROOT_USER:
-        sighup_status = send_sighup_to_syslog(syslog_name_for_configuration)
-        if sighup_status:
-            doverify(loggly_user, loggly_password, loggly_subdomain)
+        send_sighup_to_syslog(syslog_name_for_configuration)
 
     Logger.printLog(AUTHTOKEN_MODIFICATION_TEXT %
                     (authorization_details['token'],
                      modified_config_file), print_comp = True, prio = 'debug')
     Logger.printLog("Installation completed", prio = 'debug')
+    print("You may verify installation by rerunning with action 'verify'")
     return syslog_name_for_configuration
 
 def verify(current_environment):
@@ -1368,6 +1371,7 @@ def parse_options():
                                'sysinfo', 'loggly_help', 'dryrun'))
     parser.add_option("-v", "--verbose", action="store_true",
                       dest="verbose", default=False)
+    parser.add_option("-t", "--token")
     (options, args) = parser.parse_args()
     return options
 
@@ -1385,6 +1389,7 @@ def main():
         sys.exit()
 
     current_environment = get_environment_details()
+    current_environment['options'] = options
     data = json.dumps({
         "operating_system": current_environment['operating_system'],
         "syslog_versions": current_environment['syslog_versions']
