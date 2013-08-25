@@ -1,3 +1,19 @@
+#!/usr/bin/env python
+
+######################################################################
+# Loggly Syslog configuration script.
+#
+# This script automatically configures a syslog-ng or rsyslog
+# installation such that it sends all logs from this system to Loggly.
+#
+# For this to work you must have an account on the Loggly system. Sign
+# up for one at http://www.loggly.com.
+#
+# For best results the script should be run with superuser privileges.
+#
+# (c) Copyright Loggly 2013.
+######################################################################
+
 import os
 import platform
 import re
