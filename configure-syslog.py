@@ -172,7 +172,7 @@ LOGGLY_HELP = '''
 Instructions to manually re-configure syslog for Loggly
 =======================================================
 
-1.Modification in configuration file
+1. Configure the version of syslog you're running.  More details are available http://www.loggly.com/docs/sending-logs-unixlinux-system-setup/
  rsyslog
  -------
 
@@ -189,7 +189,7 @@ and add following lines at bottom of the configuration file:
  syslog-ng
  ---------
 
-1. Edit your syslog-ng.conf file, usually found in /etc/syslog-ng/syslog-ng.conf:
+ -Edit your syslog-ng.conf file, usually found in /etc/syslog-ng/syslog-ng.conf:
 
  - Instructions for syslog-ng version above 3.2
  -- Look for source with internal() directive. If no source found with \
@@ -198,6 +198,7 @@ internal() directive then add following lines at bottom of the file:
 \tsource %(syslog_source)s {
 \t\tsystem();
 \t\tinternal();
+\t\tfile("/path/to/your/file" follow_freq(1) flags(no-parse));
 \t};
 
  -If version of syslog-ng is 3.2 or below and source with internal() is not \
@@ -209,15 +210,15 @@ present then add the following lines at the bottom of the file
 \t\tfile("/path/to/your/file" follow_freq(1) flags(no-parse));
 \t};
 
- -Append following settings at the end of configuration file. Here \
-source_name should be name of source with internal().
+ -All versions: Append the following lines at the end of configuration file. The \
+source_name must match the name of the source with internal() e.g.  %(syslog_source)s.
  template LogglyFormat { template("<${PRI}>1 ${ISODATE} ${HOST} ${PROGRAM} \
 ${PID} ${MSGID} [%(token)s@%(dist_id)s] $MSG\\n");};
  destination d_loggly {tcp("%(syslog_server)s" port(%(syslog_port)s) template(LogglyFormat));};
- log { source(source_name); destination(d_loggly); };
+ log { source( %(syslog_source)s); destination(d_loggly); };
  ### END Syslog Logging Directives for Loggly (%(subdomain)s.loggly.com) ###
 
- -WARNING: if source with internal() is already present then do not add new \
+ -WARNING: if a source with internal() is already present then do not add the new \
 source. The new source will break configurations.
 
 2. Once you are done configuring syslog-ng or rsyslog, restart it
