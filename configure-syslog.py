@@ -70,12 +70,11 @@ REST_URL_GET_SEARCH_ID = ("http://%s.loggly.com"
 REST_URL_GET_SEARCH_RESULT = ("http://%s.loggly.com/apiv2/events?rsid=%s")
 USER_NAME_TEXT = ("Enter your username that you use to log into your account.")
 ACCOUNT_NAME_TEXT = ("Enter your Loggly account name. This is your subdomain. "
-                     "For example if you login at mycompany.loggly.com, "
-                     "your account name is mycompany.")
-AUTHTOKEN_MODIFICATION_TEXT = ("\nIf you wish to use a different auth-token, "
-                               "you need to replace %s with auth-token"
-                               "(that you want to use) in "
-                               "template LogglyFormat in %s.\n")
+                     "For example if you login at mycompany.loggly.com,"
+                     "\nyour account name is mycompany.\n")
+AUTHTOKEN_MODIFICATION_TEXT = ("\nIf you wish to use a different Auth token, "
+                               "replace %s\nwith the token you wish to use, in"
+                               " the file %s.")
 
 _LOG_SOCKET = None
 OUR_PROGNAME      = "configure-syslog"
