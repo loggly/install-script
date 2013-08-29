@@ -68,11 +68,11 @@ STR_MULTIPLE_SYSLOG_MESSAGE = ("Multiple syslogd are running.")
 STR_AUTHTOKEN_NOTFOUND_MESSAGE = ("No Customer Tokens were found.")
 STR_AUTHENTICATION_FAIL_MESSAGE = ("Authentication fail for user %s")
 VERIFICATION_FAIL_MESSAGE = ("Loggly verification failed. "
-                             "Please contact support@loggly.com"
+                             "Please visit http://loggly.com/docs/sending-logs-unixlinux-system-setup/"
                              " for more information.")
 STR_EXIT_MESSAGE = ("\nThis environment (OS : %s) is not supported by "
-                    "the Loggly Syslog Configuration Script. Please contact "
-                    "support@loggly.com for more information.\n")
+                    "the Loggly Syslog Configuration Script. Please visit "
+                    "http://loggly.com/docs/sending-logs-unixlinux-system-setup/ for more information.\n")
 STR_NO_SYSLOG_MESSAGE = "\nSupported syslog type/version not found."
 STR_ERROR_MESSAGE = ("Can not automatically re-configure syslog for "
                      "this Linux distribution. "
@@ -84,11 +84,11 @@ REST_URL_GET_AUTH_TOKEN = ("http://%s.loggly.com/apiv2/customer")
 REST_URL_GET_SEARCH_ID = ("http://%s.loggly.com"
                           "/apiv2/search?q=%s&from=-2h&until=now&size=10")
 REST_URL_GET_SEARCH_RESULT = ("http://%s.loggly.com/apiv2/events?rsid=%s")
-USER_NAME_TEXT = ("Enter your username that you use to log into your account.")
+USER_NAME_TEXT = ("Enter the username that you use to log into your Loggly account.")
 ACCOUNT_NAME_TEXT = ("Enter your Loggly account name. This is your subdomain. "
                      "For example if you login at mycompany.loggly.com,"
                      "\nyour account name is mycompany.\n")
-AUTHTOKEN_MODIFICATION_TEXT = ("\nIf you wish to use a different Auth token, "
+AUTHTOKEN_MODIFICATION_TEXT = ("\nIf you wish to use a different Customer Token, "
                                "replace %s\nwith the token you wish to use, in"
                                " the file %s.")
 
@@ -813,7 +813,7 @@ def login():
 
 def get_json_data(url, user, password):
     """
-    Retrieve Auth Token and Distribution ID from Loggly account
+    Retrieve Customer Token and Distribution ID from Loggly account
     """
     try:
         if AUTHENTICATION_FAIL in LOGGLY_QA:
@@ -1171,7 +1171,7 @@ def write_env_details(current_environment):
 
         env_file.close()
         Logger.printLog(("Created environment details file at %s, "
-                        "please forward it to support@loggly.com" % file_path),
+                        "please visit http://loggly.com/docs/sending-logs-unixlinux-system-setup/ for more information." % file_path),
                         print_comp = True)
         printEnvironment(current_environment)
     except Exception as e:
