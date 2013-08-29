@@ -212,10 +212,11 @@ present then add the following lines at the bottom of the file
 
  -All versions: Append the following lines at the end of configuration file. The \
 source_name must match the name of the source with internal() e.g.  %(syslog_source)s.
+ 
  template LogglyFormat { template("<${PRI}>1 ${ISODATE} ${HOST} ${PROGRAM} \
 ${PID} ${MSGID} [%(token)s@%(dist_id)s] $MSG\\n");};
  destination d_loggly {tcp("%(syslog_server)s" port(%(syslog_port)s) template(LogglyFormat));};
- log { source( %(syslog_source)s); destination(d_loggly); };
+ log { source(%(syslog_source)s); destination(d_loggly); };
  ### END Syslog Logging Directives for Loggly (%(subdomain)s.loggly.com) ###
 
  -WARNING: if a source with internal() is already present then do not add the new \
