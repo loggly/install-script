@@ -1207,16 +1207,64 @@ def uninstall(current_environment):
     send_sighup_to_syslog(syslog_name_for_configuration)
     LOGGER.debug("Uninstall completed")
 
-def dryrun(current_environment):
-    LOGGER.debug("Dryrun started")
+def rsyslog_dryrun():
+    results = get_stderr_from_process('rsyslogd -N1')
+    errors = []
+    for line in results:
+        if 'UDP' in line:
+            if 'enabled' in line:
+                print 'UDP Reception: Enabled'
+            else:
+                print 'UDP Reception: Disabled'
+        if 'error' in line.lower():
+            errors.append(line)
+
+    return errors
+
+def get_stderr_from_process(command):
+    process = subprocess.Popen(command, shell=True,
+        stdout=subprocess.PIPE,
+        stdin=open(os.devnull),
+        stderr=subprocess.PIPE)
+    results = process.stderr.readlines()
+    process.stderr.close()
+    return results
+
+def syslog_ng_dryrun():
+    results = get_stderr_from_process('syslog-ng -s')
+    errors = []
+    for line in results:
+        if 'error' in line.lower():
+            errors.append(line)
+    return errors
+
+def ensure_root():
     user_type = get_user_type()
     if user_type == NON_ROOT_USER:
         LOGGER.warning("Current user is not root user")
         sys.exit()
-    syslog_name_for_configuration = install(current_environment)
-    remove_configuration(syslog_name_for_configuration)
-    send_sighup_to_syslog(syslog_name_for_configuration)
-    LOGGER.debug("Dryrun completed")
+
+def dryrun(current_environment):
+    ensure_root()
+    syslogd = perform_sanity_check_and_get_product_for_configuration(current_environment)
+    LOGGER.debug("Dryrun started for syslog version %s" % syslogd)
+
+    config_file = write_configuration(syslogd, {'token': 'foofey', 'id': DISTRIBUTION_ID }, 1)
+    errors = []
+
+    if syslogd == 'rsyslog':
+        errors = rsyslog_dryrun()
+    elif syslogd == 'syslog-ng':
+        errors = syslog_ng_dryrun()
+    
+    remove_configuration(syslogd)
+    
+    if len(errors) > 0:
+        LOGGER.error('\n!Dry Run FAIL: errors in config script!\n')
+        for error in errors:
+            LOGGER.error('  %s' % error)
+    else:
+        LOGGER.info("Dryrun completed successfully!!!")
 
 module_dict = {
     'sysinfo' : write_env_details,
