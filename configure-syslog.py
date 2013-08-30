@@ -286,8 +286,8 @@ def printEnvironment(current_environment):
 
     LOGGER.info("Syslog versions:")
     if current_environment['syslog_versions']:
-        for i, version in enumerate(current_environment['syslog_versions']):
-            line = "\t%d.   %s(%s)" % (i + 1, version[0], version[1])
+        for i, version in enumerate(current_environment['syslog_versions'], 1):
+            line = "\t%d.   %s(%s)" % (i, version[0], version[1])
             LOGGER.info(line)
     else:
         LOGGER.critical("\tNo Syslog Version Found......")
@@ -1107,9 +1107,9 @@ def write_env_details(current_environment):
                        (current_environment['operating_system']))
         env_file.write("\nSyslog versions:\n")
         if len(current_environment['syslog_versions']) > 0:
-            for i, version in enumerate(current_environment['syslog_versions']):
+            for i, version in enumerate(current_environment['syslog_versions'], 1):
                 env_file.write("\t%d.   %s(%s)" %
-                            (i + 1, version[0], version[1]))
+                            (i, version[0], version[1]))
 
         else:
             env_file.write("\tNo Syslog version Found......")
