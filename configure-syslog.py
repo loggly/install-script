@@ -86,10 +86,10 @@ STR_ERROR_MESSAGE = ("Can not automatically re-configure syslog for "
                      "to manually re-configure syslog for Loggly.")
 STR_SYSLOG_DAEMON_MESSAGE = ("\nSyslog daemon (%s) is not running. "
                              "Please start %s daemon and try again.\n")
-REST_URL_GET_AUTH_TOKEN = ("http://%s.loggly.com/apiv2/customer")
-REST_URL_GET_SEARCH_ID = ("http://%s.loggly.com"
+REST_URL_GET_AUTH_TOKEN = ("http://%s.frontend.chipper01.loggly.net/apiv2/customer")
+REST_URL_GET_SEARCH_ID = ("http://%s.frontend.chipper01.loggly.net"
                           "/apiv2/search?q=%s&from=-2h&until=now&size=10")
-REST_URL_GET_SEARCH_RESULT = ("http://%s.loggly.com/apiv2/events?rsid=%s")
+REST_URL_GET_SEARCH_RESULT = ("http://%s.frontend.chipper01.loggly.net/apiv2/events?rsid=%s")
 USER_NAME_TEXT = ("Enter the username that you use to log into your Loggly account.")
 ACCOUNT_NAME_TEXT = ("Enter your Loggly account name. This is your subdomain. "
                      "For example if you login at mycompany.loggly.com,"
@@ -1207,16 +1207,59 @@ def uninstall(current_environment):
     send_sighup_to_syslog(syslog_name_for_configuration)
     LOGGER.debug("Uninstall completed")
 
+def rsyslog_dryrun():
+    errors = []
+    process = subprocess.Popen('rsyslogd -N1', shell=True,
+        stdout=subprocess.PIPE,
+        stdin=open(os.devnull),
+        stderr=subprocess.PIPE)
+    results = process.stderr.readlines()
+    process.stderr.close()
+
+    for line in results:
+        if 'UDP' in line:
+            if 'enabled' in line:
+                print 'UDP Reception: Enabled'
+            else:
+                print 'UDP Reception: Disabled'
+        if 'error' in line.lower():
+            errors.append(line)
+
+    return errors
+
+def syslogng_dryrun():
+    for line in results:
+        pass
+
 def dryrun(current_environment):
-    LOGGER.debug("Dryrun started")
-    user_type = get_user_type()
-    if user_type == NON_ROOT_USER:
-        LOGGER.warning("Current user is not root user")
-        sys.exit()
-    syslog_name_for_configuration = install(current_environment)
-    remove_configuration(syslog_name_for_configuration)
-    send_sighup_to_syslog(syslog_name_for_configuration)
-    LOGGER.debug("Dryrun completed")
+    syslogd = perform_sanity_check_and_get_product_for_configuration(current_environment)
+    LOGGER.debug("Dryrun started for syslog version %s" % syslogd)
+
+    config_file = write_configuration(syslogd, {'token': 'foofey', 'id': DISTRIBUTION_ID }, 1)
+    errors = []
+
+    if syslogd == 'rsyslog':
+        errors = rsyslog_dryrun()
+    elif syslogd == 'syslog-ng':
+        errors = syslogng_dryrun()
+    
+    remove_configuration(syslogd)
+    
+    if len(errors) > 0:
+        LOGGER.error('\n!Dry Run FAIL: errors in config script!\n')
+        for error in errors:
+            LOGGER.error('  %s' % error)
+    else:
+        LOGGER.info("Dryrun completed successfully!!!")
+    
+#    user_type = get_user_type()
+#    if user_type == NON_ROOT_USER:
+#        LOGGER.warning("Current user is not root user")
+#        sys.exit()
+#    syslog_name_for_configuration = install(current_environment)
+#    remove_configuration(syslog_name_for_configuration)
+#    send_sighup_to_syslog(syslog_name_for_configuration)
+#    LOGGER.debug("Dryrun completed")
 
 module_dict = {
     'sysinfo' : write_env_details,
