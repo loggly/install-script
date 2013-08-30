@@ -86,10 +86,10 @@ STR_ERROR_MESSAGE = ("Can not automatically re-configure syslog for "
                      "to manually re-configure syslog for Loggly.")
 STR_SYSLOG_DAEMON_MESSAGE = ("\nSyslog daemon (%s) is not running. "
                              "Please start %s daemon and try again.\n")
-REST_URL_GET_AUTH_TOKEN = ("http://%s.frontend.chipper01.loggly.net/apiv2/customer")
-REST_URL_GET_SEARCH_ID = ("http://%s.frontend.chipper01.loggly.net"
+REST_URL_GET_AUTH_TOKEN = ("http://%s.loggly.com/apiv2/customer")
+REST_URL_GET_SEARCH_ID = ("http://%s.loggly.com"
                           "/apiv2/search?q=%s&from=-2h&until=now&size=10")
-REST_URL_GET_SEARCH_RESULT = ("http://%s.frontend.chipper01.loggly.net/apiv2/events?rsid=%s")
+REST_URL_GET_SEARCH_RESULT = ("http://%s.loggly.com/apiv2/events?rsid=%s")
 USER_NAME_TEXT = ("Enter the username that you use to log into your Loggly account.")
 ACCOUNT_NAME_TEXT = ("Enter your Loggly account name. This is your subdomain. "
                      "For example if you login at mycompany.loggly.com,"
