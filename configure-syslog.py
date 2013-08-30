@@ -1222,7 +1222,7 @@ def rsyslog_dryrun():
     return errors
 
 def get_stderr_from_process(command):
-    process = subprocess.Popen('rsyslogd -N1', shell=True,
+    process = subprocess.Popen(command, shell=True,
         stdout=subprocess.PIPE,
         stdin=open(os.devnull),
         stderr=subprocess.PIPE)
