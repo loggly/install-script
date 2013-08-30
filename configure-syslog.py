@@ -1208,14 +1208,8 @@ def uninstall(current_environment):
     LOGGER.debug("Uninstall completed")
 
 def rsyslog_dryrun():
+    results = get_stderr_from_process('rsyslogd -N1')
     errors = []
-    process = subprocess.Popen('rsyslogd -N1', shell=True,
-        stdout=subprocess.PIPE,
-        stdin=open(os.devnull),
-        stderr=subprocess.PIPE)
-    results = process.stderr.readlines()
-    process.stderr.close()
-
     for line in results:
         if 'UDP' in line:
             if 'enabled' in line:
@@ -1227,11 +1221,31 @@ def rsyslog_dryrun():
 
     return errors
 
-def syslogng_dryrun():
+def get_stderr_from_process(command):
+    process = subprocess.Popen('rsyslogd -N1', shell=True,
+        stdout=subprocess.PIPE,
+        stdin=open(os.devnull),
+        stderr=subprocess.PIPE)
+    results = process.stderr.readlines()
+    process.stderr.close()
+    return results
+
+def syslog_ng_dryrun():
+    results = get_stderr_from_process('syslog-ng -s')
+    errors = []
     for line in results:
-        pass
+        if 'error' in line.lower():
+            errors.append(line)
+    return errors
+
+def ensure_root():
+    user_type = get_user_type()
+    if user_type == NON_ROOT_USER:
+        LOGGER.warning("Current user is not root user")
+        sys.exit()
 
 def dryrun(current_environment):
+    ensure_root()
     syslogd = perform_sanity_check_and_get_product_for_configuration(current_environment)
     LOGGER.debug("Dryrun started for syslog version %s" % syslogd)
 
@@ -1241,7 +1255,7 @@ def dryrun(current_environment):
     if syslogd == 'rsyslog':
         errors = rsyslog_dryrun()
     elif syslogd == 'syslog-ng':
-        errors = syslogng_dryrun()
+        errors = syslog_ng_dryrun()
     
     remove_configuration(syslogd)
     
@@ -1251,15 +1265,6 @@ def dryrun(current_environment):
             LOGGER.error('  %s' % error)
     else:
         LOGGER.info("Dryrun completed successfully!!!")
-    
-#    user_type = get_user_type()
-#    if user_type == NON_ROOT_USER:
-#        LOGGER.warning("Current user is not root user")
-#        sys.exit()
-#    syslog_name_for_configuration = install(current_environment)
-#    remove_configuration(syslog_name_for_configuration)
-#    send_sighup_to_syslog(syslog_name_for_configuration)
-#    LOGGER.debug("Dryrun completed")
 
 module_dict = {
     'sysinfo' : write_env_details,
