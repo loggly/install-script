@@ -94,7 +94,7 @@ AUTHTOKEN_MODIFICATION_TEXT = ("\nIf you wish to use a different Customer Token,
 
 _LOG_SOCKET = None
 OUR_PROGNAME      = "configure-syslog"
-LOGGLY_AUTH_TOKEN = "f5b38b8c-ed99-11e2-8ee8-3c07541ea376"
+LOGGLY_AUTH_TOKEN = "MWVjNGU4ZTEtZmJiMi00N2U3LTkyOWItNzVhMWJmZjVmZmUw"
 
 RSYSLOG_PROCESS = "rsyslogd"
 SYSLOG_NG_PROCESS = "syslog-ng"
@@ -1217,7 +1217,7 @@ def log(msg, prio = 'info', facility = 'local0'):
       'app-name':           OUR_PROGNAME,
       'procid':             os.getpid(),
       'msgid':              '-',
-      'loggly-auth-token':  LOGGLY_AUTH_TOKEN,
+      'loggly-auth-token':  base64.decodestring(LOGGLY_AUTH_TOKEN),
       'loggly-pen':         int(DISTRIBUTION_ID),
       'msg':                msg,
     }
@@ -1228,7 +1228,6 @@ def log(msg, prio = 'info', facility = 'local0'):
 
     if not _LOG_SOCKET:  # first time only...
         _LOG_SOCKET = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
-
     _LOG_SOCKET.sendto(fullmsg.encode('utf-8'),
                        (LOGGLY_SYSLOG_SERVER, LOGGLY_SYSLOG_PORT))
 
