@@ -14,7 +14,7 @@
 # (c) Copyright Loggly 2013.
 ######################################################################
 
-import os
+import os, os.path
 import platform
 import re
 import sys
@@ -366,30 +366,43 @@ def get_syslog_process_name(product_name):
         'rsyslog': RSYSLOG_PROCESS,
         }.get(product_name.lower(), PROD_UNSUPPORTED)
 
-def get_syslog_version(distro_id):
+def get_syslog_version(verify_config_paths=False):
     """
-    Determine which syslog version is installed
+    Guess the syslog daemon and version number,
+    returns a singleton list containing a tuple: [(daemon, version_string)]
+
+    if verify_config_paths is set, this will also verify the configuration file
+    and/or paths are present on this system
     """
-    LOGGER.debug("Reading installed Syslog versions....")
-    if distro_id == OS_UBUNTU:
-        command = r"dpkg -l \*sys\*log\* | grep ^ii"
-        pattern = r'ii\s+(rsyslog|syslog-ng)\s+(\d+\.\d+)'
-    elif distro_id == OS_FEDORA:
-        command = "rpm -qa | grep -i 'sys' | grep -i 'log'"
-        pattern = r'(rsyslog|syslog-ng)-(\d+\.\d+)'
-    elif distro_id == OS_RHEL:
-        command = "rpm -qa | grep -i 'sys' | grep -i 'log'"
-        pattern = r'(rsyslog|syslog-ng)-(\d+\.\d+)'
-    elif distro_id == OS_CENTOS:
-        command = "rpm -qa | grep -i 'sys' | grep -i 'log'"
-        pattern = r'(rsyslog|syslog-ng)-(\d+\.\d+)'
-    else:
-        return []
 
-    output = os.popen(command).read()
-    compiled_regex = re.compile(pattern, re.MULTILINE | re.IGNORECASE)
+    SYSLOG_PATHS = [
+        # (syslog type, command, conf path, conf.d path)
+        ("rsyslog", "rsyslogd -v", "/etc/rsyslog.conf", "/etc/rsyslog.d/"),
+        ("syslog-ng", "syslog-ng --version", "/etc/syslog-ng/syslog-ng.conf", "/etc/syslog-ng/")
+    ]
 
-    return compiled_regex.findall(output)
+    for s in SYSLOG_PATHS:
+
+        p = subprocess.Popen(s[1], shell=True, stderr=subprocess.PIPE, stdout=subprocess.PIPE)
+        p.wait()
+        if p.returncode != 0:
+            continue
+
+        version_line = p.stdout.readlines()[0]
+
+        if verify_config_paths:
+            if not os.path.isfile(s[2]) or not os.path.isdir(s[3]):
+                continue
+
+        # extract the version number from the daemon's version report,
+        # only cares about the major and minor version numbers and ignores
+        # the point number.
+        version_pattern = r'%s (\d+\.+\d)' % s[0]
+        version_string = re.search(version_pattern, version_line).group(1)
+
+        return [(s[0], version_string)]
+
+    return []
 
 def get_user_type():
     """
@@ -426,7 +439,7 @@ def get_environment_details():
         'distro_id': distro_id,
         'version': version,
         'id': version_id,
-        'syslog_versions': get_syslog_version(distro_id),
+        'syslog_versions': get_syslog_version(),
         'supported_syslog_versions': {},
         'operating_system': "%s-%s(%s)" % distribution
     }
@@ -850,8 +863,7 @@ def syslog_config_file_content(syslog_id, source, authorization_details):
         configured_source = source
         source_created = ''
         if len(configured_source) <= 0:
-            syslog_version = get_selected_syslog_version(syslog_id,
-            get_syslog_version(get_os_id(platform.linux_distribution()[0])))
+            syslog_version = get_selected_syslog_version(syslog_id, get_syslog_version())
 
             if  syslog_version > float(3.2):
                 source_created = (SYSLOG_NG_SOURCE_TEXT_ABOVE_3_2
