@@ -319,7 +319,7 @@ def printEnvironment(current_environment):
     if current_environment['syslog_versions']:
         for i, version in enumerate(current_environment['syslog_versions'], 1):
             line = "\t%d.   %s(%s)" % (i, version[0], version[1])
-            LOGGER.info(line)
+            Logger.printLog(line)
     else:
         Logger.printLog("\tNo Syslog Version Found......", prio = 'crit',
                         print_comp = True)
