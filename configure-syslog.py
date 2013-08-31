@@ -34,6 +34,7 @@ import socket
 import subprocess
 from optparse import OptionParser, SUPPRESS_HELP
 import locale
+import traceback
 
 #Constants
 TEMP_PREFIX = 'temp'
@@ -1460,3 +1461,9 @@ if __name__ == "__main__":
         main()
     except KeyboardInterrupt:
         Logger.printLog("KeyboardInterrupt", prio = 'error')
+    except Exception as e:
+        try:
+            Logger.printLog(traceback.format_exc())
+        finally:
+            Logger.printLog('Configure script has errors')
+            sys.exit(-1)
