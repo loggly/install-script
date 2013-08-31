@@ -319,7 +319,7 @@ def printEnvironment(current_environment):
     if current_environment['syslog_versions']:
         for i, version in enumerate(current_environment['syslog_versions'], 1):
             line = "\t%d.   %s(%s)" % (i, version[0], version[1])
-            LOGGER.info(line)
+            Logger.printLog(line)
     else:
         Logger.printLog("\tNo Syslog Version Found......", prio = 'crit',
                         print_comp = True)
@@ -408,13 +408,13 @@ def get_syslog_version(verify_config_paths=False):
 
     SYSLOG_PATHS = [
         # (syslog type, command, conf path, conf.d path)
-        ("rsyslog", "rsyslogd -v", "/etc/rsyslog.conf", "/etc/rsyslog.d/"),
-        ("syslog-ng", "syslog-ng --version", "/etc/syslog-ng/syslog-ng.conf", "/etc/syslog-ng/")
+        ("rsyslog", "rsyslogd", "-v", "/etc/rsyslog.conf", "/etc/rsyslog.d/"),
+        ("syslog-ng", "syslog-ng", "--version", "/etc/syslog-ng/syslog-ng.conf", "/etc/syslog-ng/")
     ]
 
     for s in SYSLOG_PATHS:
 
-        p = subprocess.Popen(s[1], shell=True, stderr=subprocess.PIPE, stdout=subprocess.PIPE)
+        p = subprocess.Popen(s[1] + ' ' + s[2], shell=True, stderr=subprocess.PIPE, stdout=subprocess.PIPE)
         p.wait()
         if p.returncode != 0:
             continue
@@ -422,13 +422,13 @@ def get_syslog_version(verify_config_paths=False):
         version_line = p.stdout.readlines()[0]
 
         if verify_config_paths:
-            if not os.path.isfile(s[2]) or not os.path.isdir(s[3]):
+            if not os.path.isfile(s[3]) or not os.path.isdir(s[4]):
                 continue
 
         # extract the version number from the daemon's version report,
         # only cares about the major and minor version numbers and ignores
         # the point number.
-        version_pattern = r'%s (\d+\.+\d)' % s[0]
+        version_pattern = r'%s (\d+\.+\d)' % s[1]
         version_string = re.search(version_pattern, version_line).group(1)
 
         return [(s[0], version_string)]
