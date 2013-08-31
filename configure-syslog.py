@@ -54,6 +54,7 @@ PROD_SYSLOG_NG = 1
 PROD_RSYSLOG = 2
 PROD_UNSUPPORTED = -1
 
+LOGGLY_DOMAIN = "gen2.loggly.com"
 LOGGLY_SYSLOG_SERVER = "logs-01.loggly.com"
 LOGGLY_SYSLOG_PORT = 514
 DISTRIBUTION_ID = "41058"
@@ -80,10 +81,9 @@ STR_ERROR_MESSAGE = ("Can not automatically re-configure syslog for "
                      "to manually re-configure syslog for Loggly.")
 STR_SYSLOG_DAEMON_MESSAGE = ("\nSyslog daemon (%s) is not running. "
                              "Please start %s daemon and try again.\n")
-REST_URL_GET_AUTH_TOKEN = ("http://%s.loggly.com/apiv2/customer")
-REST_URL_GET_SEARCH_ID = ("http://%s.loggly.com"
-                          "/apiv2/search?q=%s&from=-2h&until=now&size=10")
-REST_URL_GET_SEARCH_RESULT = ("http://%s.loggly.com/apiv2/events?rsid=%s")
+REST_URL_GET_AUTH_TOKEN = ("http://%s.%s/apiv2/customer")
+REST_URL_GET_SEARCH_ID = ("http://%s.%s/apiv2/search?q=%s&from=-2h&until=now&size=10")
+REST_URL_GET_SEARCH_RESULT = ("http://%s.%s/apiv2/events?rsid=%s")
 USER_NAME_TEXT = ("Enter the username that you use to log into your Loggly account.")
 ACCOUNT_NAME_TEXT = ("Enter your Loggly account name. This is your subdomain. "
                      "For example if you login at mycompany.loggly.com,"
@@ -94,7 +94,7 @@ AUTHTOKEN_MODIFICATION_TEXT = ("\nIf you wish to use a different Customer Token,
 
 _LOG_SOCKET = None
 OUR_PROGNAME      = "configure-syslog"
-LOGGLY_AUTH_TOKEN = "f5b38b8c-ed99-11e2-8ee8-3c07541ea376"
+LOGGLY_AUTH_TOKEN = "MWVjNGU4ZTEtZmJiMi00N2U3LTkyOWItNzVhMWJmZjVmZmUw"
 
 RSYSLOG_PROCESS = "rsyslogd"
 SYSLOG_NG_PROCESS = "syslog-ng"
@@ -855,7 +855,7 @@ def get_json_data(url, user, password):
         sys_exit(reason = "%s" % e)
 
 def get_auth(loggly_user, loggly_password, loggly_subdomain):
-    url = (REST_URL_GET_AUTH_TOKEN % (loggly_subdomain))
+    url = (REST_URL_GET_AUTH_TOKEN % (loggly_subdomain, LOGGLY_DOMAIN))
     data = get_json_data(url, loggly_user, loggly_password)
     auth_tokens = data["tokens"]
     if not auth_tokens or AUTH_TOKEN_FAIL in LOGGLY_QA:
@@ -1141,14 +1141,14 @@ def doverify(loggly_user, loggly_password, loggly_subdomain):
     Logger.printLog("Sending message (%s) to Loggly server (%s)"
                      % (dummy_message, LOGGLY_SYSLOG_SERVER))
     os.popen("logger -p INFO '%s'" % dummy_message).read()
-    search_url = REST_URL_GET_SEARCH_ID % (loggly_subdomain, unique_string)
+    search_url = REST_URL_GET_SEARCH_ID % (loggly_subdomain, LOGGLY_DOMAIN, unique_string)
     # Implement REST APIs to search if dummy message has been sent.
     wait_time = 0
     while wait_time < VERIFICATION_SLEEP_INTERAVAL:
         Logger.printLog("Sending search request. %s" % search_url)
         data = get_json_data(search_url, loggly_user, loggly_password)
         rsid = data["rsid"]["id"]
-        search_result_url = REST_URL_GET_SEARCH_RESULT % (loggly_subdomain, rsid)
+        search_result_url = REST_URL_GET_SEARCH_RESULT % (loggly_subdomain, LOGGLY_DOMAIN, rsid)
         Logger.printLog("Sending search result request. %s" % search_result_url)
         data = get_json_data(search_result_url, loggly_user, loggly_password)
         total_events = data["total_events"]
@@ -1229,7 +1229,7 @@ def log(msg, prio = 'info', facility = 'local0'):
       'app-name':           OUR_PROGNAME,
       'procid':             os.getpid(),
       'msgid':              '-',
-      'loggly-auth-token':  LOGGLY_AUTH_TOKEN,
+      'loggly-auth-token':  base64.decodestring(LOGGLY_AUTH_TOKEN),
       'loggly-pen':         int(DISTRIBUTION_ID),
       'msg':                msg,
     }
@@ -1240,7 +1240,6 @@ def log(msg, prio = 'info', facility = 'local0'):
 
     if not _LOG_SOCKET:  # first time only...
         _LOG_SOCKET = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
-
     _LOG_SOCKET.sendto(fullmsg.encode('utf-8'),
                        (LOGGLY_SYSLOG_SERVER, LOGGLY_SYSLOG_PORT))
 
