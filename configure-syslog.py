@@ -41,8 +41,8 @@ ROOT_USER = 1
 NON_ROOT_USER = 2
 
 MINIMUM_SUPPORTED_PYTHON_VERSION = '2.6'
-VERIFICATION_SLEEP_INTERAVAL = 240
-VERIFICATION_SLEEP_INTERAVAL_PER_ITERATION = 5
+VERIFICATION_SLEEP_INTERVAL = 240
+VERIFICATION_SLEEP_INTERVAL_PER_ITERATION = 5
 
 OS_UBUNTU = 1
 OS_FEDORA = 2
@@ -1144,7 +1144,7 @@ def doverify(loggly_user, loggly_password, loggly_subdomain):
     search_url = REST_URL_GET_SEARCH_ID % (loggly_subdomain, LOGGLY_DOMAIN, unique_string)
     # Implement REST APIs to search if dummy message has been sent.
     wait_time = 0
-    while wait_time < VERIFICATION_SLEEP_INTERAVAL:
+    while wait_time < VERIFICATION_SLEEP_INTERVAL:
         print ".",
         sys.stdout.flush()
 
@@ -1161,10 +1161,10 @@ def doverify(loggly_user, loggly_password, loggly_subdomain):
                              "Loggly is configured successfully."),
                              print_comp = True)
             break
-        wait_time += VERIFICATION_SLEEP_INTERAVAL_PER_ITERATION
-        time.sleep(VERIFICATION_SLEEP_INTERAVAL_PER_ITERATION)
+        wait_time += VERIFICATION_SLEEP_INTERVAL_PER_ITERATION
+        time.sleep(VERIFICATION_SLEEP_INTERVAL_PER_ITERATION)
 
-    if wait_time >= VERIFICATION_SLEEP_INTERAVAL:
+    if wait_time >= VERIFICATION_SLEEP_INTERVAL:
         Logger.printLog(VERIFICATION_FAIL_MESSAGE,
                         prio = 'crit', print_comp = True)
 
