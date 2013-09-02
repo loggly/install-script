@@ -42,8 +42,8 @@ ROOT_USER = 1
 NON_ROOT_USER = 2
 
 MINIMUM_SUPPORTED_PYTHON_VERSION = '2.6'
-VERIFICATION_SLEEP_INTERAVAL = 25
-VERIFICATION_SLEEP_INTERAVAL_PER_ITERATION = 5
+VERIFICATION_SLEEP_INTERVAL = 240
+VERIFICATION_SLEEP_INTERVAL_PER_ITERATION = 5
 
 OS_UBUNTU = 1
 OS_FEDORA = 2
@@ -120,7 +120,7 @@ configuration_text = {
 
 %s
 template LogglyFormat { template("<${PRI}>1 ${ISODATE} ${HOST} ${PROGRAM} \
-${PID} ${MSGID} [%s@%s] $MSG\\n");};
+${PID} ${MSGID} [%s@%s tag=\\"example\\"] $MSG\\n");};
 destination d_loggly {tcp("%s" port(%s) template(LogglyFormat));};
 log { source(%s); destination(d_loggly); };
 
@@ -137,7 +137,7 @@ log { source(%s); destination(d_loggly); };
 
 # Define the template used for sending logs to Loggly. Do not change this format.
 $template LogglyFormat,"<%%pri%%>%%protocol-version%% %%timestamp:::date-rfc3339%% \
-%%HOSTNAME%% %%app-name%% %%procid%% %%msgid%% [%s@%s] %%msg%%"
+%%HOSTNAME%% %%app-name%% %%procid%% %%msgid%% [%s@%s tag=\\"example\\"] %%msg%%"
 # Send messages to syslog server listening on TCP port using template
 
 *.*             @@%s:%s;LogglyFormat
@@ -1145,7 +1145,10 @@ def doverify(loggly_user, loggly_password, loggly_subdomain):
     search_url = REST_URL_GET_SEARCH_ID % (loggly_subdomain, LOGGLY_DOMAIN, unique_string)
     # Implement REST APIs to search if dummy message has been sent.
     wait_time = 0
-    while wait_time < VERIFICATION_SLEEP_INTERAVAL:
+    while wait_time < VERIFICATION_SLEEP_INTERVAL:
+        print ".",
+        sys.stdout.flush()
+
         Logger.printLog("Sending search request. %s" % search_url)
         data = get_json_data(search_url, loggly_user, loggly_password)
         rsid = data["rsid"]["id"]
@@ -1154,13 +1157,15 @@ def doverify(loggly_user, loggly_password, loggly_subdomain):
         data = get_json_data(search_result_url, loggly_user, loggly_password)
         total_events = data["total_events"]
         if total_events >= 1 and VERIFICATION_FAIL not in LOGGLY_QA:
+            print "."
             Logger.printLog(("******* Congratulations! "
                              "Loggly is configured successfully."),
                              print_comp = True)
             break
-        wait_time += VERIFICATION_SLEEP_INTERAVAL_PER_ITERATION
-        time.sleep(VERIFICATION_SLEEP_INTERAVAL_PER_ITERATION)
-    if wait_time >= VERIFICATION_SLEEP_INTERAVAL:
+        wait_time += VERIFICATION_SLEEP_INTERVAL_PER_ITERATION
+        time.sleep(VERIFICATION_SLEEP_INTERVAL_PER_ITERATION)
+
+    if wait_time >= VERIFICATION_SLEEP_INTERVAL:
         Logger.printLog(VERIFICATION_FAIL_MESSAGE,
                         prio = 'crit', print_comp = True)
 
