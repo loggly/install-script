@@ -944,9 +944,8 @@ def create_bash_script(content):
     config_file =  open(file_path, "w")
     config_file.write(content)
     config_file.close()
-    Logger.printLog(("Current user is not root user. Run script %s as root,"
-                     "restart syslog service and then "
-                     "run configure-syslog.py again with 'verify'"
+    Logger.printLog(("Current user is not root user. Run script %s as root then "
+                     "restart the syslog service"
                      % file_path), prio = 'crit', print_comp = True)
 
 def create_loggly_config_file(syslog_id, syslog_configuration_details,
@@ -1317,14 +1316,18 @@ def install(current_environment):
                     (authorization_details['token'],
                      modified_config_file), print_comp = True, prio = 'debug')
     Logger.printLog("Installation completed", prio = 'debug')
-    print("You may verify installation by re-running with action 'verify'")
+
     return syslog_name_for_configuration
 
 def verify(current_environment):
     Logger.printLog("Verification started", prio = 'debug')
+
     perform_sanity_check_and_get_product_for_configuration(current_environment)
+
     loggly_user, loggly_password, loggly_subdomain = login()
+
     doverify(loggly_user, loggly_password, loggly_subdomain)
+
     Logger.printLog("Verification completed", prio = 'debug')
 
 def uninstall(current_environment):
