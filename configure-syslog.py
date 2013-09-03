@@ -1321,13 +1321,9 @@ def install(current_environment):
 
 def verify(current_environment):
     Logger.printLog("Verification started", prio = 'debug')
-
     perform_sanity_check_and_get_product_for_configuration(current_environment)
-
     loggly_user, loggly_password, loggly_subdomain = login()
-
     doverify(loggly_user, loggly_password, loggly_subdomain)
-
     Logger.printLog("Verification completed", prio = 'debug')
 
 def uninstall(current_environment):
