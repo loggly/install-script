@@ -57,6 +57,7 @@ PROD_UNSUPPORTED = -1
 
 LOGGLY_DOMAIN = "gen2.loggly.com"
 LOGGLY_SYSLOG_SERVER = "logs-01.loggly.com"
+
 LOGGLY_SYSLOG_PORT = 514
 DISTRIBUTION_ID = "41058"
 LOGGLY_CONFIG_FILE = "22-loggly.conf"
@@ -213,7 +214,7 @@ present then add the following lines at the bottom of the file
 
  -All versions: Append the following lines at the end of configuration file. The \
 source_name must match the name of the source with internal() e.g.  %(syslog_source)s.
- 
+
  template LogglyFormat { template("<${PRI}>1 ${ISODATE} ${HOST} ${PROGRAM} \
 ${PID} ${MSGID} [%(token)s@%(dist_id)s] $MSG\\n");};
  destination d_loggly {tcp("%(syslog_server)s" port(%(syslog_port)s) template(LogglyFormat));};
@@ -320,7 +321,7 @@ def printEnvironment(current_environment):
     if current_environment['syslog_versions']:
         for i, version in enumerate(current_environment['syslog_versions'], 1):
             line = "\t%d.   %s(%s)" % (i, version[0], version[1])
-            Logger.printLog(line)
+            Logger.printLog(line, print_comp = True)
     else:
         Logger.printLog("\tNo Syslog Version Found......", prio = 'crit',
                         print_comp = True)
@@ -430,7 +431,8 @@ def get_syslog_version(verify_config_paths=False):
         # only cares about the major and minor version numbers and ignores
         # the point number.
         version_pattern = r'%s (\d+\.+\d)' % s[1]
-        version_string = re.search(version_pattern, version_line).group(1)
+        version_string = re.search(version_pattern,
+                                   version_line.decode('utf-8')).group(1)
 
         return [(s[0], version_string)]
 
@@ -453,7 +455,7 @@ def try_int(x):
         return x
 
 def version_tuple(v):
-    return map(try_int, v.split('.'))
+    return list(map(try_int, v.split('.')))
 
 def greater_version(minimum, version):
     return version_tuple(version) >= version_tuple(minimum)
@@ -1098,6 +1100,27 @@ def modify_syslog_config_file(syslog_id, syslog_configuration_details,
     printMessage("Aborting")
     sys.exit(-1)
 
+def check_selinux_service_status(syslog_type):
+    """
+    Run getenforce command and if output is 'Enforcing' then selinux is on
+    else it is off.
+    """
+    selinux_status = ''
+    command = 'getenforce'
+    p = subprocess.Popen(command, shell=True, stderr=subprocess.PIPE,
+                         stdout=subprocess.PIPE)
+    p.wait()
+    output = p.stdout.readlines()
+    if output:
+        selinux_status = output[0].rstrip()
+    if selinux_status == 'Enforcing':
+        Logger.printLog(("SELinux is on. Please disable it "
+                        "and restart %s daemon manually." % syslog_type),
+                        prio = 'warning', print_comp = True)
+        return True
+    else:
+        return False
+
 def send_sighup_to_syslog(syslog_type):
     """
     Sending sighup to syslog daemon
@@ -1146,7 +1169,7 @@ def doverify(loggly_user, loggly_password, loggly_subdomain):
     # Implement REST APIs to search if dummy message has been sent.
     wait_time = 0
     while wait_time < VERIFICATION_SLEEP_INTERVAL:
-        print ".",
+        print("."),
         sys.stdout.flush()
 
         Logger.printLog("Sending search request. %s" % search_url)
@@ -1157,7 +1180,7 @@ def doverify(loggly_user, loggly_password, loggly_subdomain):
         data = get_json_data(search_result_url, loggly_user, loggly_password)
         total_events = data["total_events"]
         if total_events >= 1 and VERIFICATION_FAIL not in LOGGLY_QA:
-            print "."
+            print (".")
             Logger.printLog(("******* Congratulations! "
                              "Loggly is configured successfully."),
                              print_comp = True)
@@ -1285,9 +1308,9 @@ def install(current_environment):
     #default path for rsyslog will be /etc/rsyslog.d/
     modified_config_file = write_configuration(syslog_name_for_configuration,
                         authorization_details, user_type)
-
-    # 6. SIGHUP the syslog daemon.
-    if user_type == ROOT_USER:
+    selinux_status = check_selinux_service_status(syslog_name_for_configuration)
+    if user_type == ROOT_USER and not selinux_status:
+        # 6. SIGHUP the syslog daemon.
         send_sighup_to_syslog(syslog_name_for_configuration)
 
     Logger.printLog(AUTHTOKEN_MODIFICATION_TEXT %
@@ -1316,7 +1339,9 @@ def uninstall(current_environment):
     perform_sanity_check_and_get_product_for_configuration(current_environment,
                                                 check_syslog_service = False)
     remove_configuration(syslog_name_for_configuration)
-    send_sighup_to_syslog(syslog_name_for_configuration)
+    selinux_status = check_selinux_service_status(syslog_name_for_configuration)
+    if not selinux_status:
+        send_sighup_to_syslog(syslog_name_for_configuration)
     Logger.printLog("Uninstall completed", prio = 'debug')
 
 def rsyslog_dryrun():
@@ -1325,9 +1350,9 @@ def rsyslog_dryrun():
     for line in results:
         if 'UDP' in line:
             if 'enabled' in line:
-                print 'UDP Reception: Enabled'
+                print("UDP Reception: Enabled")
             else:
-                print 'UDP Reception: Disabled'
+                print("UDP Reception: Disabled")
         if 'error' in line.lower():
             errors.append(line)
 
@@ -1369,9 +1394,8 @@ def dryrun(current_environment):
         errors = rsyslog_dryrun()
     elif syslogd == 'syslog-ng':
         errors = syslog_ng_dryrun()
-    
+
     remove_configuration(syslogd)
-    
     if len(errors) > 0:
         Logger.printLog('\n!Dry Run FAIL: errors in config script!\n', print_comp= True)
         for error in errors:
