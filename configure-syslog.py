@@ -312,7 +312,7 @@ def printEnvironment(current_environment):
 
 def sendEnvironment(data):
     printLog("Sending environment details to Loggly Server.")
-    log({"environment":data})
+    log(data)
 
 def sys_exit(reason = None):
     """
@@ -1429,34 +1429,31 @@ def parse_options():
 
 # Script starts here
 def main():
-    printMessage("Starting")
-    options = parse_options()
-    global LOGGLY_QA
-    LOGGLY_QA = os.environ.get('LOGGLY_QA', '').split()
-    is_printLog = options.verbose
-    version_compatibility_check(MINIMUM_SUPPORTED_PYTHON_VERSION)
-
-    if options.action == 'loggly_help':
-        loggly_help()
-        sys.exit()
-
-    log({"status":"start", "args": vars(options)})
-    current_environment = get_environment_details()
-    current_environment['options'] = options
-    data = {
-        "operating_system": current_environment['operating_system'],
-        "syslog_versions": current_environment['syslog_versions']
-        }
-    sendEnvironment(data)
-    call_module(options.action, current_environment)
-    printMessage("Finished")
-    log({"status":"finish", "args": vars(options)})
-
-if __name__ == "__main__":
     try:
-        main()
+        printMessage("Starting")
+        options = parse_options()
+        global LOGGLY_QA
+        LOGGLY_QA = os.environ.get('LOGGLY_QA', '').split()
+        is_printLog = options.verbose
+        version_compatibility_check(MINIMUM_SUPPORTED_PYTHON_VERSION)
+
+        if options.action == 'loggly_help':
+            loggly_help()
+            sys.exit()
+
+        log({"status":"start", "args": vars(options)})
+        current_environment = get_environment_details()
+        current_environment['options'] = options
+        log({
+            "operating_system": current_environment['operating_system'],
+            "syslog_versions": [ {"daemon": d, "version": v} for d,v in current_environment['syslog_versions'] ]
+            })
+        call_module(options.action, current_environment)
+        printMessage("Finished")
+        log({"status":"finish", "args": vars(options)})
     except KeyboardInterrupt:
-        printLog("KeyboardInterrupt")
+        print "\nAborting..."
+        log({"status":"aborted", "args": vars(options), "msg":"KeyboardInterrupt" })
     except Exception as e:
         try:
             trace = traceback.format_exc()
@@ -1465,3 +1462,6 @@ if __name__ == "__main__":
         finally:
             printLog('Configure script has errors')
             sys.exit(-1)
+
+if __name__ == "__main__":
+    main()
