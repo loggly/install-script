@@ -1121,9 +1121,47 @@ def check_selinux_service_status(syslog_type):
     else:
         return False
 
-def send_sighup_to_syslog(syslog_type):
+def run_command(command):
+    """ runs a command and returns 3-tuple of
+        exit code, list of stdout, and list of stderr
     """
-    Sending sighup to syslog daemon
+
+    p = subprocess.Popen(command, shell=True,
+        stderr=subprocess.PIPE, stdout=subprocess.PIPE)
+    p.wait()
+
+    return_code = p.returncode
+    out = p.stdout.readlines()
+    err = p.stderr.readlines() 
+
+    return (return_code, out, err)
+
+def restart_syslog_process(syslog_type, process_id):
+    """
+    Attempt to restart the syslog process assuming we have root priv
+    """
+
+    if run_command("pgrep supervisord")[0] == 0:
+        printLog("Restarting with supervisorctl")
+        command = "supervisorctl restart %s" % syslog_type
+        code, out, err = run_command(command)
+        if code == 0: return True
+
+    printLog("Restarting with /etc/init.d/%s restart" % syslog_type)
+    command = "/etc/init.d/%s restart" % syslog_type
+    code, out, err = run_command(command)
+    if code == 0: return True
+
+    printLog("Restarting %s with SIGHUP" % syslog_type)
+    command = "kill -HUP %d" % process_id
+    code, out, err = run_command(command)
+    if code == 0: return True
+
+    return False
+
+def confirm_syslog_restart(syslog_type):
+    """
+    Ask the user if it's okay to restart their syslog daemon
     """
     if PROCESS_ID != -1:
         question = ("Do you want the Loggly Syslog Configuration Script "
@@ -1132,9 +1170,7 @@ def send_sighup_to_syslog(syslog_type):
             user_input = usr_input(question).lower()
             if len(user_input) > 0:
                 if  user_input in yes:
-                    output = os.popen("kill -HUP %d" % PROCESS_ID).read()
-                    Logger.printLog("SIGHUP Sent. %s" % (output))
-                    return True
+                    return restart_syslog_process(syslog_type, PROCESS_ID)
                 elif user_input in no:
                     Logger.printLog(("Configuration file has been modified, "
                                      "please restart %s daemon manually."
@@ -1311,7 +1347,7 @@ def install(current_environment):
     selinux_status = check_selinux_service_status(syslog_name_for_configuration)
     if user_type == ROOT_USER and not selinux_status:
         # 6. SIGHUP the syslog daemon.
-        send_sighup_to_syslog(syslog_name_for_configuration)
+        confirm_syslog_restart(syslog_name_for_configuration)
 
     Logger.printLog(AUTHTOKEN_MODIFICATION_TEXT %
                     (authorization_details['token'],
@@ -1341,7 +1377,7 @@ def uninstall(current_environment):
     remove_configuration(syslog_name_for_configuration)
     selinux_status = check_selinux_service_status(syslog_name_for_configuration)
     if not selinux_status:
-        send_sighup_to_syslog(syslog_name_for_configuration)
+        confirm_syslog_restart(syslog_name_for_configuration)
     Logger.printLog("Uninstall completed", prio = 'debug')
 
 def rsyslog_dryrun():
