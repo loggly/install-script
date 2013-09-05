@@ -282,7 +282,7 @@ LOGGLY_QA = []
 #   "verification_fail"         --> Syslog configuration fail
 #   "authentication_fail"       --> Invalid username or password
 
-def printLog(message, *args):
+def printLog(message):
     print(message)
 
 def printMessage(message):
