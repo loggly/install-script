@@ -911,9 +911,10 @@ def create_bash_script(content):
     config_file =  open(file_path, "w")
     config_file.write(content)
     config_file.close()
+	#Remove invalid argument
     printLog(("Current user is not root user. Run script %s as root then "
                      "restart the syslog service"
-                     % file_path), prio = 'crit', print_comp = True)
+                     % file_path))
 
 def create_loggly_config_file(syslog_id, syslog_configuration_details,
                               authorization_details, user_type):
@@ -1336,12 +1337,13 @@ def rsyslog_dryrun():
     results = get_stderr_from_process('rsyslogd -N1')
     errors = []
     for line in results:
-        if 'UDP' in line:
-            if 'enabled' in line:
+        #Python3 and above throw error
+        if 'UDP' in str(line):
+            if 'enabled' in str(line):
                 print("UDP Reception: Enabled")
             else:
                 print("UDP Reception: Disabled")
-        if 'error' in line.lower():
+        if 'error' in str(line).lower():
             errors.append(line)
 
     return errors
@@ -1359,7 +1361,8 @@ def syslog_ng_dryrun():
     results = get_stderr_from_process('syslog-ng -s')
     errors = []
     for line in results:
-        if 'error' in line.lower():
+        #Python3 and above throw error
+        if 'error' in str(line).lower():
             errors.append(line)
     return errors
 
@@ -1486,7 +1489,8 @@ def main():
         printMessage("Finished")
         log({"status":"finish", "args": vars(options)})
     except KeyboardInterrupt:
-        print "\nAborting..."
+		#Python3 and above throw error
+        print("\nAborting...")
         log({"status":"aborted", "args": vars(options), "msg":"KeyboardInterrupt" })
     except Exception as e:
         try:
