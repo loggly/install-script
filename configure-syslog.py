@@ -123,7 +123,7 @@ configuration_text = {
 %s
 template LogglyFormat { template("<${PRI}>1 ${ISODATE} ${HOST} ${PROGRAM} \
 ${PID} ${MSGID} [%s@%s tag=\\"example\\"] $MSG\\n");};
-destination d_loggly {tcp("%s" port(%s) template(LogglyFormat));};
+destination d_loggly { tcp("%s" port(%s) template(LogglyFormat) flush_timeout(1000) frac_digits(3)); };
 log { source(%s); destination(d_loggly); };
 
 #          -------------------------------------------------------
@@ -218,7 +218,7 @@ source_name must match the name of the source with internal() e.g.  %(syslog_sou
 
  template LogglyFormat { template("<${PRI}>1 ${ISODATE} ${HOST} ${PROGRAM} \
 ${PID} ${MSGID} [%(token)s@%(dist_id)s] $MSG\\n");};
- destination d_loggly {tcp("%(syslog_server)s" port(%(syslog_port)s) template(LogglyFormat));};
+ destination d_loggly { tcp("%(syslog_server)s" port(%(syslog_port)s) template(LogglyFormat) flush_timeout(1000) frac_digits(3)); };
  log { source(%(syslog_source)s); destination(d_loggly); };
  ### END Syslog Logging Directives for Loggly (%(subdomain)s.loggly.com) ###
 
