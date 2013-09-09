@@ -363,6 +363,7 @@ def get_os_id(os_name):
         'fedora': OS_FEDORA,
         'red hat enterprise linux server': OS_RHEL,
         'centos': OS_CENTOS,
+        'debian': OS_UBUNTU,
         }.get(os_name.lower(), OS_UNSUPPORTED)
 
 def get_syslog_id(product_name):
