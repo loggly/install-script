@@ -1459,6 +1459,7 @@ def parse_options():
     parser.add_posarg("action", dest='action', type="choice",
                       choices=('install', 'uninstall', 'verify',
                                'sysinfo', 'loggly_help', 'dryrun'))
+    parser.add_option("-s", "--subdomain")
     parser.add_option("-v", "--verbose", action="store_true",
                       dest="verbose", default=False)
     parser.add_option("-t", "--token")
