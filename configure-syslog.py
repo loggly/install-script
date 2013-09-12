@@ -1462,7 +1462,7 @@ def parse_options():
     parser.add_option("-s", "--subdomain")
     parser.add_option("-v", "--verbose", action="store_true",
                       dest="verbose", default=False)
-    parser.add_option("-t", "--token")
+    parser.add_option("-a", "--auth")
     (options, args) = parser.parse_args()
     return options
 
