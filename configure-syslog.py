@@ -1461,7 +1461,7 @@ def parse_options():
                                'sysinfo', 'loggly_help', 'dryrun'))
     parser.add_option("-v", "--verbose", action="store_true",
                       dest="verbose", default=False)
-    parser.add_option("-t", "--token")
+    parser.add_option("-a", "--auth")
     (options, args) = parser.parse_args()
     return options
 
