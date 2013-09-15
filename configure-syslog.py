@@ -141,8 +141,8 @@ log { source(%s); destination(d_loggly); };
 # Define the template used for sending logs to Loggly. Do not change this format.
 $template LogglyFormat,"<%%pri%%>%%protocol-version%% %%timestamp:::date-rfc3339%% \
 %%HOSTNAME%% %%app-name%% %%procid%% %%msgid%% [%s@%s tag=\\"example\\"] %%msg%%"
-# Send messages to syslog server listening on TCP port using template
 
+# Send messages to Loggly over TCP using the template.
 *.*             @@%s:%s;LogglyFormat
 
 #          -------------------------------------------------------
