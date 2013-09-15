@@ -92,7 +92,8 @@ ACCOUNT_NAME_TEXT = ("Enter your Loggly account name. This is your subdomain. "
                      "\nyour account name is mycompany.\n")
 AUTHTOKEN_MODIFICATION_TEXT = ("\nIf you wish to use a different Customer Token, "
                                "replace %s\nwith the token you wish to use, in"
-                               " the file %s.")
+                               " the file %s.\n")
+INSTALLATION_COMPLETED_TEXT = ("Installation completed.\n")
 
 _LOG_SOCKET = None
 OUR_PROGNAME      = "configure-syslog"
@@ -1308,7 +1309,7 @@ def install(current_environment):
     printLog(AUTHTOKEN_MODIFICATION_TEXT %
                     (authorization_details['token'],
                      modified_config_file))
-    printLog("Installation completed")
+    printLog(INSTALLATION_COMPLETED_TEXT)
     return syslog_name_for_configuration
 
 def verify(current_environment):
