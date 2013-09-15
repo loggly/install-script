@@ -123,7 +123,7 @@ configuration_text = {
 
 %s
 template LogglyFormat { template("<${PRI}>1 ${ISODATE} ${HOST} ${PROGRAM} \
-${PID} ${MSGID} [%s@%s tag=\\"example\\"] $MSG\\n");};
+${PID} ${MSGID} [%s@%s] $MSG\\n");};
 destination d_loggly { tcp("%s" port(%s) template(LogglyFormat) flush_timeout(1000) frac_digits(3)); };
 log { source(%s); destination(d_loggly); };
 
@@ -140,7 +140,7 @@ log { source(%s); destination(d_loggly); };
 
 # Define the template used for sending logs to Loggly. Do not change this format.
 $template LogglyFormat,"<%%pri%%>%%protocol-version%% %%timestamp:::date-rfc3339%% \
-%%HOSTNAME%% %%app-name%% %%procid%% %%msgid%% [%s@%s tag=\\"example\\"] %%msg%%"
+%%HOSTNAME%% %%app-name%% %%procid%% %%msgid%% [%s@%s] %%msg%%"
 
 # Send messages to Loggly over TCP using the template.
 *.*             @@%s:%s;LogglyFormat
