@@ -65,35 +65,56 @@ LOGGLY_ENV_DETAILS_FILE = "env_details.txt"
 LOGGLY_BASH_SCRIPT = 'configure-syslog.%s.sh' % os.getpid()
 PROCESS_ID = -1
 
-STR_PYTHON_FAIL_MESSAGE = ("Python version check fails: Installed version is "
-                           "%s. Minimum required version is %s.")
-STR_MULTIPLE_SYSLOG_MESSAGE = ("Multiple syslogd are running.")
-STR_AUTHTOKEN_NOTFOUND_MESSAGE = ("No Customer Tokens were found.")
-STR_AUTHENTICATION_FAIL_MESSAGE = ("Authentication fail for user %s")
-VERIFICATION_FAIL_MESSAGE = ("Loggly verification failed. "
-                             "Please visit http://loggly.com/docs/sending-logs-unixlinux-system-setup/"
-                             " for more information.")
-STR_EXIT_MESSAGE = ("\nThis environment (OS : %s) is not supported by "
-                    "the Loggly Syslog Configuration Script. Please visit "
-                    "http://loggly.com/docs/sending-logs-unixlinux-system-setup/ for more information.\n")
+STR_PYTHON_FAIL_MESSAGE = '''
+Python version check fails: Installed version is "%s. \
+Minimum required version is %s.
+'''.strip()
+
+STR_MULTIPLE_SYSLOG_MESSAGE = "Multiple syslogd are running."
+STR_AUTHTOKEN_NOTFOUND_MESSAGE = "No Customer Tokens were found."
+STR_AUTHENTICATION_FAIL_MESSAGE = "Authentication fail for user %s"
+
+VERIFICATION_FAIL_MESSAGE = '''
+Loggly verification failed. Please visit \
+http://loggly.com/docs/sending-logs-unixlinux-system-setup/ for more information.
+'''.strip()
+
+STR_EXIT_MESSAGE = '''
+This environment (OS : %s) is not supported by the Loggly Syslog \
+Configuration Script. Please visit \
+http://loggly.com/docs/sending-logs-unixlinux-system-setup/ \
+for more information.
+'''
+
 STR_NO_SYSLOG_MESSAGE = "\nSupported syslog type/version not found."
-STR_ERROR_MESSAGE = ("Can not automatically re-configure syslog for "
-                     "this Linux distribution. "
-                     "\nUse the help option for instructions "
-                     "to manually re-configure syslog for Loggly.")
-STR_SYSLOG_DAEMON_MESSAGE = ("\nSyslog daemon (%s) is not running. "
-                             "Please start %s daemon and try again.\n")
-REST_URL_GET_AUTH_TOKEN = ("http://%s.%s/apiv2/customer")
-REST_URL_GET_SEARCH_ID = ("http://%s.%s/apiv2/search?q=%s&from=-2h&until=now&size=10")
-REST_URL_GET_SEARCH_RESULT = ("http://%s.%s/apiv2/events?rsid=%s")
-USER_NAME_TEXT = ("Enter the username that you use to log into your Loggly account.")
-ACCOUNT_NAME_TEXT = ("Enter your Loggly account name. This is your subdomain. "
-                     "For example if you login at mycompany.loggly.com,"
-                     "\nyour account name is mycompany.\n")
-AUTHTOKEN_MODIFICATION_TEXT = ("\nIf you wish to use a different Customer Token, "
-                               "replace %s\nwith the token you wish to use, in"
-                               " the file %s.\n")
-INSTALLATION_COMPLETED_TEXT = ("Installation completed.\n")
+
+STR_ERROR_MESSAGE = '''
+Can not automatically re-configure syslog for this Linux distribution.
+Use the help option for instructions to manually re-configure syslog for Loggly.
+'''.strip()
+
+STR_SYSLOG_DAEMON_MESSAGE = '''
+Syslog daemon (%s) is not running. Please start %s daemon and try again.
+'''
+
+REST_URL_GET_AUTH_TOKEN = "http://%s.%s/apiv2/customer"
+REST_URL_GET_SEARCH_ID = "http://%s.%s/apiv2/search?q=%s&from=-2h&until=now&size=10"
+REST_URL_GET_SEARCH_RESULT = "http://%s.%s/apiv2/events?rsid=%s"
+
+USER_NAME_TEXT = "Enter the username that you use to log into your loggly account."
+
+ACCOUNT_NAME_TEXT = '''
+Enter your Loggly account name. This is your subdomain. For example if \
+you login at mycompany.loggly.com,
+your account name is mycompany.
+'''.lstrip()
+
+AUTHTOKEN_MODIFICATION_TEXT = '''
+If you wish to use a different Customer Token, replace %s
+with the token you wish to use, in the file %s.
+'''
+
+INSTALLATION_COMPLETED_TEXT = "Installation completed.\n"
 
 _LOG_SOCKET = None
 OUR_PROGNAME      = "configure-syslog"
