@@ -92,7 +92,8 @@ ACCOUNT_NAME_TEXT = ("Enter your Loggly account name. This is your subdomain. "
                      "\nyour account name is mycompany.\n")
 AUTHTOKEN_MODIFICATION_TEXT = ("\nIf you wish to use a different Customer Token, "
                                "replace %s\nwith the token you wish to use, in"
-                               " the file %s.")
+                               " the file %s.\n")
+INSTALLATION_COMPLETED_TEXT = ("Installation completed.\n")
 
 _LOG_SOCKET = None
 OUR_PROGNAME      = "configure-syslog"
@@ -122,7 +123,7 @@ configuration_text = {
 
 %s
 template LogglyFormat { template("<${PRI}>1 ${ISODATE} ${HOST} ${PROGRAM} \
-${PID} ${MSGID} [%s@%s tag=\\"example\\"] $MSG\\n");};
+${PID} ${MSGID} [%s@%s] $MSG\\n");};
 destination d_loggly { tcp("%s" port(%s) template(LogglyFormat) flush_timeout(1000) frac_digits(3)); };
 log { source(%s); destination(d_loggly); };
 
@@ -139,9 +140,9 @@ log { source(%s); destination(d_loggly); };
 
 # Define the template used for sending logs to Loggly. Do not change this format.
 $template LogglyFormat,"<%%pri%%>%%protocol-version%% %%timestamp:::date-rfc3339%% \
-%%HOSTNAME%% %%app-name%% %%procid%% %%msgid%% [%s@%s tag=\\"example\\"] %%msg%%"
-# Send messages to syslog server listening on TCP port using template
+%%HOSTNAME%% %%app-name%% %%procid%% %%msgid%% [%s@%s] %%msg%%"
 
+# Send messages to Loggly over TCP using the template.
 *.*             @@%s:%s;LogglyFormat
 
 #          -------------------------------------------------------
@@ -1295,7 +1296,7 @@ def install(current_environment):
     printLog(AUTHTOKEN_MODIFICATION_TEXT %
                     (authorization_details['token'],
                      modified_config_file))
-    printLog("Installation completed")
+    printLog(INSTALLATION_COMPLETED_TEXT)
     return syslog_name_for_configuration
 
 def verify(current_environment):
