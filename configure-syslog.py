@@ -1447,7 +1447,6 @@ Action:
 \tloggly_help  Guideline for users for each step to configure syslog
 \tdryrun       Perform configuration steps without modifying anything
 Option:
-\t-v|--verbose Print detailed logs on console
 '''.lstrip()
 
 def parse_options():
@@ -1460,8 +1459,6 @@ def parse_options():
                       choices=('install', 'uninstall', 'verify',
                                'sysinfo', 'loggly_help', 'dryrun'))
     parser.add_option("-s", "--subdomain")
-    parser.add_option("-v", "--verbose", action="store_true",
-                      dest="verbose", default=False)
     parser.add_option("-a", "--auth")
     (options, args) = parser.parse_args()
     return options
@@ -1473,7 +1470,6 @@ def main():
         options = parse_options()
         global LOGGLY_QA
         LOGGLY_QA = os.environ.get('LOGGLY_QA', '').split()
-        is_printLog = options.verbose
         version_compatibility_check(MINIMUM_SUPPORTED_PYTHON_VERSION)
 
         if options.action == 'loggly_help':
