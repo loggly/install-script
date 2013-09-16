@@ -232,19 +232,6 @@ source. The new source will break configurations.
    logger "loggly is better than a bee in your aunt\'s bonnet"
 '''.strip()
 
-CMD_USAGE = '''
-%prog <action> [option]
-Action:
-\tinstall      Configure the syslog
-\tuninstall    Remove changes made by the syslog configuration script
-\tverify       Verify the configuration explicitly
-\tsysinfo      Print, write system information
-\tloggly_help  Guideline for users for each step to configure syslog
-\tdryrun       Perform configuration steps without modifying anything
-Option:
-\t-v|--verbose Print detailed logs on console
-'''.lstrip()
-
 # log priorities...
 LOG_PRIORITIES = {
     "emerg":   0,  "alert":  1,  "crit": 2,   "error": 3,
@@ -1450,6 +1437,20 @@ class PAOptionParser(OptionParser, object):
         return options, args
 
 
+CMD_USAGE = '''
+%prog <action> [option]
+Action:
+\tinstall      Configure the syslog
+\tuninstall    Remove changes made by the syslog configuration script
+\tverify       Verify the configuration explicitly
+\tsysinfo      Print, write system information
+\tloggly_help  Guideline for users for each step to configure syslog
+\tdryrun       Perform configuration steps without modifying anything
+Option:
+\tsubdomain    Name of loggly account being connected to
+\tauth         Loggly auth token to use for logging
+'''.lstrip()
+
 def parse_options():
     """
     Parse command line argument
@@ -1460,8 +1461,6 @@ def parse_options():
                       choices=('install', 'uninstall', 'verify',
                                'sysinfo', 'loggly_help', 'dryrun'))
     parser.add_option("-s", "--subdomain")
-    parser.add_option("-v", "--verbose", action="store_true",
-                      dest="verbose", default=False)
     parser.add_option("-a", "--auth")
     (options, args) = parser.parse_args()
     return options
@@ -1473,7 +1472,6 @@ def main():
         options = parse_options()
         global LOGGLY_QA
         LOGGLY_QA = os.environ.get('LOGGLY_QA', '').split()
-        is_printLog = options.verbose
         version_compatibility_check(MINIMUM_SUPPORTED_PYTHON_VERSION)
 
         if options.action == 'loggly_help':
