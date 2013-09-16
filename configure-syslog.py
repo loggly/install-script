@@ -232,19 +232,6 @@ source. The new source will break configurations.
    logger "loggly is better than a bee in your aunt\'s bonnet"
 '''.strip()
 
-CMD_USAGE = '''
-%prog <action> [option]
-Action:
-\tinstall      Configure the syslog
-\tuninstall    Remove changes made by the syslog configuration script
-\tverify       Verify the configuration explicitly
-\tsysinfo      Print, write system information
-\tloggly_help  Guideline for users for each step to configure syslog
-\tdryrun       Perform configuration steps without modifying anything
-Option:
-\t-v|--verbose Print detailed logs on console
-'''.lstrip()
-
 # log priorities...
 LOG_PRIORITIES = {
     "emerg":   0,  "alert":  1,  "crit": 2,   "error": 3,
@@ -1449,6 +1436,19 @@ class PAOptionParser(OptionParser, object):
             self.error(msg)
         return options, args
 
+
+CMD_USAGE = '''
+%prog <action> [option]
+Action:
+\tinstall      Configure the syslog
+\tuninstall    Remove changes made by the syslog configuration script
+\tverify       Verify the configuration explicitly
+\tsysinfo      Print, write system information
+\tloggly_help  Guideline for users for each step to configure syslog
+\tdryrun       Perform configuration steps without modifying anything
+Option:
+\t-v|--verbose Print detailed logs on console
+'''.lstrip()
 
 def parse_options():
     """
