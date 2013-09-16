@@ -1447,6 +1447,8 @@ Action:
 \tloggly_help  Guideline for users for each step to configure syslog
 \tdryrun       Perform configuration steps without modifying anything
 Option:
+\tsubdomain    Name of loggly account being connected to
+\tauth         Loggly auth token to use for logging
 '''.lstrip()
 
 def parse_options():
