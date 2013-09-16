@@ -1498,7 +1498,7 @@ def main():
         try:
             trace = traceback.format_exc()
             printLog(trace)
-            log({"status":"failed", "traceback":trace})
+            log({"status":"failed", "traceback":trace, "args": vars(options)})
         finally:
             printLog('Configure script has errors')
             sys.exit(-1)
