@@ -1378,7 +1378,8 @@ def dryrun(current_environment):
     syslogd = perform_sanity_check_and_get_product_for_configuration(current_environment)
     printLog("Dryrun started for syslog version %s" % syslogd)
 
-    config_file = write_configuration(syslogd, {'token': 'foofey', 'id': DISTRIBUTION_ID }, 1)
+    token = getattr(current_environment['options'], 'auth') or 'foofey'
+    config_file = write_configuration(syslogd, {'token': token, 'id': DISTRIBUTION_ID }, 1)
     errors = []
 
     if syslogd == 'rsyslog':
