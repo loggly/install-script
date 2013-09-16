@@ -1285,8 +1285,8 @@ def install(current_environment):
     perform_sanity_check_and_get_product_for_configuration(current_environment)
 
     options = current_environment['options']
-    if options.token:
-        token = options.token
+    if options.auth:
+        token = options.auth
     else:
         loggly_user, loggly_password, loggly_subdomain = login()
         token = get_auth_token(loggly_user, loggly_password, loggly_subdomain)
