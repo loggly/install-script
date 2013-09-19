@@ -556,7 +556,7 @@ def find_syslog_process():
         if results:
             #For python version 3 and above, reading binary data, not str,
             #so we need to decode the output first:
-            encoding = locale.getdefaultlocale()[1]
+            encoding = locale.getdefaultlocale()[1] or 'UTF-8'
             reslines = results.decode(encoding).split('\n')
             if len(reslines) == 1:
                 ps_out_fields = reslines[0].split()
