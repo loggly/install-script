@@ -588,7 +588,7 @@ def product_for_configuration(current_environment,
         printLog("Multiple versions of syslog detected on your system.")
         index = 0
         for (syslog_name, syslog_version)\
-            in supported_syslog_versions.iteritems():
+            in supported_syslog_versions.items():
             index += 1
             printLog("\t%d. %s(%s)" %
                             (index, syslog_name, syslog_version))
