@@ -492,27 +492,17 @@ def perform_sanity_check(current_environment):
                 syslog_version):
             syslog_versions[syslog_type] = syslog_version
 
-    current_environment['supported_syslog_versions'] = syslog_versions
-
-    if(current_environment['supported_syslog_versions'] == None
-       or len(current_environment['supported_syslog_versions']) <= 0)\
-       or SYSLOG_FAIL in LOGGLY_QA:
-
+    if SYSLOG_FAIL in LOGGLY_QA or not syslog_versions:
         printLog(STR_NO_SYSLOG_MESSAGE)
         printLog(STR_ERROR_MESSAGE)
         sys_exit(reason = STR_NO_SYSLOG_MESSAGE)
 
     #Check whether multiple syslogd running or not
-    if len(current_environment['supported_syslog_versions']) > 1\
-       or MULTPLE_SYSLOG_RUNNING in LOGGLY_QA:
+    if len(syslog_versions) > 1 or MULTPLE_SYSLOG_RUNNING in LOGGLY_QA:
         index = 0
         running_syslog_count = 0
-        for (syslog_name, syslog_version)\
-            in current_environment['supported_syslog_versions'].items():
-            if check_syslog_service_status(
-                list(
-                    current_environment['supported_syslog_versions'].keys()
-                    )[index]):
+        for (syslog_name, syslog_version) in syslog_versions.items():
+            if check_syslog_service_status(syslog_name):
                 running_syslog_count += 1
             index += 1
             printLog("\t%d. %s(%s)" %
@@ -521,6 +511,8 @@ def perform_sanity_check(current_environment):
             printLog(STR_MULTIPLE_SYSLOG_MESSAGE)
             printLog(STR_ERROR_MESSAGE)
             sys_exit(reason = STR_MULTIPLE_SYSLOG_MESSAGE)
+
+    current_environment['supported_syslog_versions'] = syslog_versions
     printLog("Sanity Check Passed. Your environment is supported.")
 
 def find_syslog_process():
@@ -591,11 +583,12 @@ def product_for_configuration(current_environment,
     """
     user_choice = 0
 
-    if len(current_environment['supported_syslog_versions']) > 1:
+    supported_syslog_versions = current_environment['supported_syslog_versions']
+    if len(supported_syslog_versions) > 1:
         printLog("Multiple versions of syslog detected on your system.")
         index = 0
         for (syslog_name, syslog_version)\
-            in current_environment['supported_syslog_versions'].iteritems():
+            in supported_syslog_versions.iteritems():
             index += 1
             printLog("\t%d. %s(%s)" %
                             (index, syslog_name, syslog_version))
@@ -613,9 +606,7 @@ def product_for_configuration(current_environment,
             printLog(("Invalid choice entered. "
                              "Continue with default value."))
             user_choice = 0
-    syslog_type = list(
-        current_environment['supported_syslog_versions'].keys()
-        )[user_choice]
+    syslog_type = list( supported_syslog_versions.keys())[user_choice]
     service_status = check_syslog_service_status(syslog_type)
     if check_syslog_service:
         if not service_status or PS_FAIL in LOGGLY_QA:
@@ -624,12 +615,7 @@ def product_for_configuration(current_environment,
             sys_exit(reason = STR_SYSLOG_DAEMON_MESSAGE %
                      (syslog_type, syslog_type))
     printLog("Configuring %s-%s" %
-                    (list(
-                    current_environment['supported_syslog_versions'].keys()
-                        )[user_choice],
-                     list(
-                    current_environment['supported_syslog_versions'].values()
-                         )[user_choice]))
+            (syslog_type, supported_syslog_versions[syslog_type]))
     return syslog_type
 
 def get_syslog_ng_source(default_config_file_path):
