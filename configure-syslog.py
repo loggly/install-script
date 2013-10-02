@@ -14,6 +14,8 @@
 # (c) Copyright Loggly 2013.
 ######################################################################
 
+from __future__ import with_statement
+
 import os, os.path
 import platform
 import re
