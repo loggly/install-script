@@ -931,28 +931,22 @@ def create_loggly_config_file(syslog_id, syslog_configuration_details,
         config_file =  open(file_path, "w")
         config_file.write(content)
         config_file.close()
+        destfile = os.path.join(syslog_configuration_details.get("path"),
+                                LOGGLY_CONFIG_FILE)
         if user_type == NON_ROOT_USER:
             # print Instructions...
-            content = "mv -f %s %s\n%s" % (file_path,
-                        os.path.join(syslog_configuration_details.get("path"),
-                                     LOGGLY_CONFIG_FILE), command_content)
+            content = "mv -f %s %s\n%s" % (file_path, destfile, command_content)
             create_bash_script(content)
         else:
-            if os.path.isfile(os.path.join(
-                syslog_configuration_details.get("path"), LOGGLY_CONFIG_FILE)):
+            if os.path.isfile(destfile):
                 msg = ("Loggly configuration file (%s) is already present. "
-                       "Do you want to overwrite it? [Yes|No]: "
-                       % os.path.join(syslog_configuration_details.get("path"),
-                                      LOGGLY_CONFIG_FILE))
+                       "Do you want to overwrite it? [Yes|No]: " % destfile)
 
                 for _ in range(5):
                     user_input = usr_input(msg).lower()
                     if len(user_input) > 0:
                         if user_input in yes:
-                            os.popen("mv -f %s %s" % (file_path,
-                                    os.path.join(
-                                    syslog_configuration_details.get("path"),
-                                    LOGGLY_CONFIG_FILE)))
+                            os.popen("mv -f %s %s" % (file_path, destfile))
                             return
                         elif user_input in no:
                             printMessage("Finished")
@@ -960,9 +954,7 @@ def create_loggly_config_file(syslog_id, syslog_configuration_details,
                         else:
                             printLog("Not a valid input. Please retry.")
             else:
-                os.popen("mv -f %s %s" % (file_path,
-                    os.path.join(syslog_configuration_details.get("path"),
-                                 LOGGLY_CONFIG_FILE)))
+                os.popen("mv -f %s %s" % (file_path, destfile))
                 return
 
             printLog("Invalid input received after maximum attempts.")
