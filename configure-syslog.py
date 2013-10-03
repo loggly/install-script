@@ -110,11 +110,6 @@ you login at mycompany.loggly.com,
 your account name is mycompany.
 '''.lstrip()
 
-AUTHTOKEN_MODIFICATION_TEXT = '''
-If you wish to use a different Customer Token, replace %s
-with the token you wish to use, in the file %s.
-'''
-
 INSTALLATION_COMPLETED_TEXT = "Installation completed.\n"
 
 _LOG_SOCKET = None
@@ -1304,9 +1299,6 @@ def install(current_environment):
         # 6. SIGHUP the syslog daemon.
         confirm_syslog_restart(syslog_name_for_configuration)
 
-    printLog(AUTHTOKEN_MODIFICATION_TEXT %
-                    (authorization_details['token'],
-                     modified_config_file))
     printLog(INSTALLATION_COMPLETED_TEXT)
     return syslog_name_for_configuration
 
