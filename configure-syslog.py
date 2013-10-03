@@ -690,7 +690,7 @@ def get_installed_syslog_configuration(syslog_id):
     return { "path": default_directory, "token": auth_token, "source": source }
 
 def write_configuration(syslog_name_for_configuration,
-                        authorization_details, user_type):
+                        authorization_details, user_type, force=False):
     """
     Function to create/modify configuration file
     """
@@ -709,12 +709,12 @@ def write_configuration(syslog_name_for_configuration,
                          #              LOGGLY_CONFIG_FILE)))
         create_loggly_config_file(syslog_id,
                                   syslog_configuration_details,
-                                  authorization_details, user_type)
+                                  authorization_details, user_type, force)
         return config_file
     else:
         modify_syslog_config_file(syslog_id,
                                   syslog_configuration_details,
-                                  authorization_details, user_type)
+                                  authorization_details, user_type, force)
         return config_file
 
 def remove_syslog_ng_source(default_config_file):
@@ -924,7 +924,7 @@ def confirm(question):
             printLog("Not a valid input. Please retry.")
 
 def create_loggly_config_file(syslog_id, syslog_configuration_details,
-                              authorization_details, user_type):
+                              authorization_details, user_type, force=False):
     """
     Create Loggly configuration file
     """
@@ -948,7 +948,7 @@ def create_loggly_config_file(syslog_id, syslog_configuration_details,
             if os.path.isfile(destfile):
                 msg = ("Loggly configuration file (%s) is already present. "
                        "Do you want to overwrite it?" % destfile)
-                move = confirm(msg)
+                move = force or confirm(msg)
                 if move:
                     os.popen("mv -f %s %s" % (file_path, destfile))
                     return
@@ -969,7 +969,7 @@ def create_loggly_config_file(syslog_id, syslog_configuration_details,
         printLog("IOError %s" % e)
 
 def modify_syslog_config_file(syslog_id, syslog_configuration_details,
-                              authorization_details, user_type):
+                              authorization_details, user_type, force=False):
     """
     Modifying configuration file by adding Loggly configuration text
     """
@@ -987,7 +987,7 @@ def modify_syslog_config_file(syslog_id, syslog_configuration_details,
                     "\n\nDo you want this installer to modify "
                     "the configuration file?"
                     % default_config_file_name.get(syslog_id))
-        modify = confirm(question)
+        modify = force or confirm(question)
         if modify:
             backup_file_name = ("%s_%s.bak"
                         % (default_config_file_name.get(syslog_id),
@@ -1025,7 +1025,7 @@ def modify_syslog_config_file(syslog_id, syslog_configuration_details,
         question = ("\nThis configuration currently uses \"%s\" as its Customer Token. "
                     "Do you want to overwrite it?"
                     % syslog_configuration_details.get("token"))
-        overwrite = confirm(question)
+        overwrite = force or confirm(question)
         if overwrite:
             pattern = (r"s/[a-z0-9]\{8\}\-[a-z0-9]\{4\}\-[a-z0-9]"
                        r"\{4\}\-[a-z0-9]\{4\}\-[a-z0-9]\{12\}/%s/g"
@@ -1106,14 +1106,14 @@ def restart_syslog_process(syslog_type, process_id):
 
     return False
 
-def confirm_syslog_restart(syslog_type):
+def confirm_syslog_restart(syslog_type, force=False):
     """
     Ask the user if it's okay to restart their syslog daemon
     """
     if PROCESS_ID != -1:
         question = ("Do you want the Loggly Syslog Configuration Script "
                     "to restart (SIGHUP) the syslog daemon.")
-        result = confirm(question)
+        result = force or confirm(question)
         if result:
             return restart_syslog_process(syslog_type, PROCESS_ID)
         elif result is False:
@@ -1280,11 +1280,11 @@ def install(current_environment):
     #place it in configuration directory path ($IncludeConfig),
     #default path for rsyslog will be /etc/rsyslog.d/
     modified_config_file = write_configuration(syslog_name_for_configuration,
-                        authorization_details, user_type)
+                        authorization_details, user_type, options.force)
     selinux_status = check_selinux_service_status(syslog_name_for_configuration)
     if user_type == ROOT_USER and not selinux_status:
         # 6. SIGHUP the syslog daemon.
-        confirm_syslog_restart(syslog_name_for_configuration)
+        confirm_syslog_restart(syslog_name_for_configuration, options.force)
 
     printLog(AUTHTOKEN_MODIFICATION_TEXT %
                     (authorization_details['token'],
@@ -1312,7 +1312,8 @@ def uninstall(current_environment):
     remove_configuration(syslog_name_for_configuration)
     selinux_status = check_selinux_service_status(syslog_name_for_configuration)
     if not selinux_status:
-        confirm_syslog_restart(syslog_name_for_configuration)
+        force = current_environment['options'].force
+        confirm_syslog_restart(syslog_name_for_configuration, force)
     printLog("Uninstall completed")
 
 def rsyslog_dryrun():
@@ -1360,7 +1361,9 @@ def dryrun(current_environment):
     printLog("Dryrun started for syslog version %s" % syslogd)
 
     token = getattr(current_environment['options'], 'auth') or 'foofey'
-    config_file = write_configuration(syslogd, {'token': token, 'id': DISTRIBUTION_ID }, 1)
+    force = current_environment['options'].force
+    config_file = write_configuration(
+            syslogd, {'token': token, 'id': DISTRIBUTION_ID }, 1, force)
     errors = []
 
     if syslogd == 'rsyslog':
@@ -1444,6 +1447,7 @@ Action:
 Option:
 \tsubdomain    Name of loggly account being connected to
 \tauth         Loggly auth token to use for logging
+\tforce        Skip confirmations -- assume yes
 '''.lstrip()
 
 def parse_options():
@@ -1455,6 +1459,7 @@ def parse_options():
     parser.add_posarg("action", dest='action', type="choice",
                       choices=('install', 'uninstall', 'verify',
                                'sysinfo', 'loggly_help', 'dryrun'))
+    parser.add_option("-y", "--force", action="store_true")
     parser.add_option("-s", "--subdomain")
     parser.add_option("-a", "--auth")
     (options, args) = parser.parse_args()
