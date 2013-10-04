@@ -186,9 +186,6 @@ source %s {
 };
 '''.strip()
 
-yes = ['yes', 'ye', 'y']
-no = ['no', 'n']
-
 LOGGLY_HELP = '''
 Instructions to manually re-configure syslog for Loggly
 =======================================================
@@ -688,7 +685,7 @@ def get_installed_syslog_configuration(syslog_id):
     return { "path": default_directory, "token": auth_token, "source": source }
 
 def write_configuration(syslog_name_for_configuration,
-                        authorization_details, user_type):
+                        authorization_details, user_type, noconfirm=False):
     """
     Function to create/modify configuration file
     """
@@ -707,12 +704,12 @@ def write_configuration(syslog_name_for_configuration,
                          #              LOGGLY_CONFIG_FILE)))
         create_loggly_config_file(syslog_id,
                                   syslog_configuration_details,
-                                  authorization_details, user_type)
+                                  authorization_details, user_type, noconfirm)
         return config_file
     else:
         modify_syslog_config_file(syslog_id,
                                   syslog_configuration_details,
-                                  authorization_details, user_type)
+                                  authorization_details, user_type, noconfirm)
         return config_file
 
 def remove_syslog_ng_source(default_config_file):
@@ -911,8 +908,18 @@ def create_bash_script(content):
                      "restart the syslog service"
                      % file_path))
 
+def confirm(question):
+    for _ in range(5):
+        user_input = usr_input(question + ' [Yes|No]: ').lower()
+        if  user_input in ['yes', 'ye', 'y']:
+            return True
+        elif user_input in ['no', 'n']:
+            return False
+        elif user_input:
+            printLog("Not a valid input. Please retry.")
+
 def create_loggly_config_file(syslog_id, syslog_configuration_details,
-                              authorization_details, user_type):
+                              authorization_details, user_type, noconfirm=False):
     """
     Create Loggly configuration file
     """
@@ -926,49 +933,38 @@ def create_loggly_config_file(syslog_id, syslog_configuration_details,
         config_file =  open(file_path, "w")
         config_file.write(content)
         config_file.close()
+        destfile = os.path.join(syslog_configuration_details.get("path"),
+                                LOGGLY_CONFIG_FILE)
         if user_type == NON_ROOT_USER:
             # print Instructions...
-            content = "mv -f %s %s\n%s" % (file_path,
-                        os.path.join(syslog_configuration_details.get("path"),
-                                     LOGGLY_CONFIG_FILE), command_content)
+            content = "mv -f %s %s\n%s" % (file_path, destfile, command_content)
             create_bash_script(content)
         else:
-            if os.path.isfile(os.path.join(
-                syslog_configuration_details.get("path"), LOGGLY_CONFIG_FILE)):
+            if os.path.isfile(destfile):
                 msg = ("Loggly configuration file (%s) is already present. "
-                       "Do you want to overwrite it? [Yes|No]: "
-                       % os.path.join(syslog_configuration_details.get("path"),
-                                      LOGGLY_CONFIG_FILE))
+                       "Do you want to overwrite it?" % destfile)
+                move = noconfirm or confirm(msg)
+                if move:
+                    os.popen("mv -f %s %s" % (file_path, destfile))
+                    return
+                elif move is False:
+                    printMessage("Finished")
+                    sys.exit(0)
+                elif move is None:
+                    printLog("Invalid input received after maximum attempts.")
+                    printMessage("Aborting")
+                    sys.exit(-1)
 
-                for _ in range(5):
-                    user_input = usr_input(msg).lower()
-                    if len(user_input) > 0:
-                        if user_input in yes:
-                            os.popen("mv -f %s %s" % (file_path,
-                                    os.path.join(
-                                    syslog_configuration_details.get("path"),
-                                    LOGGLY_CONFIG_FILE)))
-                            return
-                        elif user_input in no:
-                            printMessage("Finished")
-                            sys.exit(0)
-                        else:
-                            printLog("Not a valid input. Please retry.")
             else:
-                os.popen("mv -f %s %s" % (file_path,
-                    os.path.join(syslog_configuration_details.get("path"),
-                                 LOGGLY_CONFIG_FILE)))
+                os.popen("mv -f %s %s" % (file_path, destfile))
                 return
 
-            printLog("Invalid input received after maximum attempts.")
-            printMessage("Aborting")
-            sys.exit(-1)
 
     except IOError as e:
         printLog("IOError %s" % e)
 
 def modify_syslog_config_file(syslog_id, syslog_configuration_details,
-                              authorization_details, user_type):
+                              authorization_details, user_type, noconfirm=False):
     """
     Modifying configuration file by adding Loggly configuration text
     """
@@ -984,73 +980,64 @@ def modify_syslog_config_file(syslog_id, syslog_configuration_details,
     if len(syslog_configuration_details.get("token")) <= 0:
         question = ("\nThe Loggly configuration will be appended to (%s) file."
                     "\n\nDo you want this installer to modify "
-                    "the configuration file? [Yes|No]: "
+                    "the configuration file?"
                     % default_config_file_name.get(syslog_id))
-        for _ in range(5):
-            user_input = usr_input(question).lower()
-            if len(user_input) > 0:
-                if  user_input in yes:
+        modify = noconfirm or confirm(question)
+        if modify:
+            backup_file_name = ("%s_%s.bak"
+                        % (default_config_file_name.get(syslog_id),
+                        datetime.now().strftime('%Y-%m-%dT%H:%M:%S')))
 
-                    backup_file_name = ("%s_%s.bak"
-                                % (default_config_file_name.get(syslog_id),
-                                datetime.now().strftime('%Y-%m-%dT%H:%M:%S')))
+            with tempfile.NamedTemporaryFile(delete=False) as temp_file:
+                temp_file.write(content.encode('utf-8'))
+            if user_type == ROOT_USER:
+                os.popen(("cp -p %s %s"
+                          % (default_config_file_name.get(syslog_id),
+                             backup_file_name)))
+                os.popen(("bash -c 'cat %s >> %s' "
+                    % (temp_file.name,
+                    default_config_file_name.get(syslog_id)))).read()
+                os.unlink(temp_file.name)
+            else:
+                bash_script_content = ("cp -p %s %s "
+                            "\nbash -c 'cat %s >> %s'\n%s"
+                            % (default_config_file_name.get(syslog_id),
+                               backup_file_name, temp_file.name,
+                               default_config_file_name.get(syslog_id),
+                               command_content))
+                create_bash_script(bash_script_content)
+            return backup_file_name
+        elif modify is False:
+            printLog("\nPlease add the following lines to "
+                            "the syslog configuration file (%s)."
+                            "\n\n%s%s"
+                            % (default_config_file_name.get(syslog_id),
+                               comment, content))
+            printMessage("Finished")
+            sys.exit(0)
 
-                    with tempfile.NamedTemporaryFile(delete=False) as temp_file:
-                        temp_file.write(content.encode('utf-8'))
-                    if user_type == ROOT_USER:
-                        os.popen(("cp -p %s %s"
-                                  % (default_config_file_name.get(syslog_id),
-                                     backup_file_name)))
-                        os.popen(("bash -c 'cat %s >> %s' "
-                            % (temp_file.name,
-                            default_config_file_name.get(syslog_id)))).read()
-                        os.unlink(temp_file.name)
-                    else:
-                        bash_script_content = ("cp -p %s %s "
-                                    "\nbash -c 'cat %s >> %s'\n%s"
-                                    % (default_config_file_name.get(syslog_id),
-                                       backup_file_name, temp_file.name,
-                                       default_config_file_name.get(syslog_id),
-                                       command_content))
-                        create_bash_script(bash_script_content)
-                    return backup_file_name
-
-                elif user_input in no:
-                    printLog("\nPlease add the following lines to "
-                                    "the syslog configuration file (%s)."
-                                    "\n\n%s%s"
-                                    % (default_config_file_name.get(syslog_id),
-                                       comment, content))
-                    printMessage("Finished")
-                    sys.exit(0)
     else:
         question = ("\nThis configuration currently uses \"%s\" as its Customer Token. "
-                    "Do you want to overwrite it? [Yes|No]: "
+                    "Do you want to overwrite it?"
                     % syslog_configuration_details.get("token"))
-        for _ in range(5):
-            user_input = usr_input(question).lower()
-            if len(user_input) > 0:
-                if  user_input in yes:
-                    pattern = (r"s/[a-z0-9]\{8\}\-[a-z0-9]\{4\}\-[a-z0-9]"
-                               r"\{4\}\-[a-z0-9]\{4\}\-[a-z0-9]\{12\}/%s/g"
-                               % authorization_details.get("token"))
-                    if user_type == ROOT_USER:
-                        os.popen("sed -i '%s' %s" % (pattern,
-                                    default_config_file_name.get(syslog_id)))
-                    else:
-                        bash_script_content = "sed -i '%s' %s\n%s" % (pattern,
-                                    default_config_file_name.get(syslog_id),
-                                    command_content)
-                        create_bash_script(bash_script_content)
-                    return
-                elif user_input in no:
-                    printMessage("Finished")
-                    sys.exit(0)
-                    return
-                else:
-                    printLog("Not a valid input. Please retry.")
-        printMessage("Aborting")
-        sys.exit(-1)
+        overwrite = noconfirm or confirm(question)
+        if overwrite:
+            pattern = (r"s/[a-z0-9]\{8\}\-[a-z0-9]\{4\}\-[a-z0-9]"
+                       r"\{4\}\-[a-z0-9]\{4\}\-[a-z0-9]\{12\}/%s/g"
+                       % authorization_details.get("token"))
+            if user_type == ROOT_USER:
+                os.popen("sed -i '%s' %s" % (pattern,
+                            default_config_file_name.get(syslog_id)))
+            else:
+                bash_script_content = "sed -i '%s' %s\n%s" % (pattern,
+                            default_config_file_name.get(syslog_id),
+                            command_content)
+                create_bash_script(bash_script_content)
+            return
+        elif overwrite is False:
+            printMessage("Finished")
+            sys.exit(0)
+            return
 
     printLog("Invalid input received after maximum attempts.")
     printMessage("Aborting")
@@ -1114,25 +1101,20 @@ def restart_syslog_process(syslog_type, process_id):
 
     return False
 
-def confirm_syslog_restart(syslog_type):
+def confirm_syslog_restart(syslog_type, noconfirm=False):
     """
     Ask the user if it's okay to restart their syslog daemon
     """
     if PROCESS_ID != -1:
         question = ("Do you want the Loggly Syslog Configuration Script "
-                    "to restart (SIGHUP) the syslog daemon. [Yes|No]: ")
-        for _ in range(5):
-            user_input = usr_input(question).lower()
-            if len(user_input) > 0:
-                if  user_input in yes:
-                    return restart_syslog_process(syslog_type, PROCESS_ID)
-                elif user_input in no:
-                    printLog("Configuration file has been modified, "
-                                     "please restart %s daemon manually."
-                                     % syslog_type)
-                    return False
-                else:
-                    printLog("Not a valid input. Please retry.")
+                    "to restart (SIGHUP) the syslog daemon.")
+        result = noconfirm or confirm(question)
+        if result:
+            return restart_syslog_process(syslog_type, PROCESS_ID)
+        elif result is False:
+            printLog("Configuration file has been modified, "
+                     "please restart %s daemon manually."
+                     % syslog_type)
     else:
         printLog("Syslog daemon (%s) is not running. "
                          "Configuration file has been modified,"
@@ -1293,11 +1275,11 @@ def install(current_environment):
     #place it in configuration directory path ($IncludeConfig),
     #default path for rsyslog will be /etc/rsyslog.d/
     modified_config_file = write_configuration(syslog_name_for_configuration,
-                        authorization_details, user_type)
+                        authorization_details, user_type, options.noconfirm)
     selinux_status = check_selinux_service_status(syslog_name_for_configuration)
     if user_type == ROOT_USER and not selinux_status:
         # 6. SIGHUP the syslog daemon.
-        confirm_syslog_restart(syslog_name_for_configuration)
+        confirm_syslog_restart(syslog_name_for_configuration, options.noconfirm)
 
     printLog(INSTALLATION_COMPLETED_TEXT)
     return syslog_name_for_configuration
@@ -1322,7 +1304,8 @@ def uninstall(current_environment):
     remove_configuration(syslog_name_for_configuration)
     selinux_status = check_selinux_service_status(syslog_name_for_configuration)
     if not selinux_status:
-        confirm_syslog_restart(syslog_name_for_configuration)
+        noconfirm = current_environment['options'].noconfirm
+        confirm_syslog_restart(syslog_name_for_configuration, noconfirm)
     printLog("Uninstall completed")
 
 def rsyslog_dryrun():
@@ -1370,7 +1353,9 @@ def dryrun(current_environment):
     printLog("Dryrun started for syslog version %s" % syslogd)
 
     token = getattr(current_environment['options'], 'auth') or 'foofey'
-    config_file = write_configuration(syslogd, {'token': token, 'id': DISTRIBUTION_ID }, 1)
+    noconfirm = current_environment['options'].noconfirm
+    config_file = write_configuration(
+            syslogd, {'token': token, 'id': DISTRIBUTION_ID }, 1, noconfirm)
     errors = []
 
     if syslogd == 'rsyslog':
@@ -1454,6 +1439,7 @@ Action:
 Option:
 \tsubdomain    Name of loggly account being connected to
 \tauth         Loggly auth token to use for logging
+\tyes          Skip confirmations -- assume yes
 '''.lstrip()
 
 def parse_options():
@@ -1465,6 +1451,7 @@ def parse_options():
     parser.add_posarg("action", dest='action', type="choice",
                       choices=('install', 'uninstall', 'verify',
                                'sysinfo', 'loggly_help', 'dryrun'))
+    parser.add_option("-y", "--yes", action="store_true", dest='noconfirm')
     parser.add_option("-s", "--subdomain")
     parser.add_option("-a", "--auth")
     (options, args) = parser.parse_args()
