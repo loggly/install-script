@@ -1470,6 +1470,15 @@ def parse_options():
     (options, args) = parser.parse_args()
     return options
 
+def assert_os():
+    platform = sys.platform
+    # maybe also allow freebsd or sunos?
+    if not platform.startswith('linux'):
+        printLog("This script is only designed to run under linux, not %s" %
+                platform)
+        log({"platform": platform})
+        sys.exit(1)
+
 # Script starts here
 def main():
     try:
@@ -1490,6 +1499,7 @@ def main():
             "operating_system": current_environment['operating_system'],
             "syslog_versions": [ {"daemon": d, "version": v} for d,v in current_environment['syslog_versions'] ]
             })
+        assert_os()
         call_module(options.action, current_environment)
         printMessage("Finished")
         log({"status":"finish", "args": vars(options)})
