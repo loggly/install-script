@@ -110,7 +110,7 @@ you login at mycompany.loggly.com,
 your account name is mycompany.
 '''.lstrip()
 
-INSTALLATION_COMPLETED_TEXT = "Installation completed.\n"
+INSTALLATION_COMPLETED_TEXT = "Configuration script completed."
 
 _LOG_SOCKET = None
 OUR_PROGNAME      = "configure-syslog"
