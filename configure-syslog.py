@@ -470,12 +470,6 @@ def perform_sanity_check(current_environment):
     Performing quick check of OS and Syslog
     """
     printLog("Performing sanity check....")
-    if (current_environment['distro_id'] == OS_UNSUPPORTED\
-        or OS_FAIL in LOGGLY_QA):
-        printLog(STR_EXIT_MESSAGE % current_environment['operating_system'])
-        sys_exit(
-            reason = STR_EXIT_MESSAGE % current_environment['operating_system']
-            )
 
     syslog_versions = {}
     for (syslog_type, syslog_version)\
