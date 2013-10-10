@@ -316,6 +316,9 @@ def sendEnvironment(data):
     printLog("Sending environment details to Loggly Server.")
     log(data)
 
+def get_python_version_string():
+    return ".".join(map(str, sys.version_info))
+
 def sys_exit(reason = None):
     """
     If script fails, send environment details with reason for failure to loggly
@@ -324,7 +327,7 @@ def sys_exit(reason = None):
     data = {
         "operating_system": current_environment['operating_system'],
         "syslog_versions": current_environment['syslog_versions'],
-        "python_version": ".".join(map(str, sys.version_info)),
+        "python_version": get_python_version_string(),
         "reason":reason,
         "username":USER,
         "subdomain": SUBDOMAIN
