@@ -29,7 +29,10 @@ try:
     import urllib.request as urllib_request
 except ImportError:
     import urllib2 as urllib_request
-import json
+try:
+    import json
+except ImportError:
+    json = None
 import uuid
 import base64
 import socket
@@ -1465,6 +1468,13 @@ def main():
     try:
         printMessage("Starting")
         options = parse_options()
+        if json is None:
+            version = get_python_version_string()
+            log_msg('''{"python_version": "%s", "subdomain": "%s"}''' %
+                    (version, options.subdomain))
+            printMessage(STR_PYTHON_FAIL_MESSAGE %
+                    (version, MINIMUM_SUPPORTED_PYTHON_VERSION))
+            sys.exit(-1)
         global LOGGLY_QA
         LOGGLY_QA = os.environ.get('LOGGLY_QA', '').split()
         log({"status":"start", "args": vars(options)})
