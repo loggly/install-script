@@ -1199,16 +1199,16 @@ def log(d, prio = 'info', facility = 'local0'):
     Send a log message to Loggly;
     send a UDP datagram to Loggly rather than risk blocking.
     """
+    msg_dict = {"version": OUR_VERSION}
+    msg_dict.update(d)
+    log_msg(json.dumps(msg_dict))
 
+def log_msg(msg, prio='info', facility='local0'):
     global _LOG_SOCKET
     try:
         pri = LOG_PRIORITIES[prio] + LOG_FACILITIES[facility]
     except KeyError, errmsg:
         pass
-
-    msg_dict = {"version": OUR_VERSION}
-    msg_dict.update(d)
-
     vals = {
       'pri':                pri,
       'version':            1,
@@ -1219,7 +1219,7 @@ def log(d, prio = 'info', facility = 'local0'):
       'msgid':              '-',
       'loggly-auth-token':  LOGGLY_AUTH_TOKEN,
       'loggly-pen':         int(DISTRIBUTION_ID),
-      'msg':                json.dumps(msg_dict)
+      'msg':                msg
     }
 
     fullmsg = ("<%(pri)s>%(version)s %(timestamp)s %(hostname)s "
