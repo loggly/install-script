@@ -1468,12 +1468,6 @@ def main():
         options = parse_options()
         global LOGGLY_QA
         LOGGLY_QA = os.environ.get('LOGGLY_QA', '').split()
-        version_compatibility_check(MINIMUM_SUPPORTED_PYTHON_VERSION)
-
-        if options.action == 'loggly_help':
-            loggly_help()
-            sys.exit()
-
         log({"status":"start", "args": vars(options)})
         current_environment = get_environment_details()
         current_environment['options'] = options
@@ -1481,7 +1475,13 @@ def main():
             "operating_system": current_environment['operating_system'],
             "syslog_versions": [ {"daemon": d, "version": v} for d,v in current_environment['syslog_versions'] ]
             })
+        version_compatibility_check(MINIMUM_SUPPORTED_PYTHON_VERSION)
         assert_os()
+
+        if options.action == 'loggly_help':
+            loggly_help()
+            sys.exit()
+
         call_module(options.action, current_environment)
         printMessage("Finished")
         log({"status":"finish", "args": vars(options)})
