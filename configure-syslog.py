@@ -324,6 +324,7 @@ def sys_exit(reason = None):
     data = {
         "operating_system": current_environment['operating_system'],
         "syslog_versions": current_environment['syslog_versions'],
+        "python_version": ".".join(map(str, sys.version_info)),
         "reason":reason,
         "username":USER,
         "subdomain": SUBDOMAIN
