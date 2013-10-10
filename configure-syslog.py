@@ -536,18 +536,14 @@ def find_syslog_process():
         if results:
             #For python version 3 and above, reading binary data, not str,
             #so we need to decode the output first:
-            reslines = results.split(b'\n')
+            reslines = results.split('\n')
             if len(reslines) == 1:
                 ps_out_fields = reslines[0].split()
                 pid = int(ps_out_fields[1])
                 progname = ps_out_fields[7]
-                if b'/' in progname:
-                    progname = progname.split(b'/')[-1]
-                try:
-                    return (progname.decode('UTF-8'), pid)
-                except ValueError:
-                    # if progname won't decode, it's not a progname we know.
-                    pass
+                if '/' in progname:
+                    progname = progname.split('/')[-1]
+                return progname, pid
     return None, 0
 
 def check_syslog_service_status(syslog_type):
