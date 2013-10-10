@@ -797,17 +797,17 @@ def get_json_data(url, user, password):
         req.add_header("Authorization",
                        "Basic " + str(user_passwd.rstrip().decode("utf-8")))
         return json.loads(urllib_request.urlopen(req).read().decode("utf-8"))
-    except urllib_request.HTTPError as e:
+    except urllib_request.HTTPError, e:
         if e.code == 401:
             msg = STR_AUTHENTICATION_FAIL_MESSAGE % USER
         else:
             msg = str(e)
         printLog("%s" % msg)
         sys_exit(reason = "%s" % msg)
-    except urllib_request.URLError as e:
+    except urllib_request.URLError, e:
         printLog("%s" % e)
         sys_exit(reason = "%s" % e)
-    except Exception as e:
+    except Exception, e:
         printLog("Exception %s" % e)
         sys_exit(reason = "%s" % e)
 
@@ -838,7 +838,7 @@ def get_auth_token(loggly_user, loggly_password, loggly_subdomain):
             printLog("Loggly credentials could not be verified.")
             sys_exit(reason = "Loggly credentials could not be verified.")
 
-    except Exception as e:
+    except Exception, e:
         printLog("Exception %s" % e)
         sys_exit(reason = "%s" % e)
 
@@ -951,7 +951,7 @@ def create_loggly_config_file(syslog_id, syslog_configuration_details,
                 return
 
 
-    except IOError as e:
+    except IOError, e:
         printLog("IOError %s" % e)
 
 def modify_syslog_config_file(syslog_id, syslog_configuration_details,
@@ -1175,7 +1175,7 @@ def write_env_details(current_environment):
         printLog("Created environment details file at %s, "
                         "please visit http://loggly.com/docs/sending-logs-unixlinux-system-setup/ for more information." % file_path)
         printEnvironment(current_environment)
-    except Exception as e:
+    except Exception, e:
         printLog("Error %s" % e)
         sys_exit(reason = "Error %s" % e)
 
@@ -1203,7 +1203,7 @@ def log(d, prio = 'info', facility = 'local0'):
     global _LOG_SOCKET
     try:
         pri = LOG_PRIORITIES[prio] + LOG_FACILITIES[facility]
-    except KeyError as errmsg:
+    except KeyError, errmsg:
         pass
 
     msg_dict = {"version": OUR_VERSION}
@@ -1485,7 +1485,7 @@ def main():
 		#Python3 and above throw error
         print("\nAborting...")
         log({"status":"aborted", "args": vars(options), "msg":"KeyboardInterrupt" })
-    except Exception as e:
+    except Exception, e:
         try:
             trace = traceback.format_exc()
             printLog(trace)
