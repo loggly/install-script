@@ -29,7 +29,10 @@ try:
     import urllib.request as urllib_request
 except ImportError:
     import urllib2 as urllib_request
-import json
+try:
+    import json
+except ImportError:
+    json = None
 import uuid
 import base64
 import socket
@@ -316,6 +319,9 @@ def sendEnvironment(data):
     printLog("Sending environment details to Loggly Server.")
     log(data)
 
+def get_python_version_string():
+    return ".".join(map(str, sys.version_info))
+
 def sys_exit(reason = None):
     """
     If script fails, send environment details with reason for failure to loggly
@@ -324,7 +330,7 @@ def sys_exit(reason = None):
     data = {
         "operating_system": current_environment['operating_system'],
         "syslog_versions": current_environment['syslog_versions'],
-        "python_version": ".".join(map(str, sys.version_info)),
+        "python_version": get_python_version_string(),
         "reason":reason,
         "username":USER,
         "subdomain": SUBDOMAIN
@@ -536,18 +542,14 @@ def find_syslog_process():
         if results:
             #For python version 3 and above, reading binary data, not str,
             #so we need to decode the output first:
-            reslines = results.split(b'\n')
+            reslines = results.split('\n')
             if len(reslines) == 1:
                 ps_out_fields = reslines[0].split()
                 pid = int(ps_out_fields[1])
                 progname = ps_out_fields[7]
-                if b'/' in progname:
-                    progname = progname.split(b'/')[-1]
-                try:
-                    return (progname.decode('UTF-8'), pid)
-                except ValueError:
-                    # if progname won't decode, it's not a progname we know.
-                    pass
+                if '/' in progname:
+                    progname = progname.split('/')[-1]
+                return progname, pid
     return None, 0
 
 def check_syslog_service_status(syslog_type):
@@ -801,17 +803,17 @@ def get_json_data(url, user, password):
         req.add_header("Authorization",
                        "Basic " + str(user_passwd.rstrip().decode("utf-8")))
         return json.loads(urllib_request.urlopen(req).read().decode("utf-8"))
-    except urllib_request.HTTPError as e:
+    except urllib_request.HTTPError, e:
         if e.code == 401:
             msg = STR_AUTHENTICATION_FAIL_MESSAGE % USER
         else:
             msg = str(e)
         printLog("%s" % msg)
         sys_exit(reason = "%s" % msg)
-    except urllib_request.URLError as e:
+    except urllib_request.URLError, e:
         printLog("%s" % e)
         sys_exit(reason = "%s" % e)
-    except Exception as e:
+    except Exception, e:
         printLog("Exception %s" % e)
         sys_exit(reason = "%s" % e)
 
@@ -842,7 +844,7 @@ def get_auth_token(loggly_user, loggly_password, loggly_subdomain):
             printLog("Loggly credentials could not be verified.")
             sys_exit(reason = "Loggly credentials could not be verified.")
 
-    except Exception as e:
+    except Exception, e:
         printLog("Exception %s" % e)
         sys_exit(reason = "%s" % e)
 
@@ -955,7 +957,7 @@ def create_loggly_config_file(syslog_id, syslog_configuration_details,
                 return
 
 
-    except IOError as e:
+    except IOError, e:
         printLog("IOError %s" % e)
 
 def modify_syslog_config_file(syslog_id, syslog_configuration_details,
@@ -1179,7 +1181,7 @@ def write_env_details(current_environment):
         printLog("Created environment details file at %s, "
                         "please visit http://loggly.com/docs/sending-logs-unixlinux-system-setup/ for more information." % file_path)
         printEnvironment(current_environment)
-    except Exception as e:
+    except Exception, e:
         printLog("Error %s" % e)
         sys_exit(reason = "Error %s" % e)
 
@@ -1203,16 +1205,16 @@ def log(d, prio = 'info', facility = 'local0'):
     Send a log message to Loggly;
     send a UDP datagram to Loggly rather than risk blocking.
     """
+    msg_dict = {"version": OUR_VERSION}
+    msg_dict.update(d)
+    log_msg(json.dumps(msg_dict))
 
+def log_msg(msg, prio='info', facility='local0'):
     global _LOG_SOCKET
     try:
         pri = LOG_PRIORITIES[prio] + LOG_FACILITIES[facility]
-    except KeyError as errmsg:
+    except KeyError, errmsg:
         pass
-
-    msg_dict = {"version": OUR_VERSION}
-    msg_dict.update(d)
-
     vals = {
       'pri':                pri,
       'version':            1,
@@ -1223,7 +1225,7 @@ def log(d, prio = 'info', facility = 'local0'):
       'msgid':              '-',
       'loggly-auth-token':  LOGGLY_AUTH_TOKEN,
       'loggly-pen':         int(DISTRIBUTION_ID),
-      'msg':                json.dumps(msg_dict)
+      'msg':                msg
     }
 
     fullmsg = ("<%(pri)s>%(version)s %(timestamp)s %(hostname)s "
@@ -1466,14 +1468,15 @@ def main():
     try:
         printMessage("Starting")
         options = parse_options()
+        if json is None:
+            version = get_python_version_string()
+            log_msg('''{"python_version": "%s", "subdomain": "%s"}''' %
+                    (version, options.subdomain))
+            printMessage(STR_PYTHON_FAIL_MESSAGE %
+                    (version, MINIMUM_SUPPORTED_PYTHON_VERSION))
+            sys.exit(-1)
         global LOGGLY_QA
         LOGGLY_QA = os.environ.get('LOGGLY_QA', '').split()
-        version_compatibility_check(MINIMUM_SUPPORTED_PYTHON_VERSION)
-
-        if options.action == 'loggly_help':
-            loggly_help()
-            sys.exit()
-
         log({"status":"start", "args": vars(options)})
         current_environment = get_environment_details()
         current_environment['options'] = options
@@ -1481,7 +1484,13 @@ def main():
             "operating_system": current_environment['operating_system'],
             "syslog_versions": [ {"daemon": d, "version": v} for d,v in current_environment['syslog_versions'] ]
             })
+        version_compatibility_check(MINIMUM_SUPPORTED_PYTHON_VERSION)
         assert_os()
+
+        if options.action == 'loggly_help':
+            loggly_help()
+            sys.exit()
+
         call_module(options.action, current_environment)
         printMessage("Finished")
         log({"status":"finish", "args": vars(options)})
@@ -1489,7 +1498,7 @@ def main():
 		#Python3 and above throw error
         print("\nAborting...")
         log({"status":"aborted", "args": vars(options), "msg":"KeyboardInterrupt" })
-    except Exception as e:
+    except Exception, e:
         try:
             trace = traceback.format_exc()
             printLog(trace)
