@@ -1382,7 +1382,7 @@ def loggly_help():
     loggly_user, loggly_password, loggly_subdomain = login()
     auth_tokens = get_auth(loggly_user, loggly_password, loggly_subdomain)
     logglyhelp = LOGGLY_HELP %  {
-        'subdomain': loggly_subdomain,
+        'account': loggly_subdomain,
         'token': auth_tokens[-1],
         'dist_id': DISTRIBUTION_ID,
         'syslog_server': LOGGLY_SYSLOG_SERVER,
@@ -1434,7 +1434,7 @@ Action:
 \tloggly_help  Guideline for users for each step to configure syslog
 \tdryrun       Perform configuration steps without modifying anything
 Option:
-\tsubdomain    Name of loggly account being connected to
+\taccount      Name of loggly account being connected to
 \tauth         Loggly auth token to use for logging
 \tyes          Skip confirmations -- assume yes
 '''.lstrip()
@@ -1449,7 +1449,7 @@ def parse_options():
                       choices=('setup', 'revert', 'verify',
                                'sysinfo', 'loggly_help', 'dryrun'))
     parser.add_option("-y", "--yes", action="store_true", dest='noconfirm')
-    parser.add_option("-s", "--subdomain")
+    parser.add_option("-s", "--account")
     parser.add_option("-a", "--auth")
     (options, args) = parser.parse_args()
     return options
