@@ -4,7 +4,7 @@
 # Loggly Syslog configuration script.
 #
 # This script automatically configures a syslog-ng or rsyslog
-# installation such that it sends all logs from this system to Loggly.
+# setup such that it sends all logs from this system to Loggly.
 #
 # For this to work you must have an account on the Loggly system. Sign
 # up for one at http://www.loggly.com.
@@ -976,7 +976,7 @@ def modify_syslog_config_file(syslog_id, syslog_configuration_details,
 
     if len(syslog_configuration_details.get("token")) <= 0:
         question = ("\nThe Loggly configuration will be appended to (%s) file."
-                    "\n\nDo you want this installer to modify "
+                    "\n\nDo you want this setup-script to modify "
                     "the configuration file?"
                     % default_config_file_name.get(syslog_id))
         modify = noconfirm or confirm(question)
@@ -1249,7 +1249,7 @@ def perform_sanity_check_and_get_product_for_configuration(current_environment,
     return syslog_name_for_configuration
 
 def install(current_environment):
-    printLog("Installation started")
+    printLog("Setup started")
     # 1. Determine user type.
     user_type = get_user_type()
     # 2. Determine the environment in which it was invoked
@@ -1289,10 +1289,10 @@ def verify(current_environment):
     printLog("Verification completed")
 
 def uninstall(current_environment):
-    printLog("Uninstall started")
+    printLog("Revert started")
     user_type = get_user_type()
     if user_type == NON_ROOT_USER:
-        printLog("Please become root to uninstall")
+        printLog("Please become root to revert")
         sys.exit()
     #No need to check syslog service for uninstall
     syslog_name_for_configuration = \
@@ -1303,7 +1303,7 @@ def uninstall(current_environment):
     if not selinux_status:
         noconfirm = current_environment['options'].noconfirm
         confirm_syslog_restart(syslog_name_for_configuration, noconfirm)
-    printLog("Uninstall completed")
+    printLog("Revert completed")
 
 def rsyslog_dryrun():
     results = get_stderr_from_process('rsyslogd -N1')
@@ -1370,8 +1370,8 @@ def dryrun(current_environment):
 
 module_dict = {
     'sysinfo' : write_env_details,
-    'install' :install,
-    'uninstall' : uninstall,
+    'setup' :install,
+    'revert' : uninstall,
     'verify' : verify,
     'dryrun' : dryrun
     }
@@ -1427,8 +1427,8 @@ class PAOptionParser(OptionParser, object):
 CMD_USAGE = '''
 %prog <action> [option]
 Action:
-\tinstall      Configure the syslog
-\tuninstall    Remove changes made by the syslog configuration script
+\tsetup        Configure your syslog installtion
+\trevert       Remove changes made by the syslog configuration script
 \tverify       Verify the configuration explicitly
 \tsysinfo      Print, write system information
 \tloggly_help  Guideline for users for each step to configure syslog
@@ -1446,7 +1446,7 @@ def parse_options():
 
     parser = PAOptionParser(usage=CMD_USAGE)
     parser.add_posarg("action", dest='action', type="choice",
-                      choices=('install', 'uninstall', 'verify',
+                      choices=('setup', 'revert', 'verify',
                                'sysinfo', 'loggly_help', 'dryrun'))
     parser.add_option("-y", "--yes", action="store_true", dest='noconfirm')
     parser.add_option("-s", "--subdomain")
