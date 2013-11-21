@@ -976,8 +976,7 @@ def modify_syslog_config_file(syslog_id, syslog_configuration_details,
 
     if len(syslog_configuration_details.get("token")) <= 0:
         question = ("\nThe Loggly configuration will be appended to (%s) file."
-                    "\n\nDo you want this setup-script to modify "
-                    "the configuration file?"
+                    "\n\nWould you like to have the configuration file modified?"
                     % default_config_file_name.get(syslog_id))
         modify = noconfirm or confirm(question)
         if modify:
@@ -1427,8 +1426,8 @@ class PAOptionParser(OptionParser, object):
 CMD_USAGE = '''
 %prog <action> [option]
 Action:
-\tsetup        Configure your syslog installtion
-\trevert       Remove changes made by the syslog configuration script
+\tsetup        Configure your syslog setup
+\trevert       Revert changes made by this syslog configuration script
 \tverify       Verify the configuration explicitly
 \tsysinfo      Print, write system information
 \tloggly_help  Guideline for users for each step to configure syslog
