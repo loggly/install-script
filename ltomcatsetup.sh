@@ -1,8 +1,6 @@
 #!/bin/bash 
-#LOGGLY_CATALINA_HOME=/home/vagrant/manoj/apache-tomcat-7.0.52
 # executing the script for loggly to get the install and configure syslog.
 configureLoggly() {
-#LOGGLY_CATALINA_HOME=/home/vagrant/manoj32/apache-tomcat-7.0.52
 SERVICE=tomcat
 LOGGLY_CATALINA_CONF_HOME=$LOGGLY_CATALINA_HOME/conf
 LOGGLY_CATALINA_PROPFILE=$LOGGLY_CATALINA_CONF_HOME/logging.properties
