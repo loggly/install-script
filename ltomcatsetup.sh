@@ -145,7 +145,7 @@ while [ "$tomcatLatestLogCount" -le "$tomcatinitialLogCount" ]; do
    sleep 30
    echo "######## Done waiting. verfiying again..."
    echo "Try # $counter of total 10"
-   searchAndFetch tomcatLatestLogcount "$queryParam" 
+   searchAndFetch tomcatLatestLogCount "$queryParam" 
    echo "Again Fetch: initial count $tomcatinitialLogCount : latest count : $tomcatLatestLogCount  counter: $counter  max counter: $maxCounter"
    let counter=$counter+1
 done
