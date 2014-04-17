@@ -1,7 +1,7 @@
 #!/bin/bash 
 # executing the script for loggly to get the install and configure syslog.
 configureLoggly() {
-SERVICE=tomcat
+SERVICE=tomcat6
 LOGGLY_CATALINA_CONF_HOME=$LOGGLY_CATALINA_HOME/conf
 LOGGLY_CATALINA_PROPFILE=$LOGGLY_CATALINA_CONF_HOME/logging.properties
 LOGGLY_CATALINA_BACKUP_PROPFILE=$LOGGLY_CATALINA_PROPFILE.bk
