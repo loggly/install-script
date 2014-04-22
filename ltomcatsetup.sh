@@ -34,6 +34,16 @@ cp -f $LOGGLY_CATALINA_PROPFILE $LOGGLY_CATALINA_BACKUP_PROPFILE
 
 sed -i -e 's/rotatable\ =\ true/rotatable\ =\ false/g' $LOGGLY_CATALINA_BACKUP_PROPFILE 
 
+#if [ $(fgrep rotatable "$LOGGLY_CATALINA_PROPFILE" | wc -l) < 4 ]; then
+#echo "Rotable configuration doesn't exist on the properites file. Adding it..."
+#cat << ROTATABLE >> "$LOGGLY_CATALINA_PROPFILEA"
+#1catalina.org.apache.juli.FileHandler.rotatable = false
+#2localhost.org.apache.juli.FileHandler.rotatable = false
+#3manager.org.apache.juli.FileHandler.rotatable = false
+#4host-manager.org.apache.juli.FileHandler.rotatable = false
+#ROTATABLE
+#fi
+
 restartTomcat
 
 # Create rsyslog dir if doesn't exist, Modify the rsyslog directory if exsit
@@ -55,8 +65,41 @@ else
    echo " Creating file $TOMCAT_SYSLOGCONF_FILE" 
    sudo touch $TOMCAT_SYSLOGCONF_FILE
    sudo chmod o+w $TOMCAT_SYSLOGCONF_FILE
+   generateTomcat21File
 fi
 
+tomcatinitialLogCount=0
+tomcatLatestLogCount=0
+queryParam="&from=-15m&until=now&size=1"
+searchAndFetch tomcatinitialLogCount "$queryParam"
+# restart the syslog service.
+restartsyslog
+echo "restarting tomcat one more time..."
+restartTomcat
+searchAndFetch tomcatLatestLogCount "$queryParam"
+
+counter=1
+maxCounter=10
+echo "latest tomcat log count: $tomcatLatestLogCount and before query count: $tomcatinitialLogCount"
+while [ "$tomcatLatestLogCount" -le "$tomcatinitialLogCount" ]; do 
+   echo "######### waiting for 30 secs......"
+   sleep 30
+   echo "######## Done waiting. verfiying again..."
+   echo "Try # $counter of total 10"
+   searchAndFetch tomcatLatestLogCount "$queryParam" 
+   echo "Again Fetch: initial count $tomcatinitialLogCount : latest count : $tomcatLatestLogCount  counter: $counter  max counter: $maxCounter"
+   let counter=$counter+1
+done
+
+if [ "$tomcatLatestLogCount" -gt "$tomcatinitialCount" ]; then
+echo "####### Tomcat Log succesfully transferred to Loggly ###########"
+fi
+
+
+}
+# End of configure rsyslog for tomcat
+
+generateTomcat21File() {
 #change the tomcat-21 file to variable from above and also take the directory of the tomcat log file.
 sudo cat << EOIPFW >> /etc/rsyslog.d/21-tomcat.conf 
 \$ModLoad imfile
@@ -127,36 +170,7 @@ if \$programname == 'localhost-log' then @@logs-01.loggly.com:514;LogglyFormatTo
 if \$programname == 'manager' then @@logs-01.loggly.com:514;LogglyFormatTomcat
     if \$programname == 'manager' then ~
 EOIPFW
-tomcatinitialLogCount=0
-tomcatLatestLogCount=0
-queryParam="&from=-15m&until=now&size=1"
-searchAndFetch tomcatinitialLogCount "$queryParam"
-# restart the syslog service.
-restartsyslog
-echo "restarting tomcat one more time..."
-restartTomcat
-searchAndFetch tomcatLatestLogCount "$queryParam"
-
-counter=1
-maxCounter=10
-echo "latest tomcat log count: $tomcatLatestLogCount and before query count: $tomcatinitialLogCount"
-while [ "$tomcatLatestLogCount" -le "$tomcatinitialLogCount" ]; do 
-   echo "######### waiting for 30 secs......"
-   sleep 30
-   echo "######## Done waiting. verfiying again..."
-   echo "Try # $counter of total 10"
-   searchAndFetch tomcatLatestLogCount "$queryParam" 
-   echo "Again Fetch: initial count $tomcatinitialLogCount : latest count : $tomcatLatestLogCount  counter: $counter  max counter: $maxCounter"
-   let counter=$counter+1
-done
-
-if [ "$tomcatLatestLogCount" -gt "$tomcatinitialCount" ]; then
-echo "####### Tomcat Log succesfully transferred to Loggly ###########"
-fi
-
-
 }
-# End of configure rsyslog for tomcat
 
 rollback() {
  echo "Reverting the catalina file ...."
