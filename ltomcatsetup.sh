@@ -1,6 +1,9 @@
 #!/bin/bash 
-# executing the script for loggly to get the install and configure syslog.
+SCRIPT_NAME="ltomcatsetup.sh"
+SCRIPT_VERSION="1.0"
+CONFIG_SYSLOG_TOKEN="b886e45a-b2f9-4019-8ffb-accc0a68e114"
 
+# executing the script for loggly to get the install and configure syslog.
 setVariables(){
 #These are common variables and will be used across various functions
 SERVICE=tomcat6
@@ -15,10 +18,30 @@ LOGGLY_CATALINA_PROPFILE=$LOGGLY_CATALINA_CONF_HOME/logging.properties
 LOGGLY_CATALINA_BACKUP_PROPFILE=$LOGGLY_CATALINA_PROPFILE.loggly.bk
 
 LOGGLY_CATALINA_LOG_HOME=/var/log/$SERVICE
+
+#Following variables are used for configsys logging
+#identify tomcat version
+CATALINA_JAR_PATH=$LOGGLY_CATALINA_HOME/lib/catalina.jar
+if [ ! -f "$CATALINA_JAR_PATH" ]; then
+	if [ $(sudo find / -name catalina.jar | grep tomcat6 | wc -l) = 1 ]; then
+			CATALINA_JAR_PATH=$(sudo find / -name catalina.jar | grep tomcat6)
+	fi
+fi
+
+if [ -f "$CATALINA_JAR_PATH" ]; then
+	TOMCAT_VERSION=$(java -cp $CATALINA_JAR_PATH org.apache.catalina.util.ServerInfo | grep "Server number")
+	TOMCAT_VERSION=${TOMCAT_VERSION#*: }
+	TOMCAT_VERSION=$TOMCAT_VERSION | tr -d ' '
+fi
+
+HOST_NAME=$(hostname)
+LINUX_DIST=$(lsb_release -ds)
+CONFIG_SYSLOG_TOKEN="1ec4e8e1-fbb2-47e7-929b-75a1bff5ffe0"
 }
 
 configureLoggly() {
 setVariables
+logMsgToConfigSysLog "INFO" "Initiating configure Loggly"
 INITIAL_MSGSEARCH_COUNT=0
 FINAL_MSGSEARCH_COUNT=0
 
@@ -32,44 +55,52 @@ if [ -f "$LOGGLY_SYSLOG_CONFFILE" ]; then
 else 
     if [ "$LOGGLY_ACCOUNT" != "" ]; then
         wget -q -O - https://www.loggly.com/install/configure-syslog.py | sudo python - setup --auth $LOGGLY_AUTH_TOKEN --account $LOGGLY_ACCOUNT   
-    else 
-        echo "ERROR: Loggly auth token is required to configure rsyslog. Please pass -a <auth token> while running script"
+    else
+		logMsgToConfigSysLog "ERROR" "ERROR: Loggly auth token is required to configure rsyslog. Please pass -a <auth token> while running script"
+		exit 1
     fi 
 fi 
 	
 # backup the logging properties file just in case it need to reverted.
 echo "Backing up the properties file: $LOGGLY_CATALINA_PROPFILE to $LOGGLY_CATALINA_BACKUP_PROPFILE"
-cp -f $LOGGLY_CATALINA_PROPFILE $LOGGLY_CATALINA_BACKUP_PROPFILE
+if [ ! -f $LOGGLY_CATALINA_PROPFILE ]; then
+	logMsgToConfigSysLog "ERROR" "ERROR: logging.properties file not found!. Looked at location $LOGGLY_CATALINA_PROPFILE" 
+	exit 1
+else
+	cp -f $LOGGLY_CATALINA_PROPFILE $LOGGLY_CATALINA_BACKUP_PROPFILE
+fi
+
 
 # This might not be needed.
 #wget -q -O - https://www.loggly.com/install/configure-syslog.py | sudo  python - setup
 
 #On RHEL 6.4, 'yum install tomcat' installs tomcat v6.0.24. This version does not support disabling of log rotation
 if [ "$(lsb_release -ds | grep  'Red Hat Enterprise Linux Server release 6.4')" = "" ]; then
-#removing the end . from logging.properties variable 1catalina.org.apache.juli.FileHandler.prefix = catalina.
-if grep -Fq "prefix = catalina." $LOGGLY_CATALINA_PROPFILE
-then
-    sudo sed -i "s/prefix = catalina./prefix = catalina/g" $LOGGLY_CATALINA_PROPFILE
-fi
-if grep -Fq "prefix = localhost." $LOGGLY_CATALINA_PROPFILE
-then
-    sudo sed -i "s/prefix = localhost./prefix = localhost/g" $LOGGLY_CATALINA_PROPFILE
-fi
-if grep -Fq "prefix = manager." $LOGGLY_CATALINA_PROPFILE
-then
-    sudo sed -i "s/prefix = manager./prefix = manager/g" $LOGGLY_CATALINA_PROPFILE
-fi
-if grep -Fq "prefix = host-manager." $LOGGLY_CATALINA_PROPFILE
-then
-    sudo sed -i "s/prefix = host-manager./prefix = host-manager/g" $LOGGLY_CATALINA_PROPFILE
-fi
+	#removing the end . from logging.properties variable 1catalina.org.apache.juli.FileHandler.prefix = catalina.
+	if grep -Fq "prefix = catalina." $LOGGLY_CATALINA_PROPFILE
+	then
+		sudo sed -i "s/prefix = catalina./prefix = catalina/g" $LOGGLY_CATALINA_PROPFILE
+	fi
+	if grep -Fq "prefix = localhost." $LOGGLY_CATALINA_PROPFILE
+	then
+		sudo sed -i "s/prefix = localhost./prefix = localhost/g" $LOGGLY_CATALINA_PROPFILE
+	fi
+	if grep -Fq "prefix = manager." $LOGGLY_CATALINA_PROPFILE
+	then
+		sudo sed -i "s/prefix = manager./prefix = manager/g" $LOGGLY_CATALINA_PROPFILE
+	fi
+	if grep -Fq "prefix = host-manager." $LOGGLY_CATALINA_PROPFILE
+	then
+		sudo sed -i "s/prefix = host-manager./prefix = host-manager/g" $LOGGLY_CATALINA_PROPFILE
+	fi
 
-#Check if the rotatable property is present in logging.properties 
-if grep -Fq "rotatable" $LOGGLY_CATALINA_PROPFILE
-then
-#If present, set all the values to false
-sed -i -e 's/rotatable = true/rotatable = false/g' $LOGGLY_CATALINA_PROPFILE 
-fi 
+	#Check if the rotatable property is present in logging.properties 
+	if grep -Fq "rotatable" $LOGGLY_CATALINA_PROPFILE
+	then
+	#If present, set all the values to false
+	sed -i -e 's/rotatable = true/rotatable = false/g' $LOGGLY_CATALINA_PROPFILE 
+	fi
+	if [ $(fgrep "rotatable = false" "$LOGGLY_CATALINA_PROPFILE" | wc -l) < 4 ]; then
 #If rotatable property present or not, add the following lines to disable rotation in any case
 sudo cat << EOIPFW >> $LOGGLY_CATALINA_PROPFILE 
 1catalina.org.apache.juli.FileHandler.rotatable = false
@@ -77,6 +108,7 @@ sudo cat << EOIPFW >> $LOGGLY_CATALINA_PROPFILE
 3manager.org.apache.juli.FileHandler.rotatable = false
 4host-manager.org.apache.juli.FileHandler.rotatable = false
 EOIPFW
+	fi
 
 fi
 #if [ $(fgrep rotatable "$LOGGLY_CATALINA_PROPFILE" | wc -l) < 4 ]; then
@@ -129,36 +161,35 @@ counter=1
 maxCounter=10
 echo "latest tomcat log count: $tomcatLatestLogCount and before query count: $tomcatinitialLogCount"
 while [ "$tomcatLatestLogCount" -le "$tomcatinitialLogCount" ]; do 
-   echo "######### waiting for 30 secs......"
-   sleep 30
-   echo "######## Done waiting. verifying again..."
-   echo "Try # $counter of total 10"
-   searchAndFetch tomcatLatestLogCount "$queryParam" 
-   echo "Again Fetch: initial count $tomcatinitialLogCount : latest count : $tomcatLatestLogCount  counter: $counter  max counter: $maxCounter"
-   let counter=$counter+1
-   if [ "$counter" -gt "$maxCounter" ]; then
-	echo "####### Tomcat logs did not make to Loggly in stipulated time. Please retry ###########"
-	break;
-   fi
+	echo "######### waiting for 30 secs......"
+	sleep 30
+	echo "######## Done waiting. verifying again..."
+	echo "Try # $counter of total 10"
+	searchAndFetch tomcatLatestLogCount "$queryParam" 
+	echo "Again Fetch: initial count $tomcatinitialLogCount : latest count : $tomcatLatestLogCount  counter: $counter  max counter: $maxCounter"
+	let counter=$counter+1
+	if [ "$counter" -gt "$maxCounter" ]; then
+		logMsgToConfigSysLog "ERROR" "ERROR: Tomcat logs did not make to Loggly in stipulated time. Please retry"
+		exit 1
+	fi
 done
 
 if [ "$tomcatLatestLogCount" -gt "$tomcatinitialLogCount" ]; then
-echo "####### Tomcat Log successfully transferred to Loggly ###########"
+	logMsgToConfigSysLog "SUCCESS" "SUCCESS: Tomcat Log successfully transferred to Loggly"
+	exit 0
 fi
-
 }
 # End of configure rsyslog for tomcat
 
 generateTomcat21File() {
 
 imfileStr="\$ModLoad imfile
-\$WorkDirectory $SYSLOG_DIR
-"
+\$WorkDirectory $SYSLOG_DIR"
 if [ "$(lsb_release -ds | grep Ubuntu)" != "" ]; then
-imfileStr+="\$PrivDropToGroup adm
+imfileStr+="
+\$PrivDropToGroup adm
 \$WorkDirectory $SYSLOG_DIR"
 fi
-
 
 
 #change the tomcat-21 file to variable from above and also take the directory of the tomcat log file.
@@ -232,6 +263,7 @@ EOIPFW
 
 rollback() {
 	setVariables
+	logMsgToConfigSysLog "INFO" "Initiating rollback"
 	echo "Reverting the catalina file ...."
 	if [ -f "$LOGGLY_CATALINA_BACKUP_PROPFILE" ]; then
 		sudo rm -fr $LOGGLY_CATALINA_PROPFILE
@@ -244,9 +276,12 @@ rollback() {
 	fi
 	echo "Removed all the needed files"
 	restartTomcat
+	logMsgToConfigSysLog "INFO" "Rollback completed"
 }
+
 debug() {
 	setVariables
+	logMsgToConfigSysLog "INFO" "Initiating debug"
     #if [ -f loggly_tcpdump.log ]; then
     #    sudo rm -rf loggly_tcpdump.log
     #fi
@@ -286,21 +321,22 @@ debug() {
     maxCounter=10
     echo "initial count $initialCount : final count : $finalCount  counter: $counter  max counter: $maxCounter"
     while [ "$finalCount" -le "$initialCount" ]; do 
-      echo "initial count $initialCount : final count : $finalCount  counter: $counter  max counter: $maxCounter"
-      echo "######### waiting for 30 secs......"
-      sleep 30
-      echo "######## Done waiting. verifying again..."
-      echo "Try # $counter of total 10"
-      searchAndFetch finalCount "$queryParam"
-      echo "Again Fetch: initial count $initialCount : final count : $finalCount  counter: $counter  max counter: $maxCounter"
-      let counter=$counter+1
-	  if [ "$counter" -gt "$maxCounter" ]; then
-		echo "####### Tomcat logs did not make to Loggly in stipulated time. Please retry ###########"
-		break;
-	  fi
+		echo "initial count $initialCount : final count : $finalCount  counter: $counter  max counter: $maxCounter"
+		echo "######### waiting for 30 secs......"
+		sleep 30
+		echo "######## Done waiting. verifying again..."
+		echo "Try # $counter of total 10"
+		searchAndFetch finalCount "$queryParam"
+		echo "Again Fetch: initial count $initialCount : final count : $finalCount  counter: $counter  max counter: $maxCounter"
+		let counter=$counter+1
+		if [ "$counter" -gt "$maxCounter" ]; then
+			logMsgToConfigSysLog "ERROR" "ERROR: Tomcat logs did not make to Loggly in stipulated time. Please retry"
+			exit 1
+		fi
     done
     if [ "$finalCount" -gt "$initialCount" ]; then
-	echo "####### Log successfully transferred to Loggly ###########"
+	logMsgToConfigSysLog "SUCCESS" "SUCCESS: Tomcat Log successfully transferred to Loggly"
+	exit 0
     fi
 }
 
@@ -315,8 +351,8 @@ searchAndFetch() {
     result=$(wget -qO- /dev/stdout --user "$LOGGLY_USERNAME" --password "$LOGGLY_PASSWORD" "$url")
     #echo "Result of wget invoke $result"
     if [ -z "$result" ]; then
-       echo "loggly subdomain, username and password need to be specified" 
-       exit 1
+		logMsgToConfigSysLog "ERROR" "ERROR: Please check your network connectivity & ensure Loggly subdomain, username and password is specified"
+		exit 1
     fi
     id=$(echo "$result" | grep -v "{" | grep id | awk '{print $2}')
     # strip last double quote from id
@@ -336,7 +372,7 @@ searchAndFetch() {
     #$1=$count;
     if [ "$count" > 0 ]; then 
         timestamp=$(echo "$result" | grep timestamp)
-#        echo "timestamp: "$timestamp""
+		#echo "timestamp: "$timestamp""
         echo "Data made successfully to loggly!!!"
     fi
 }
@@ -350,28 +386,40 @@ EOF
 
 
 restartsyslog() {
-echo "Restarting the rsyslog service..."
-sudo service rsyslog restart
+	echo "Restarting the rsyslog service..."
+	sudo service rsyslog restart
 }
 
 restartTomcat() {
-#sudo service tomcat restart or home/bin/start.sh
-if [ $(ps -ef | grep -v grep | grep "$SERVICE" | wc -l) > 0 ]; then
-   echo "$SERVICE is running..."
-  if [ -f /etc/init.d/$SERVICE ]; then
-    echo "$SERVICE is running as service"
-    sudo service $SERVICE restart
-  else 
-    echo "$SERVICE is not running as service..."
-    # To be commented only for test
-   echo "shutting down tomcat..."
-   $LOGGLY_CATALINA_HOME/bin/shutdown.sh 
-   echo "Done shutting down tomcat!"
-   echo "starting up tomcat..."
-   $LOGGLY_CATALINA_HOME/bin/startup.sh 
-   echo "Tomcat is up and running"
-  fi
-fi
+	#sudo service tomcat restart or home/bin/start.sh
+	if [ $(ps -ef | grep -v grep | grep "$SERVICE" | wc -l) > 0 ]; then
+		echo "$SERVICE is running..."
+		if [ -f /etc/init.d/$SERVICE ]; then
+			echo "$SERVICE is running as service"
+			sudo service $SERVICE restart
+		else 
+			echo "$SERVICE is not running as service..."
+			# To be commented only for test
+			echo "shutting down tomcat..."
+			$LOGGLY_CATALINA_HOME/bin/shutdown.sh 
+			echo "Done shutting down tomcat!"
+			echo "starting up tomcat..."
+			$LOGGLY_CATALINA_HOME/bin/startup.sh 
+			echo "Tomcat is up and running"
+		fi
+	fi
+}
+
+logMsgToConfigSysLog() {
+	#$1 variable will be SUCCESS or ERROR or INFO
+	#$2 variable will be the message
+	echo "$2"
+	CURRENT_TIME=$(date)
+	
+	var="{\"sub-domain\":\"$LOGGLY_ACCOUNT\", \"host-name\":\"$HOST_NAME\", \"script-name\":\"$SCRIPT_NAME\", \"script-version\":\"$SCRIPT_VERSION\", \"status\":\"$1\", \"time-stamp\":\"$CURRENT_TIME\", \"linux-distribution\":\"$LINUX_DIST\", \"tomcat-version\":\"$TOMCAT_VERSION\", \"messages\":\"$2\"}"
+
+	curl -H "content-type:application/json" -d "$var" https://logs-01.loggly.com/inputs/$CONFIG_SYSLOG_TOKEN
+	echo
 }
 
 LOGGLY_ACCOUNT=""
@@ -407,11 +455,11 @@ while [ "$1" != "" ]; do
          ;;
       -d | --debug )
           LOGGLY_DEBUG="true"
-          echo "Running debug..."          
+          echo "Running debug..."
           ;;
        -r | --rollback )
 		  LOGGLY_ROLLBACK="true"
-          echo "Reverting configuration for sending tomcat logs to Loggly"          
+          echo "Reverting configuration for sending tomcat logs to Loggly"
           ;;
       -h | --help) 
           usage
@@ -425,9 +473,9 @@ while [ "$1" != "" ]; do
 done
 fi
 
-if [ "$LOGGLY_DEBUG" != ""  -a  "$LOGGLY_CATALINA_HOME" != ""  -a  "$LOGGLY_AUTH_TOKEN" != "" -a "$LOGGLY_ACCOUNT" != "" ]; then
+if [ "$LOGGLY_DEBUG" != ""  -a  "$LOGGLY_CATALINA_HOME" != ""  -a  "$LOGGLY_AUTH_TOKEN" != "" -a "$LOGGLY_ACCOUNT" != "" -a "$LOGGLY_USERNAME" != "" -a "$LOGGLY_PASSWORD" != "" ]; then
     debug
-elif [ "$LOGGLY_CATALINA_HOME" != ""  -a  "$LOGGLY_AUTH_TOKEN" != "" -a "$LOGGLY_ACCOUNT" != "" ]; then
+elif [ "$LOGGLY_CATALINA_HOME" != ""  -a  "$LOGGLY_AUTH_TOKEN" != "" -a "$LOGGLY_ACCOUNT" != "" -a "$LOGGLY_USERNAME" != "" -a "$LOGGLY_PASSWORD" != "" ]; then
     configureLoggly
 elif [ "$LOGGLY_ROLLBACK" != ""  -a  "$LOGGLY_CATALINA_HOME" != "" ]; then
     rollback
