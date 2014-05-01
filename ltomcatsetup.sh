@@ -63,8 +63,10 @@ CATALINA_JAR_PATH=$LOGGLY_CATALINA_HOME/lib/catalina.jar
 if [ ! -f "$CATALINA_JAR_PATH" ]; then
 	#if not, search it throughout the system. If we find no entries or more than
 	#1 entry, then we cannot determine the version of the tomcat
+	echo "INFO: Could not find catalina.jar in $LOGGLY_CATALINA_HOME/lib. Searching at other locations, this may take some time..."
 	if [ $(sudo find / -name catalina.jar | grep tomcat6 | wc -l) = 1 ]; then
 			CATALINA_JAR_PATH=$(sudo find / -name catalina.jar | grep tomcat6)
+			echo "INFO: Found catalina.jar at $CATALINA_JAR_PATH"
 	else
 		logMsgToConfigSysLog "WARNING" "WARNING: Unable to determine the correct version of tomcat. Assuming its >= to 6.0.33"
 	fi
@@ -100,6 +102,7 @@ getCatalinaHome()
 	else
 		checkIfValidCatalinaHome "$LOGGLY_CATALINA_HOME"
 	fi
+	echo "INFO: CATALINA HOME: $LOGGLY_CATALINA_HOME"
 }
 
 checkIfValidCatalinaHome()
@@ -107,13 +110,13 @@ checkIfValidCatalinaHome()
 	LOGGLY_CATALINA_HOME=$1
 	#check if logging.properties files  is present
 	if [ ! -f "$LOGGLY_CATALINA_HOME/conf/logging.properties" ]; then
-		logMsgToConfigSysLog "ERROR" "ERROR: Unable to find conf/logging.properties file within $LOGGLY_CATALINA_HOME. Please provide correct one using -ch option"
+		logMsgToConfigSysLog "ERROR" "ERROR: Unable to find conf/logging.properties file within $LOGGLY_CATALINA_HOME. Please provide correct Catalina Home using -ch option"
 		exit 1
 	#check if tomcat is configured as a service. If no, then check if we have access to catalina.sh file
 	elif [ ! -f /etc/init.d/$SERVICE ]; then
 		logMsgToConfigSysLog "INFO" "INFO: Tomcat is not configured as a service"
-		if [ ! -f "$LOGGLY_CATALINA_HOME/bin/catalina.sh" ]; then
-			logMsgToConfigSysLog "ERROR" "ERROR: Unable to find bin/catalina.sh files within $LOGGLY_CATALINA_HOME. Please provide correct one using -ch option"
+		if [ ! -f "$LOGGLY_CATALINA_HOME/bin/startup.sh" ]; then
+			logMsgToConfigSysLog "ERROR" "ERROR: Unable to find bin/startup.sh file within $LOGGLY_CATALINA_HOME. Please provide correct Catalina Home using -ch option"
 			exit 1
 		fi
 	fi
@@ -143,7 +146,6 @@ logMsgToConfigSysLog "INFO" "INFO: Initiating Configure Loggly"
 INITIAL_MSGSEARCH_COUNT=0
 FINAL_MSGSEARCH_COUNT=0
 
-echo "INFO: Tomcat HOME: $LOGGLY_CATALINA_HOME"
 echo "INFO: Tomcat logging properties file: $LOGGLY_CATALINA_PROPFILE"
 
 sudo service rsyslog start
@@ -159,7 +161,7 @@ fi
 # if the loggly configuration file exist, then don't create it.
 echo "INFO: Checking if loggly sysconf file $LOGGLY_SYSLOG_CONFFILE exist"
 if [ -f "$LOGGLY_SYSLOG_CONFFILE" ]; then
-    echo "Loggly syslog file $LOGGLY_SYSLOG_CONFILE exist, not creating file"
+    echo "INFO: Loggly syslog file $LOGGLY_SYSLOG_CONFILE exist, not creating file"
 else
     if [ "$LOGGLY_ACCOUNT" != "" ]; then
         wget -q -O - https://www.loggly.com/install/configure-syslog.py | sudo python - setup --auth $LOGGLY_AUTH_TOKEN --account $LOGGLY_ACCOUNT
@@ -235,7 +237,7 @@ fi
 
 restartTomcat
 
-# Create rsyslog dir if doesn't exist, Modify the rsyslog directory if exsit
+# Create rsyslog dir if doesn't exist, Modify the rsyslog directory if exist
 if [ -d "$SYSLOG_DIR" ]; then
     echo "$SYSLOG_DIR exist, not creating dir"
     if [[ "$LINUX_DIST" == *"Ubuntu"* ]]; then
@@ -251,9 +253,9 @@ else
 fi
 
 if [ -f "$TOMCAT_SYSLOGCONF_FILE" ]; then
-    echo "$TOMCAT_SYSLOGCONF_FILE exist, Not creating file"
+    echo "INFO: $TOMCAT_SYSLOGCONF_FILE exist, not creating file"
 else
-   echo " Creating file $TOMCAT_SYSLOGCONF_FILE"
+   echo "INFO: Creating file $TOMCAT_SYSLOGCONF_FILE"
    sudo touch $TOMCAT_SYSLOGCONF_FILE
    sudo chmod o+w $TOMCAT_SYSLOGCONF_FILE
    generateTomcat21File
@@ -522,7 +524,7 @@ restartTomcat()
 {
 	#sudo service tomcat restart or home/bin/start.sh
 	if [ $(ps -ef | grep -v grep | grep "$SERVICE" | wc -l) > 0 ]; then
-		echo "$SERVICE is running..."
+		echo "INFO: $SERVICE is running..."
 		if [ -f /etc/init.d/$SERVICE ]; then
 			echo "INFO: $SERVICE is running as service"
 			sudo service $SERVICE restart
@@ -548,7 +550,7 @@ logMsgToConfigSysLog()
 
 	var="{\"sub-domain\":\"$LOGGLY_ACCOUNT\", \"host-name\":\"$HOST_NAME\", \"script-name\":\"$SCRIPT_NAME\", \"script-version\":\"$SCRIPT_VERSION\", \"status\":\"$1\", \"time-stamp\":\"$CURRENT_TIME\", \"linux-distribution\":\"$LINUX_DIST\", \"tomcat-version\":\"$TOMCAT_VERSION\", \"messages\":\"$2\"}"
 
-	curl -H "content-type:application/json" -d "$var" https://logs-01.loggly.com/inputs/$CONFIG_SYSLOG_TOKEN
+	curl -s -H "content-type:application/json" -d "$var" https://logs-01.loggly.com/inputs/$CONFIG_SYSLOG_TOKEN
 	echo
 }
 
