@@ -263,7 +263,7 @@ fi
 
 tomcatinitialLogCount=0
 tomcatLatestLogCount=0
-queryParam="&from=-15m&until=now&size=1"
+queryParam="tag%3Atomcat&from=-15m&until=now&size=1"
 searchAndFetch tomcatinitialLogCount "$queryParam"
 # restart the syslog service.
 restartsyslog
