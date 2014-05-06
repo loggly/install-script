@@ -139,10 +139,41 @@ compareVersions ()
   echo  '0'
 }
 
+checkLogglyServersAccessiblilty()
+{
+echo "Checking if https://www.loggly.com is reachable"
+if [ $(curl -s --head  --request GET https://www.loggly.com | grep "200 OK" | wc -l) == 1 ]; then
+	echo "INFO: https://www.loggly.com is reachable"
+else
+	logMsgToConfigSysLog "WARNING" "WARNING: https://www.loggly.com is not reachable. Please check your network and firewall settings. Continuing to configure Loggly on your system..."
+fi
+
+echo "Checking if https://$LOGGLY_ACCOUNT.loggly.com is reachable"
+if [ $(curl -s --head  --request GET https://$LOGGLY_ACCOUNT.loggly.com/login | grep "200 OK" | wc -l) == 1 ]; then
+	echo "INFO: https://$LOGGLY_ACCOUNT.loggly.com reachable"
+else
+	logMsgToConfigSysLog "WARNING" "WARNING: https://$LOGGLY_ACCOUNT.loggly.com is not reachable. Please check your network and firewall settings. Continuing to configure Loggly on your system..."
+fi
+
+echo "Checking if logs-01.loggly.com is reachable"
+if [ $(ping -c 1 logs-01.loggly.com | grep "1 packets transmitted, 1 received, 0% packet loss" | wc -l) == 1 ]; then
+	echo "INFO: logs-01.loggly.com is reachable"
+else
+	logMsgToConfigSysLog "WARNING" "WARNING: logs-01.loggly.com is not reachable. Please check your network and firewall settings. Continuing to configure Loggly on your system..."
+fi
+if [ $(curl -s -u $LOGGLY_USERNAME:$LOGGLY_PASSWORD http://$LOGGLY_ACCOUNT.loggly.com/apiv2/customer | grep "Unauthorized" | wc -l) == 1 ]; then
+	logMsgToConfigSysLog "ERROR" "ERROR: Invalid Loggly username or password"
+	exit 1
+fi
+
+}
+
 configureLoggly()
 {
 setVariables
 logMsgToConfigSysLog "INFO" "INFO: Initiating Configure Loggly"
+checkLogglyServersAccessiblilty
+
 INITIAL_MSGSEARCH_COUNT=0
 FINAL_MSGSEARCH_COUNT=0
 
@@ -235,7 +266,7 @@ fi
 #ROTATABLE
 #fi
 
-restartTomcat
+#restartTomcat
 
 # Create rsyslog dir if doesn't exist, Modify the rsyslog directory if exist
 if [ -d "$SYSLOG_DIR" ]; then
@@ -278,12 +309,12 @@ while [ "$tomcatLatestLogCount" -le "$tomcatinitialLogCount" ]; do
 	echo "######### waiting for 30 secs......"
 	sleep 30
 	echo "######## Done waiting. verifying again..."
-	echo "Try # $counter of total 10"
+	echo "Try # $counter of total $maxCounter"
 	searchAndFetch tomcatLatestLogCount "$queryParam"
 	echo "Again Fetch: initial count $tomcatinitialLogCount : latest count : $tomcatLatestLogCount  counter: $counter  max counter: $maxCounter"
 	let counter=$counter+1
 	if [ "$counter" -gt "$maxCounter" ]; then
-		logMsgToConfigSysLog "ERROR" "ERROR: Tomcat logs did not make to Loggly in stipulated time. Please retry"
+		logMsgToConfigSysLog "ERROR" "ERROR: Tomcat logs did not make to Loggly in stipulated time. Please check your token & network/firewall settings and retry"
 		exit 1
 	fi
 done
@@ -408,6 +439,8 @@ debug()
 {
 	setVariables
 	logMsgToConfigSysLog "INFO" "INFO: Initiating debug"
+	checkLogglyServersAccessiblilty
+	
     #if [ -f loggly_tcpdump.log ]; then
     #    sudo rm -rf loggly_tcpdump.log
     #fi
@@ -456,7 +489,7 @@ debug()
 		echo "Again Fetch: initial count $initialCount : final count : $finalCount  counter: $counter  max counter: $maxCounter"
 		let counter=$counter+1
 		if [ "$counter" -gt "$maxCounter" ]; then
-			logMsgToConfigSysLog "ERROR" "ERROR: Tomcat logs did not make to Loggly in stipulated time. Please retry"
+			logMsgToConfigSysLog "ERROR" "ERROR: Tomcat logs did not make to Loggly in stipulated time. Please check your token & network/firewall settings and retry"
 			exit 1
 		fi
     done
@@ -478,7 +511,7 @@ searchAndFetch()
     result=$(wget -qO- /dev/stdout --user "$LOGGLY_USERNAME" --password "$LOGGLY_PASSWORD" "$url")
     #echo "Result of wget invoke $result"
     if [ -z "$result" ]; then
-		logMsgToConfigSysLog "ERROR" "ERROR: Please check your network connectivity & ensure Loggly subdomain, username and password is specified/correct"
+		logMsgToConfigSysLog "ERROR" "ERROR: Please check your network/firewall settings & ensure Loggly subdomain, username and password is specified correctly"
 		exit 1
     fi
     id=$(echo "$result" | grep -v "{" | grep id | awk '{print $2}')
@@ -518,6 +551,9 @@ restartsyslog()
 {
 	echo "Restarting the rsyslog service..."
 	sudo service rsyslog restart
+	if [ $? -ne 0 ]; then
+		logMsgToConfigSysLog "WARNING" "WARNING: rsyslog did not restart gracefully. Please restart rsyslog manually"
+	fi
 }
 
 restartTomcat()
@@ -528,15 +564,27 @@ restartTomcat()
 		if [ -f /etc/init.d/$SERVICE ]; then
 			echo "INFO: $SERVICE is running as service"
 			sudo service $SERVICE restart
+			if [ $? -ne 0 ]; then
+				logMsgToConfigSysLog "WARNING" "WARNING: Tomcat did not restart gracefully. Log rotation may not be disabled. Please restart tomcat manually"
+			fi
 		else
 			echo "INFO: $SERVICE is not running as service..."
 			# To be commented only for test
 			echo "INFO: Shutting down tomcat..."
-			$LOGGLY_CATALINA_HOME/bin/shutdown.sh
-			echo "INFO: Done shutting down tomcat!"
+			sudo $LOGGLY_CATALINA_HOME/bin/shutdown.sh
+			if [ $? -ne 0 ]; then
+				logMsgToConfigSysLog "WARNING" "WARNING: Tomcat did not shut down gracefully"
+			else
+				echo "INFO: Done shutting down tomcat!"
+			fi
+			
 			echo "INFO: Starting up tomcat..."
-			$LOGGLY_CATALINA_HOME/bin/startup.sh
-			echo "INFO: Tomcat is up and running"
+			sudo $LOGGLY_CATALINA_HOME/bin/startup.sh
+			if [ $? -ne 0 ]; then
+				logMsgToConfigSysLog "WARNING" "WARNING: Tomcat did not start up down gracefully"
+			else
+				echo "INFO: Tomcat is up and running"
+			fi
 		fi
 	fi
 }
