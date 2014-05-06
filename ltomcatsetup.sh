@@ -540,7 +540,7 @@ searchAndFetch()
 usage()
 {
 cat << EOF
- usage: ltomcatsetup [-a loggly auth account or subdomain] [-t loggly token] [-u username] [-p password (optional)] [-d to debug (optional)] [-ch catalina home (optional)]
+ usage: ltomcatsetup [-a loggly auth account or subdomain] [-t loggly token] [-u username] [-p password (optional)] [-ch catalina home (optional)]
  usage: ltomcatsetup [-r to rollback] [-ch catalina home (optional)]
  usage: ltomcatsetup [-h for help]
 EOF
@@ -650,9 +650,9 @@ while [ "$1" != "" ]; do
 	 -p | --password ) shift
           LOGGLY_PASSWORD=$1
          ;;
-      -d | --debug )
-          LOGGLY_DEBUG="true"
-          ;;
+      #-d | --debug )
+      #    LOGGLY_DEBUG="true"
+      #    ;;
        -r | --rollback )
 		  LOGGLY_ROLLBACK="true"
           ;;
