@@ -298,7 +298,7 @@ queryParam="tag%3Atomcat&from=-15m&until=now&size=1"
 searchAndFetch tomcatinitialLogCount "$queryParam"
 # restart the syslog service.
 restartsyslog
-echo "INFO: Restarting tomcat one more time..."
+echo "INFO: Restarting tomcat to generate logs for verification..."
 restartTomcat
 searchAndFetch tomcatLatestLogCount "$queryParam"
 
