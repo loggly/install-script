@@ -161,7 +161,7 @@ if [ $(ping -c 1 logs-01.loggly.com | grep "1 packets transmitted, 1 received, 0
 else
 	logMsgToConfigSysLog "WARNING" "WARNING: logs-01.loggly.com is not reachable. Please check your network and firewall settings. Continuing to configure Loggly on your system..."
 fi
-if [ $(curl -s -u $LOGGLY_USERNAME:$LOGGLY_PASSWORD http://$LOGGLY_ACCOUNT.loggly.com/apiv2/customer | grep "Unauthorized" | wc -l) == 1 ]; then
+if [ $(curl -s -u $LOGGLY_USERNAME:$LOGGLY_PASSWORD https://$LOGGLY_ACCOUNT.loggly.com/apiv2/customer | grep "Unauthorized" | wc -l) == 1 ]; then
 	logMsgToConfigSysLog "ERROR" "ERROR: Invalid Loggly username or password"
 	exit 1
 fi
