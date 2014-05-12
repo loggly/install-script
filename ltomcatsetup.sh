@@ -6,8 +6,6 @@
 SCRIPT_NAME=ltomcatsetup.sh
 #version of the current script
 SCRIPT_VERSION=1.0
-#token to log to config syslog
-CONFIG_SYSLOG_TOKEN=1ec4e8e1-fbb2-47e7-929b-75a1bff5ffe0
 #minimum version of tomcat to enable log rotation
 MIN_TOMCAT_VERSION=6.0.33.0
 #minimum version of syslog to enable logging to loggly
@@ -236,7 +234,7 @@ if [ $(curl -s -u $LOGGLY_USERNAME:$LOGGLY_PASSWORD $LOGGLY_ACCOUNT_URL/apiv2/cu
 	logMsgToConfigSysLog "ERROR" "ERROR: Invalid Loggly username or password"
 	exit 1
 else
-	echo "INFO: Username and password authorized successfully"
+	logMsgToConfigSysLog "INFO" "INFO: Username and password authorized successfully"
 fi
 }
 
@@ -508,7 +506,7 @@ EOIPFW
 #rollback tomcat loggly configuration
 rollback()
 {
-	checkIfUserHasRootPrivileges 
+	checkIfUserHasRootPrivileges
 	setVariables
 	logMsgToConfigSysLog "INFO" "INFO: Initiating rollback"
 	echo "INFO: Reverting the catalina file ...."
@@ -682,14 +680,20 @@ restartTomcat()
 #logs message to config syslog
 logMsgToConfigSysLog()
 {
-	#$1 variable will be SUCCESS or ERROR or INFO
+	#$1 variable will be SUCCESS or ERROR or INFO or WARNING
 	#$2 variable will be the message
 	echo "$2"
-	CURRENT_TIME=$(date)
+	currentTime=$(date)
 
-	var="{\"sub-domain\":\"$LOGGLY_ACCOUNT\", \"host-name\":\"$HOST_NAME\", \"script-name\":\"$SCRIPT_NAME\", \"script-version\":\"$SCRIPT_VERSION\", \"status\":\"$1\", \"time-stamp\":\"$CURRENT_TIME\", \"linux-distribution\":\"$LINUX_DIST\", \"tomcat-version\":\"$TOMCAT_VERSION\", \"messages\":\"$2\"}"
+	enabler=$(echo MWVjNGU4ZTEtZmJiMi00N2U3LTkyOWItNzVhMWJmZjVmZmUw | base64 -d)
+	if [ $? -ne 0 ]; then
+        echo  "ERROR: Base64 decode is not supported on your Operating System. Please update your system to support Base64"
+        exit 1
+	fi
 
-	curl -s -H "content-type:application/json" -d "$var" $LOGS_01_URL/inputs/$CONFIG_SYSLOG_TOKEN > /dev/null 2>&1
+	var="{\"sub-domain\":\"$LOGGLY_ACCOUNT\", \"host-name\":\"$HOST_NAME\", \"script-name\":\"$SCRIPT_NAME\", \"script-version\":\"$SCRIPT_VERSION\", \"status\":\"$1\", \"time-stamp\":\"$currentTime\", \"linux-distribution\":\"$LINUX_DIST\", \"tomcat-version\":\"$TOMCAT_VERSION\", \"messages\":\"$2\"}"
+
+	curl -s -H "content-type:application/json" -d "$var" $LOGS_01_URL/inputs/$enabler > /dev/null 2>&1
 }
 
 #get password in the form of asterisk
