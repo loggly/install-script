@@ -685,7 +685,15 @@ logMsgToConfigSysLog()
 	echo "$2"
 	currentTime=$(date)
 
-	enabler=$(echo MWVjNGU4ZTEtZmJiMi00N2U3LTkyOWItNzVhMWJmZjVmZmUw | base64 -d)
+	#for Linux system, we need to use -d switch to decode base64 whereas
+	#for Mac system, we need to use -D switch to decode
+	varUname=$(uname)
+	if [[ $varUname == 'Linux' ]]; then
+		enabler=$(echo MWVjNGU4ZTEtZmJiMi00N2U3LTkyOWItNzVhMWJmZjVmZmUw | base64 -d)
+	elif [[ $varUname == 'Darwin' ]]; then
+		enabler=$(echo MWVjNGU4ZTEtZmJiMi00N2U3LTkyOWItNzVhMWJmZjVmZmUw | base64 -D)
+	fi
+
 	if [ $? -ne 0 ]; then
         echo  "ERROR: Base64 decode is not supported on your Operating System. Please update your system to support Base64"
         exit 1
