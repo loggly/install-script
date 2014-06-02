@@ -91,7 +91,7 @@ HOST_NAME=$(hostname)
 LINUX_DIST=$(lsb_release -ds)
 
 if [ $? -ne 0 ]; then
-	logMsgToConfigSysLog "ERROR" "ERROR: This operating system is not supported by the script"
+	logMsgToConfigSysLog "ERROR" "ERROR: This operating system is not supported by the script."
 	exit 1
 else
 	#remove double quotes (if any) from the linux distribution name
@@ -108,7 +108,7 @@ else
 		echo "INFO: Operating system is CentOS"
 		;;
 		* )
-		logMsgToConfigSysLog "ERROR" "ERROR: This operating system is not supported by the script"
+		logMsgToConfigSysLog "ERROR" "ERROR: This operating system is not supported by the script."
 		exit 1
 		;;
 	esac
@@ -137,7 +137,7 @@ if [ ! -f "$CATALINA_JAR_PATH" ]; then
 			CATALINA_JAR_PATH=$(sudo find / -name catalina.jar | grep tomcat6)
 			logMsgToConfigSysLog "INFO" "INFO: Found catalina.jar at $CATALINA_JAR_PATH"
 	else
-		logMsgToConfigSysLog "WARNING" "WARNING: Unable to determine the correct version of tomcat. Assuming its >= to 6.0.33"
+		logMsgToConfigSysLog "WARNING" "WARNING: Unable to determine the correct version of tomcat 6. Assuming its >= to 6.0.33"
 	fi
 fi
 
@@ -146,6 +146,12 @@ if [ -f "$CATALINA_JAR_PATH" ]; then
 	TOMCAT_VERSION=$(sudo java -cp $CATALINA_JAR_PATH org.apache.catalina.util.ServerInfo | grep "Server number")
 	TOMCAT_VERSION=${TOMCAT_VERSION#*: }
 	TOMCAT_VERSION=$TOMCAT_VERSION | tr -d ' '
+
+	tomcatMajorVersion=${TOMCAT_VERSION%%.*}
+	if [ $tomcatMajorVersion -ne 6 ]; then
+			echo "ERROR" "ERROR: This script only supports Tomcat version 6"
+			exit 1
+	fi
 fi
 
 #set loggly account url
@@ -185,7 +191,7 @@ checkIfValidCatalinaHome()
 		exit 1
 	#check if tomcat is configured as a service. If no, then check if we have access to startup.sh file
 	elif [ ! -f /etc/init.d/$SERVICE ]; then
-		logMsgToConfigSysLog "INFO" "INFO: Tomcat is not configured as a service"
+		logMsgToConfigSysLog "INFO" "INFO: Tomcat 6 is not configured as a service"
 		if [ ! -f "$LOGGLY_CATALINA_HOME/bin/startup.sh" ]; then
 			logMsgToConfigSysLog "ERROR" "ERROR: Unable to find bin/startup.sh file within $LOGGLY_CATALINA_HOME. Please provide correct Catalina Home using -ch option"
 			exit 1
@@ -241,7 +247,7 @@ fi
 #checks if the tomcat is already configured with log4j. If yes, then exit
 checkIfTomcatConfiguredWithLog4J()
 {
-echo "INFO: Checking if tomcat is configured with log4j logger"
+echo "INFO: Checking if Tomcat is configured with log4j logger"
 #default path for log4j files
 LOG4J_FILE_PATH=$LOGGLY_CATALINA_HOME/lib/log4j*
 #check if the log4j files are present, if yes, then exit
@@ -682,7 +688,9 @@ logMsgToConfigSysLog()
 {
 	#$1 variable will be SUCCESS or ERROR or INFO or WARNING
 	#$2 variable will be the message
-	echo "$2"
+	cslStatus=$1
+	cslMessage=$2
+	echo "$cslMessage"
 	currentTime=$(date)
 
 	#for Linux system, we need to use -d switch to decode base64 whereas
@@ -699,9 +707,26 @@ logMsgToConfigSysLog()
         exit 1
 	fi
 
-	var="{\"sub-domain\":\"$LOGGLY_ACCOUNT\", \"host-name\":\"$HOST_NAME\", \"script-name\":\"$SCRIPT_NAME\", \"script-version\":\"$SCRIPT_VERSION\", \"status\":\"$1\", \"time-stamp\":\"$currentTime\", \"linux-distribution\":\"$LINUX_DIST\", \"tomcat-version\":\"$TOMCAT_VERSION\", \"messages\":\"$2\"}"
+	sendPayloadToConfigSysLog "$cslStatus" "$cslMessage" "$enabler"
 
-	curl -s -H "content-type:application/json" -d "$var" $LOGS_01_URL/inputs/$enabler > /dev/null 2>&1
+	#if it is an error, then log message "Script Failed" to config syslog and exit the script
+	if [[ $cslStatus == "ERROR" ]]; then
+		sendPayloadToConfigSysLog "ERROR" "Script Failed" "$enabler"
+		echo "Please follow the manual instructions to configure tomcat at https://www.loggly.com/docs/tomcat-application-server"
+		exit 1
+	fi
+
+	#if it is a success, then log message "Script Succeeded" to config syslog and exit the script
+	if [[ $cslStatus == "SUCCESS" ]]; then
+		sendPayloadToConfigSysLog "SUCCESS" "Script Succeeded" "$enabler"
+		exit 0
+	fi
+}
+
+sendPayloadToConfigSysLog()
+{
+var="{\"sub-domain\":\"$LOGGLY_ACCOUNT\", \"host-name\":\"$HOST_NAME\", \"script-name\":\"$SCRIPT_NAME\", \"script-version\":\"$SCRIPT_VERSION\", \"status\":\"$1\", \"time-stamp\":\"$currentTime\", \"linux-distribution\":\"$LINUX_DIST\", \"tomcat-version\":\"$TOMCAT_VERSION\", \"messages\":\"$2\"}"
+curl -s -H "content-type:application/json" -d "$var" $LOGS_01_URL/inputs/$3 > /dev/null 2>&1
 }
 
 #get password in the form of asterisk
