@@ -20,6 +20,8 @@ SERVICE=tomcat6
 SYSLOG_ETCDIR_CONF=/etc/rsyslog.d
 #name and location of tomcat syslog file
 TOMCAT_SYSLOG_CONFFILE=$SYSLOG_ETCDIR_CONF/21-tomcat.conf
+#name and location of tomcat syslog backup file
+TOMCAT_SYSLOG_CONFFILE_BACKUP=$SYSLOG_ETCDIR_CONF/21-tomcat.conf.loggly.bk
 #syslog directory
 SYSLOG_DIR=/var/spool/rsyslog
 
@@ -54,78 +56,99 @@ LOGGLY_CATALINA_HOME=
 MANUAL_CONFIG_INSTRUCTION="Manual instructions to configure Tomcat is available at https://www.loggly.com/docs/tomcat-application-server"
 ##########  Variable Declarations - End  ##########
 
-#sets tomcat variables which will be used across various functions
-setTomcatVariables()
+# executing the script for loggly to install and configure syslog.
+installLogglyConfForTomcat()
 {
-#get CATALINA_HOME, this sets the value for LOGGLY_CATALINA_HOME variable
-getCatalinaHome $SERVICE
+	installLogglyConf
 
-#set value for catalina conf home path, logging.properties path and
-#logging.properties.loggly.bk path
-LOGGLY_CATALINA_CONF_HOME=$LOGGLY_CATALINA_HOME/conf
-LOGGLY_CATALINA_PROPFILE=$LOGGLY_CATALINA_CONF_HOME/logging.properties
-LOGGLY_CATALINA_BACKUP_PROPFILE=$LOGGLY_CATALINA_PROPFILE.loggly.bk
+	#log message indicating starting of Loggly configuration
+	logMsgToConfigSysLog "INFO" "INFO: Initiating Configure Loggly for Tomcat."
 
-LOGGLY_CATALINA_LOG_HOME=/var/log/$SERVICE
+	#get CATALINA_HOME, this sets the value for LOGGLY_CATALINA_HOME variable
+	getTomcatHome $SERVICE
 
-#default path for catalina.jar
-CATALINA_JAR_PATH=$LOGGLY_CATALINA_HOME/lib/catalina.jar
+	#check if the provided or deduced tomcat home is correct or not
+	checkIfValidTomcatHome
 
-#check if the identified CATALINA_HOME has the catalina.jar
-if [ ! -f "$CATALINA_JAR_PATH" ]; then
-	#if not, search it throughout the system. If we find no entries or more than
-	#1 entry, then we cannot determine the version of the tomcat
-	logMsgToConfigSysLog "INFO" "INFO: Could not find catalina.jar in $LOGGLY_CATALINA_HOME/lib. Searching at other locations, this may take some time."
-	if [ $(sudo find / -name catalina.jar | grep tomcat6 | wc -l) = 1 ]; then
-			CATALINA_JAR_PATH=$(sudo find / -name catalina.jar | grep tomcat6)
-			logMsgToConfigSysLog "INFO" "INFO: Found catalina.jar at $CATALINA_JAR_PATH."
-	else
-		logMsgToConfigSysLog "WARNING" "WARNING: Unable to determine the correct version of tomcat 6. Assuming its >= to 6.0.33."
-	fi
-fi
+	#set all the required tomcat variables by this script
+	setTomcatVariables
 
-#get the tomcat version number
-if [ -f "$CATALINA_JAR_PATH" ]; then
-	TOMCAT_VERSION=$(sudo java -cp $CATALINA_JAR_PATH org.apache.catalina.util.ServerInfo | grep "Server number")
-	TOMCAT_VERSION=${TOMCAT_VERSION#*: }
-	TOMCAT_VERSION=$TOMCAT_VERSION | tr -d ' '
-	APP_TAG="\"tomcat-version\":\"$TOMCAT_VERSION\""
+	#check if tomcat version is supported by the script. The script only support tomcat 6 and 7
+	checkIfSupportedTomcatVersion
 
-	tomcatMajorVersion=${TOMCAT_VERSION%%.*}
-	if [ $tomcatMajorVersion -ne 6 ]; then
-			echo "ERROR" "ERROR: This script only supports Tomcat version 6."
-			exit 1
-	fi
-fi
+	#check if tomcat is configured with log4j. If yes, then exit
+	checkIfTomcatConfiguredWithLog4J
+
+	#backing up the logging.properties file
+	backupLoggingPropertiesFile
+
+	#update logging.properties file for log rotation
+	updateLoggingPropertiesFile
+
+	#create 21tomcat.conf file
+	write21TomcatConfFile
+
+	#verify if the tomcat logs made it to loggly
+	checkIfTomcatLogsMadeToLoggly
+
+	#log success message
+	logMsgToConfigSysLog "SUCCESS" "SUCCESS: Tomcat successfully configured to send logs via Loggly."
+}
+# End of configure rsyslog for tomcat
+
+
+removeLogglyConfForTomcat()
+{
+	logMsgToConfigSysLog "INFO" "INFO: Initiating rollback."
+
+	#check if the user has root permission to run this script
+	checkIfUserHasRootPrivileges
+	
+	#check if the OS is supported by the script. If no, then exit
+	checkIfSupportedOS
+
+	#get CATALINA_HOME, this sets the value for LOGGLY_CATALINA_HOME variable
+	getTomcatHome $SERVICE
+
+	#check if the provided or deduced tomcat home is correct or not
+	checkIfValidTomcatHome
+
+	#set all the required tomcat variables by this script
+	setTomcatVariables
+
+	#restore original loggly properties file from backup
+	restoreLogglyPropertiesFile
+
+	#remove 21tomcat.conf file
+	remove21TomcatConfFile
+
+	logMsgToConfigSysLog "INFO" "INFO: Rollback completed."
 }
 
-#try to deduce tomcat home if user has not provided one
-getCatalinaHome()
+#Get default location of tomcat home on various supported OS if user has not provided one
+getTomcatHome()
 {
 	#if user has not provided the catalina home
 	if [ "$LOGGLY_CATALINA_HOME" = "" ]; then
 		case "$LINUX_DIST" in
 			*"Ubuntu"* )
-			checkIfValidCatalinaHome "/var/lib/$1"
+			LOGGLY_CATALINA_HOME="/var/lib/$1"
 			;;
 			*"Red Hat"* )
-			checkIfValidCatalinaHome "/usr/share/$1"
+			LOGGLY_CATALINA_HOME="/usr/share/$1"
 			;;
 			*"CentOS"* )
-			checkIfValidCatalinaHome "/usr/share/$1"
+			LOGGLY_CATALINA_HOME="/usr/share/$1"
 			;;
 		esac
-	else
-		checkIfValidCatalinaHome "$LOGGLY_CATALINA_HOME"
 	fi
 	logMsgToConfigSysLog "INFO" "INFO: CATALINA HOME: $LOGGLY_CATALINA_HOME"
 }
 
 #checks if the catalina home is a valid one by searching for logging.properties and
 #checks for startup.sh if tomcat is not configured as service
-checkIfValidCatalinaHome()
+checkIfValidTomcatHome()
 {
-	LOGGLY_CATALINA_HOME=$1
 	#check if logging.properties files  is present
 	if [ ! -f "$LOGGLY_CATALINA_HOME/conf/logging.properties" ]; then
 		logMsgToConfigSysLog "ERROR" "ERROR: Unable to find conf/logging.properties file within $LOGGLY_CATALINA_HOME. Please provide correct Catalina Home using -ch option."
@@ -140,11 +163,58 @@ checkIfValidCatalinaHome()
 	fi
 }
 
+#sets tomcat variables which will be used across various functions
+setTomcatVariables()
+{
+	#set value for catalina conf home path, logging.properties path and
+	#logging.properties.loggly.bk path
+	LOGGLY_CATALINA_CONF_HOME=$LOGGLY_CATALINA_HOME/conf
+	LOGGLY_CATALINA_PROPFILE=$LOGGLY_CATALINA_CONF_HOME/logging.properties
+	LOGGLY_CATALINA_BACKUP_PROPFILE=$LOGGLY_CATALINA_PROPFILE.loggly.bk
+
+	LOGGLY_CATALINA_LOG_HOME=/var/log/$SERVICE
+
+	#default path for catalina.jar
+	CATALINA_JAR_PATH=$LOGGLY_CATALINA_HOME/lib/catalina.jar
+}
+
+#checks if the tomcat version is supported by this script, currently the script
+#only supports tomcat 6 and tomcat 7
+checkIfSupportedTomcatVersion()
+{
+	#check if the identified CATALINA_HOME has the catalina.jar
+	if [ ! -f "$CATALINA_JAR_PATH" ]; then
+		#if not, search it throughout the system. If we find no entries or more than
+		#1 entry, then we cannot determine the version of the tomcat
+		logMsgToConfigSysLog "INFO" "INFO: Could not find catalina.jar in $LOGGLY_CATALINA_HOME/lib. Searching at other locations, this may take some time."
+		if [ $(sudo find / -name catalina.jar | grep $SERVICE | wc -l) = 1 ]; then
+			CATALINA_JAR_PATH=$(sudo find / -name catalina.jar | grep $SERVICE)
+			logMsgToConfigSysLog "INFO" "INFO: Found catalina.jar at $CATALINA_JAR_PATH"
+		else
+			logMsgToConfigSysLog "WARNING" "WARNING: Unable to determine the correct version of tomcat 6. Assuming its >= to 6.0.33."
+			TOMCAT_VERSION=6.0.33.0
+		fi
+	fi
+
+	#get the tomcat version number
+	if [ -f "$CATALINA_JAR_PATH" ]; then
+		TOMCAT_VERSION=$(sudo java -cp $CATALINA_JAR_PATH org.apache.catalina.util.ServerInfo | grep "Server number")
+		TOMCAT_VERSION=${TOMCAT_VERSION#*: }
+		TOMCAT_VERSION=$TOMCAT_VERSION | tr -d ' '
+		APP_TAG="\"tomcat-version\":\"$TOMCAT_VERSION\""
+
+		tomcatMajorVersion=${TOMCAT_VERSION%%.*}
+		if [[ ($tomcatMajorVersion -ne 6 ) &&  ($tomcatMajorVersion -ne 7) ]]; then
+			echo "ERROR" "ERROR: This script only supports Tomcat version 6 or 7."
+			exit 1
+		fi
+	fi
+}
 
 #checks if the tomcat is already configured with log4j. If yes, then exit
 checkIfTomcatConfiguredWithLog4J()
 {
-	echo "INFO: Checking if tomcat is configured with log4j logger"
+	echo "INFO: Checking if tomcat is configured with log4j logger."
 	#default path for log4j files
 	LOG4J_FILE_PATH=$LOGGLY_CATALINA_HOME/lib/log4j*
 	#check if the log4j files are present, if yes, then exit
@@ -160,21 +230,17 @@ checkIfTomcatConfiguredWithLog4J()
 			exit 1
 		fi
 	fi
-	logMsgToConfigSysLog "INFO" "INFO: Tomcat seems not to be configured with log4j logger"
+	logMsgToConfigSysLog "INFO" "INFO: Tomcat seems not to be configured with log4j logger."
 }
 
-# executing the script for loggly to install and configure syslog.
-configureLogglyForTomcat()
+#backup the logging.properties file in the CATALINA_HOME folder
+backupLoggingPropertiesFile()
 {
-	configureLogglyForLinux
-	setTomcatVariables
-
 	logMsgToConfigSysLog "INFO" "INFO: Tomcat logging properties file: $LOGGLY_CATALINA_PROPFILE"
-
 	# backup the logging properties file just in case it need to reverted.
-	echo "INFO: Going to back up the properties file: $LOGGLY_CATALINA_PROPFILE to $LOGGLY_CATALINA_BACKUP_PROPFILE."
+	echo "INFO: Going to back up the properties file: $LOGGLY_CATALINA_PROPFILE to $LOGGLY_CATALINA_BACKUP_PROPFILE"
 	if [ ! -f $LOGGLY_CATALINA_PROPFILE ]; then
-		logMsgToConfigSysLog "ERROR" "ERROR: logging.properties file not found!. Looked at location $LOGGLY_CATALINA_PROPFILE."
+		logMsgToConfigSysLog "ERROR" "ERROR: logging.properties file not found!. Looked at location $LOGGLY_CATALINA_PROPFILE"
 		exit 1
 	else
 		# dont take a backup of logging properties file if it is already there
@@ -183,6 +249,12 @@ configureLogglyForTomcat()
 		fi
 	fi
 
+}
+
+#update logging.properties file to enable log rotation. If the version of tomcat
+#is less than 6.0.33, then log rotation cannot be enabled
+updateLoggingPropertiesFile()
+{
 	#check if tomcat version is less than 6.0.33.0, if yes, throw a warning
 	if [ $(compareVersions $TOMCAT_VERSION $MIN_TOMCAT_VERSION 4) -lt 0 ]; then
 		logMsgToConfigSysLog "WARNING" "WARNING: Tomcat version is less than 6.0.33. Log rotation cannot be disabled for version <6.0.33; only catalina.out log will be monitored."
@@ -226,58 +298,39 @@ sudo cat << EOIPFW >> $LOGGLY_CATALINA_PROPFILE
 EOIPFW
 		fi
 	fi
+}
 
+write21TomcatConfFile()
+{
 	#Create tomcat syslog config file if it doesn't exist
 	echo "INFO: Checking if tomcat sysconf file $TOMCAT_SYSLOG_CONFFILE exist."
 	if [ -f "$TOMCAT_SYSLOG_CONFFILE" ]; then
-	   logMsgToConfigSysLog "INFO" "INFO: Tomcat syslog file $TOMCAT_SYSLOG_CONFFILE exist, not creating file."
+	   logMsgToConfigSysLog "WARN" "WARN: Tomcat syslog file $TOMCAT_SYSLOG_CONFFILE already exist."
+		while true; do
+			read -p "Do you wish to override $TOMCAT_SYSLOG_CONFFILE? (yes/no)" yn
+			case $yn in
+				[Yy]* )
+				logMsgToConfigSysLog "INFO" "INFO: Going to back up the conf file: $TOMCAT_SYSLOG_CONFFILE to $TOMCAT_SYSLOG_CONFFILE_BACKUP";
+				sudo mv -f $TOMCAT_SYSLOG_CONFFILE $TOMCAT_SYSLOG_CONFFILE_BACKUP;
+				write21TomcatFileContents;
+				break;;
+				[Nn]* ) break;;
+				* ) echo "Please answer yes or no.";;
+			esac
+		done
 	else
-	   logMsgToConfigSysLog "INFO" "INFO: Creating file $TOMCAT_SYSLOG_CONFFILE."
-	   sudo touch $TOMCAT_SYSLOG_CONFFILE
-	   sudo chmod o+w $TOMCAT_SYSLOG_CONFFILE
-	   generateTomcat21File
-	fi
-
-	tomcatInitialLogCount=0
-	tomcatLatestLogCount=0
-	queryParam="tag%3Atomcat&from=-15m&until=now&size=1"
-	searchAndFetch tomcatInitialLogCount "$queryParam"
-
-	logMsgToConfigSysLog "INFO" "INFO: Restarting rsyslog and tomcat to generate logs for verification."
-	# restart the syslog service.
-	restartsyslog
-	# restart the tomcat service.
-	restartTomcat
-	searchAndFetch tomcatLatestLogCount "$queryParam"
-
-	counter=1
-	maxCounter=10
-	#echo "latest tomcat log count: $tomcatLatestLogCount and before query count: $tomcatInitialLogCount"
-	while [ "$tomcatLatestLogCount" -le "$tomcatInitialLogCount" ]; do
-		echo "######### waiting for 30 secs while loggly processes the test events."
-		sleep 30
-		echo "######## Done waiting. verifying again..."
-		logMsgToConfigSysLog "INFO" "INFO: Try # $counter of total $maxCounter"
-		searchAndFetch tomcatLatestLogCount "$queryParam"
-		#echo "Again Fetch: initial count $tomcatInitialLogCount : latest count : $tomcatLatestLogCount  counter: $counter  max counter: $maxCounter"
-		let counter=$counter+1
-		if [ "$counter" -gt "$maxCounter" ]; then
-			logMsgToConfigSysLog "ERROR" "ERROR: Tomcat logs did not make to Loggly in stipulated time. Please check your token & network/firewall settings and retry."
-			exit 1
-		fi
-	done
-
-	if [ "$tomcatLatestLogCount" -gt "$tomcatInitialLogCount" ]; then
-		logMsgToConfigSysLog "SUCCESS" "SUCCESS: Tomcat logs successfully transferred to Loggly."
-		exit 0
+		write21TomcatFileContents
 	fi
 }
-# End of configure rsyslog for tomcat
 
-#function to generate tomcat syslog config file
-generateTomcat21File()
+#function to write the contents of tomcat syslog config file
+write21TomcatFileContents()
 {
 
+	logMsgToConfigSysLog "INFO" "INFO: Creating file $TOMCAT_SYSLOG_CONFFILE"
+	sudo touch $TOMCAT_SYSLOG_CONFFILE
+	sudo chmod o+w $TOMCAT_SYSLOG_CONFFILE
+	
 	imfileStr="\$ModLoad imfile
 	\$WorkDirectory $SYSLOG_DIR
 	"
@@ -364,67 +417,82 @@ $imfileStr
 EOIPFW
 }
 
-#rollback tomcat loggly configuration
-rollback()
+#checks if the tomcat logs made to loggly
+checkIfTomcatLogsMadeToLoggly()
 {
-	checkIfUserHasRootPrivileges
-	setLinuxVariables
-	setTomcatVariables
-	logMsgToConfigSysLog "INFO" "INFO: Initiating rollback"
-	echo "INFO: Reverting the catalina file."
+	counter=1
+	maxCounter=10
+
+	tomcatInitialLogCount=0
+	tomcatLatestLogCount=0
+	queryParam="tag%3Atomcat&from=-15m&until=now&size=1"
+
+	queryUrl="$LOGGLY_ACCOUNT_URL/apiv2/search?q=$queryParam"
+	logMsgToConfigSysLog "INFO" "INFO: Search URL: $queryUrl"
+
+	logMsgToConfigSysLog "INFO" "INFO: Getting initial tomcat log count."
+	#get the initial count of tomcat logs for past 15 minutes
+	searchAndFetch tomcatInitialLogCount "$queryUrl"
+
+	logMsgToConfigSysLog "INFO" "INFO: Restarting rsyslog and tomcat to generate logs for verification."
+	# restart the syslog service.
+	restartRsyslog
+	# restart the tomcat service.
+	restartTomcat
+
+	logMsgToConfigSysLog "INFO" "INFO: Verifying if the tomcat logs made it to Loggly."
+	logMsgToConfigSysLog "INFO" "INFO: Verification # $counter of total $maxCounter."
+	#get the final count of tomcat logs for past 15 minutes
+	searchAndFetch tomcatLatestLogCount "$queryUrl"
+	let counter=$counter+1
+
+	while [ "$tomcatLatestLogCount" -le "$tomcatInitialLogCount" ]; do
+		echo "INFO: Did not find the test log message in Loggly's search yet. Waiting for 30 secs."
+		sleep 30
+		echo "INFO: Done waiting. Verifying again."
+		logMsgToConfigSysLog "INFO" "INFO: Verification # $counter of total $maxCounter."
+		searchAndFetch tomcatLatestLogCount "$queryUrl"
+		let counter=$counter+1
+		if [ "$counter" -gt "$maxCounter" ]; then
+			logMsgToConfigSysLog "ERROR" "ERROR: Tomcat logs did not make to Loggly in time. Please check your token & network/firewall settings and retry."
+			exit 1
+		fi
+	done
+
+	if [ "$tomcatLatestLogCount" -gt "$tomcatInitialLogCount" ]; then
+		logMsgToConfigSysLog "SUCCESS" "SUCCESS: Tomcat logs successfully transferred to Loggly! You are now sending Tomcat logs to Loggly."
+		exit 0
+	fi
+}
+
+#restore original loggly properties file from backup
+restoreLogglyPropertiesFile()
+{
+	echo "INFO: Reverting the logging.properties file."
 	if [ -f "$LOGGLY_CATALINA_BACKUP_PROPFILE" ]; then
 		sudo rm -fr $LOGGLY_CATALINA_PROPFILE
 		sudo cp -f $LOGGLY_CATALINA_BACKUP_PROPFILE $LOGGLY_CATALINA_PROPFILE
 		sudo rm -fr $LOGGLY_CATALINA_BACKUP_PROPFILE
 	fi
+}
+
+#remove 21tomcat.conf file
+remove21TomcatConfFile()
+{
 	echo "INFO: Deleting the loggly tomcat syslog conf file."
 	if [ -f "$TOMCAT_SYSLOG_CONFFILE" ]; then
 		sudo rm -rf "$TOMCAT_SYSLOG_CONFFILE"
 	fi
 	echo "INFO: Removed all the modified files."
 	restartTomcat
-	logMsgToConfigSysLog "INFO" "INFO: Rollback completed."
-}
-
-#$1 return the count of records in loggly, $2 is the query param to search in loggly
-searchAndFetch()
-{
-    searchquery="$2"
-    url="$LOGGLY_ACCOUNT_URL/apiv2/search?q=$searchquery"
-    logMsgToConfigSysLog "INFO" "INFO: Search URL: $url"
-    result=$(wget -qO- /dev/stdout --user "$LOGGLY_USERNAME" --password "$LOGGLY_PASSWORD" "$url")
-    if [ -z "$result" ]; then
-		logMsgToConfigSysLog "ERROR" "ERROR: Please check your network/firewall settings & ensure Loggly subdomain, username and password is specified correctly."
-		exit 1
-    fi
-    id=$(echo "$result" | grep -v "{" | grep id | awk '{print $2}')
-    # strip last double quote from id
-    id="${id%\"}"
-    # strip first double quote from id
-    id="${id#\"}"
-    #echo "rsid for the search is: $id"
-    url="$LOGGLY_ACCOUNT_URL/apiv2/events?rsid=$id"
-
-    # retrieve the data
-    result=$(wget -qO- /dev/stdout --user "$LOGGLY_USERNAME" --password "$LOGGLY_PASSWORD" "$url")
-	#echo "actual result based on rsid: $result"
-    count=$(echo "$result" | grep total_events | awk '{print $2}')
-    count="${count%\,}"
-    eval $1="'$count'"
-    echo "Count of events from loggly: "$count""
-    if [ "$count" > 0 ]; then
-        timestamp=$(echo "$result" | grep timestamp)
-		#echo "timestamp: "$timestamp""
-        #echo "Data made successfully to loggly!!!"
-    fi
 }
 
 #restart tomcat
 restartTomcat()
 {
 	#sudo service tomcat restart or home/bin/start.sh
-	if [ $(ps -ef | grep -v grep | grep "$SERVICE" | wc -l) > 0 ]; then
-		logMsgToConfigSysLog "INFO" "INFO: $SERVICE is running"
+	if [ $(ps -ef | grep -v grep | grep "$SERVICE" | wc -l) -gt 0 ]; then
+		logMsgToConfigSysLog "INFO" "INFO: $SERVICE is running."
 		if [ -f /etc/init.d/$SERVICE ]; then
 			logMsgToConfigSysLog "INFO" "INFO: $SERVICE is running as service."
 			logMsgToConfigSysLog "INFO" "INFO: Restarting the tomcat service."
@@ -512,9 +580,9 @@ elif [ "$LOGGLY_AUTH_TOKEN" != "" -a "$LOGGLY_ACCOUNT" != "" -a "$LOGGLY_USERNAM
 	if [ "$LOGGLY_PASSWORD" = "" ]; then
 		getPassword
 	fi
-    configureLogglyForTomcat
+    installLogglyConfForTomcat
 elif [ "$LOGGLY_ROLLBACK" != "" ]; then
-    rollback
+    removeLogglyConfForTomcat
 else
 	usage
 fi
