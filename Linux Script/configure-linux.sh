@@ -387,7 +387,7 @@ checkIfLogsMadeToLoggly()
 	let counter=$counter+1
 
 	while [ "$finalCount" -eq 0 ]; do
-		echo "INFO: Logs did not make it to Loggly in this attempt. Waiting for 30 secs."
+		echo "INFO: Did not find the test log message in Loggly's search yet. Waiting for 30 secs."
 		sleep 30
 		echo "INFO: Done waiting. Verifying again."
 		logMsgToConfigSysLog "INFO" "INFO: Verification # $counter of total $maxCounter."
