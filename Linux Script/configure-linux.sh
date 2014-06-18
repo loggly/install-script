@@ -65,6 +65,9 @@ LOGGLY_DISTRIBUTION_ID="41058"
 #on how to configure the child application
 MANUAL_CONFIG_INSTRUCTION="Manual instructions to configure rsyslog on Linux are available at https://www.loggly.com/docs/rsyslog-manual-configuration/."
 
+#this variable is set if the script is invoked via some other calling script
+IS_INVOKED=
+
 
 ##########  Variable Declarations - End  ##########
 
@@ -135,8 +138,8 @@ removeLogglyConf()
 	#set the basic variables needed by this script
 	setLinuxVariables
 
-	#delete 22-loggly.conf file
-	delete22LogglyConfFile
+	#remove 22-loggly.conf file
+	remove22LogglyConfFile
 
 	#log success message
 	logMsgToConfigSysLog "SUCCESS" "SUCCESS: Uninstalled Loggly configuration from Linux system."
@@ -199,14 +202,14 @@ checkIfLogglyServersAccessible()
 {
 	echo "INFO: Checking if $LOGGLY_ACCOUNT_URL is reachable."
 	if [ $(curl -s --head  --request GET $LOGGLY_ACCOUNT_URL/login | grep "200 OK" | wc -l) == 1 ]; then
-		echo "INFO: $LOGGLY_ACCOUNT_URL is reachable"
+		echo "INFO: $LOGGLY_ACCOUNT_URL is reachable."
 	else
 		logMsgToConfigSysLog "WARNING" "WARNING: $LOGGLY_ACCOUNT_URL is not reachable. Please check your network and firewall settings. Continuing to configure Loggly on your system."
 	fi
 
-	echo "INFO: Checking if $LOGS_01_HOST is reachable"
+	echo "INFO: Checking if $LOGS_01_HOST is reachable."
 	if [ $(ping -c 1 $LOGS_01_HOST | grep "1 packets transmitted, 1 received, 0% packet loss" | wc -l) == 1 ]; then
-		echo "INFO: $LOGS_01_HOST is reachable"
+		echo "INFO: $LOGS_01_HOST is reachable."
 	else
 		logMsgToConfigSysLog "WARNING" "WARNING: $LOGS_01_HOST is not reachable. Please check your network and firewall settings. Continuing to configure Loggly on your system."
 	fi
@@ -290,12 +293,12 @@ write22LogglyConfFile()
 {
 	echo "INFO: Checking if loggly sysconf file $LOGGLY_RSYSLOG_CONFFILE exist."
 	if [ -f "$LOGGLY_RSYSLOG_CONFFILE" ]; then
-		logMsgToConfigSysLog "WARN" "WARN: Loggly rsyslog file $LOGGLY_RSYSLOG_CONFFILE already exist"
+		logMsgToConfigSysLog "WARN" "WARN: Loggly rsyslog file $LOGGLY_RSYSLOG_CONFFILE already exist."
 		while true; do
 			read -p "Do you wish to override $LOGGLY_RSYSLOG_CONFFILE? (yes/no)" yn
 			case $yn in
-				[Yy]* )	
-				logMsgToConfigSysLog "INFO" "INFO: Going to back up the conf file: $LOGGLY_RSYSLOG_CONFFILE to $LOGGLY_RSYSLOG_CONFFILE_BACKUP.";
+				[Yy]* )
+				logMsgToConfigSysLog "INFO" "INFO: Going to back up the conf file: $LOGGLY_RSYSLOG_CONFFILE to $LOGGLY_RSYSLOG_CONFFILE_BACKUP";
 				sudo mv -f $LOGGLY_RSYSLOG_CONFFILE $LOGGLY_RSYSLOG_CONFFILE_BACKUP;
 				checkAuthTokenAndWriteContents;
 				break;;
@@ -304,7 +307,7 @@ write22LogglyConfFile()
 			esac
 		done
 	else
-		logMsgToConfigSysLog "INFO" "INFO: Loggly rsyslog file $LOGGLY_RSYSLOG_CONFFILE does not exist, creating file $LOGGLY_RSYSLOG_CONFFILE."
+		logMsgToConfigSysLog "INFO" "INFO: Loggly rsyslog file $LOGGLY_RSYSLOG_CONFFILE does not exist, creating file $LOGGLY_RSYSLOG_CONFFILE"
 		checkAuthTokenAndWriteContents
 	fi
 }
@@ -350,13 +353,13 @@ createRsyslogDir()
 	if [ -d "$RSYSLOG_DIR" ]; then
 		logMsgToConfigSysLog "INFO" "INFO: $RSYSLOG_DIR already exist, so not creating directory."
 		if [[ "$LINUX_DIST" == *"Ubuntu"* ]]; then
-			logMsgToConfigSysLog "INFO" "INFO: Changing the permission on the rsyslog in /var/spool."
+			logMsgToConfigSysLog "INFO" "INFO: Changing the permission on the rsyslog in /var/spool"
 			sudo chown -R syslog:adm $RSYSLOG_DIR
 		fi
 	else
-		logMsgToConfigSysLog "INFO" "INFO: Creating directory $SYSLOGDIR."
+		logMsgToConfigSysLog "INFO" "INFO: Creating directory $SYSLOGDIR"
 		sudo mkdir -v $RSYSLOG_DIR
-		 if [[ "$LINUX_DIST" == *"Ubuntu"* ]]; then
+		if [[ "$LINUX_DIST" == *"Ubuntu"* ]]; then
 			sudo chown -R syslog:adm $RSYSLOG_DIR
 		fi
 	fi
@@ -379,33 +382,35 @@ checkIfLogsMadeToLoggly()
 	logMsgToConfigSysLog "INFO" "INFO: Search URL: $queryUrl"
 
 	logMsgToConfigSysLog "INFO" "INFO: Verifying if the log made it to Loggly."
-	logMsgToConfigSysLog "INFO" "INFO: Verification # $counter of total $maxCounter"
+	logMsgToConfigSysLog "INFO" "INFO: Verification # $counter of total $maxCounter."
 	searchAndFetch finalCount "$queryUrl"
 	let counter=$counter+1
 
 	while [ "$finalCount" -eq 0 ]; do
-		echo "INFO: Logs did not make it to Loggly in this attempt. Waiting for 30 secs"
+		echo "INFO: Logs did not make it to Loggly in this attempt. Waiting for 30 secs."
 		sleep 30
 		echo "INFO: Done waiting. Verifying again."
-		logMsgToConfigSysLog "INFO" "INFO: Verification # $counter of total $maxCounter"
+		logMsgToConfigSysLog "INFO" "INFO: Verification # $counter of total $maxCounter."
 		searchAndFetch finalCount "$queryUrl"
 		let counter=$counter+1
 		if [ "$counter" -gt "$maxCounter" ]; then
 			MANUAL_CONFIG_INSTRUCTION=$MANUAL_CONFIG_INSTRUCTION" Rsyslog troubleshooting instructions are available at https://www.loggly.com/docs/troubleshooting-rsyslog/"
-			logMsgToConfigSysLog "ERROR" "ERROR: Verification logs did not make it to Loggly in time. Please check your token & network/firewall settings and retry"
+			logMsgToConfigSysLog "ERROR" "ERROR: Verification logs did not make it to Loggly in time. Please check your token & network/firewall settings and retry."
 			exit 1
 		fi
 	done
 
 	if [ "$finalCount" -eq 1 ]; then
-		logMsgToConfigSysLog "SUCCESS" "SUCCESS: Verification logs successfully transferred to Loggly! You are now sending Linux system logs to Loggly"
-		exit 0
+		logMsgToConfigSysLog "SUCCESS" "SUCCESS: Verification logs successfully transferred to Loggly! You are now sending Linux system logs to Loggly."
+		if [ "$IS_INVOKED" = "" ]; then
+			exit 0
+		fi
 	fi
 
 }
 
 #delete 22-loggly.conf file
-delete22LogglyConfFile()
+remove22LogglyConfFile()
 {
 	if [ -f "$LOGGLY_RSYSLOG_CONFFILE" ]; then
 		sudo rm -rf "$LOGGLY_RSYSLOG_CONFFILE"
@@ -591,17 +596,8 @@ if [ "$1" != "being-invoked" ]; then
 	else
 		usage
 	fi
+else
+	IS_INVOKED="true"
 fi
 
 ##########  Get Inputs from User - End  ##########
-
-# trap keyboard interrupt (control-c)
-trap control_c SIGINT
-
-# run if user hits control-c
-control_c()
-{
-	logMsgToConfigSysLog "WARNING" "WARNING: Forcefully exiting the script."
-	exit $?
-}
-
