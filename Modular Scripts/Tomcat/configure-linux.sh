@@ -1,5 +1,15 @@
 #!/bin/bash
 
+#trapping Control + C
+#these statements must be the first statements in the script to trap the CTRL C event
+
+trap ctrl_c INT
+
+function ctrl_c()  {
+	logMsgToConfigSysLog "WARNING" "WARNING: Forcefully exiting the script."
+	exit 1
+} 
+
 ##########  Variable Declarations - Start  ##########
 
 #name of the current script. This will get overwritten by the child script which calls this
@@ -140,6 +150,9 @@ removeLogglyConf()
 
 	#remove 22-loggly.conf file
 	remove22LogglyConfFile
+	
+	#restart rsyslog service
+	restartRsyslog
 
 	#log success message
 	logMsgToConfigSysLog "SUCCESS" "SUCCESS: Uninstalled Loggly configuration from Linux system."
@@ -213,6 +226,13 @@ checkIfLogglyServersAccessible()
 	else
 		logMsgToConfigSysLog "WARNING" "WARNING: $LOGS_01_HOST is not reachable. Please check your network and firewall settings. Continuing to configure Loggly on your system."
 	fi
+	
+	echo "INFO: Checking if Gen2 account"
+	if [ $(curl -s --head  --request GET $LOGGLY_ACCOUNT_URL/apiv2/customer | grep "404 NOT FOUND" | wc -l) == 1 ]; then
+		logMsgToConfigSysLog "ERROR" "ERROR: This scripts need a Gen2 account. Please contact Loggly support."
+	else
+		echo "INFO: It is a Gen2 account"
+	fi
 }
 
 #check if user name and password is valid
@@ -234,7 +254,7 @@ checkIfValidAuthToken()
 	if [ $(curl -s -u $LOGGLY_USERNAME:$LOGGLY_PASSWORD $LOGGLY_ACCOUNT_URL/apiv2/customer | grep \"$LOGGLY_AUTH_TOKEN\" | wc -l) == 1 ]; then
 		logMsgToConfigSysLog "INFO" "INFO: Authentication token validated successfully."
 	else
-		logMsgToConfigSysLog "ERROR" "ERROR: Invalid authentication token. You can get valid authentication token by following instructions at https://www.loggly.com/docs/customer-token-authentication-token/."
+		logMsgToConfigSysLog "ERROR" "ERROR: Invalid authentication token $LOGGLY_AUTH_TOKEN. You can get valid authentication token by following instructions at https://www.loggly.com/docs/customer-token-authentication-token/."
 		exit 1
 	fi
 }
@@ -488,9 +508,9 @@ logMsgToConfigSysLog()
 sendPayloadToConfigSysLog()
 {
 	if [ "$APP_TAG" = "" ]; then
-		var="{\"sub-domain\":\"$LOGGLY_ACCOUNT\", \"host-name\":\"$HOST_NAME\", \"script-name\":\"$SCRIPT_NAME\", \"script-version\":\"$SCRIPT_VERSION\", \"status\":\"$1\", \"time-stamp\":\"$currentTime\", \"linux-distribution\":\"$LINUX_DIST\", \"messages\":\"$2\"}"
+		var="{\"sub-domain\":\"$LOGGLY_ACCOUNT\", \"user-name\":\"$LOGGLY_USERNAME\", \"host-name\":\"$HOST_NAME\", \"script-name\":\"$SCRIPT_NAME\", \"script-version\":\"$SCRIPT_VERSION\", \"status\":\"$1\", \"time-stamp\":\"$currentTime\", \"linux-distribution\":\"$LINUX_DIST\", \"messages\":\"$2\"}"
 	else
-		var="{\"sub-domain\":\"$LOGGLY_ACCOUNT\", \"host-name\":\"$HOST_NAME\", \"script-name\":\"$SCRIPT_NAME\", \"script-version\":\"$SCRIPT_VERSION\", \"status\":\"$1\", \"time-stamp\":\"$currentTime\", \"linux-distribution\":\"$LINUX_DIST\", $APP_TAG, \"messages\":\"$2\"}"
+		var="{\"sub-domain\":\"$LOGGLY_ACCOUNT\", \"user-name\":\"$LOGGLY_USERNAME\", \"host-name\":\"$HOST_NAME\", \"script-name\":\"$SCRIPT_NAME\", \"script-version\":\"$SCRIPT_VERSION\", \"status\":\"$1\", \"time-stamp\":\"$currentTime\", \"linux-distribution\":\"$LINUX_DIST\", $APP_TAG, \"messages\":\"$2\"}"
 	fi
 	curl -s -H "content-type:application/json" -d "$var" $LOGS_01_URL/inputs/$3 > /dev/null 2>&1
 }
@@ -543,7 +563,7 @@ usage()
 {
 cat << EOF
 usage: configure-linux [-a loggly auth account or subdomain] [-t loggly token] [-u username] [-p password (optional)]
-usage: configure-linux [-r to remove]
+usage: configure-linux [-a loggly auth account or subdomain] [-r to remove]
 usage: configure-linux [-h for help]
 EOF
 }
@@ -586,8 +606,8 @@ if [ "$1" != "being-invoked" ]; then
 		done
 	fi
 
-	if [ "$LOGGLY_REMOVE" != "" ]; then
-		removeLogglyConf
+	if [ "$LOGGLY_REMOVE" != "" -a "$LOGGLY_ACCOUNT" != "" ]; then
+		removeLogglyConf		
 	elif [ "$LOGGLY_AUTH_TOKEN" != "" -a "$LOGGLY_ACCOUNT" != "" -a "$LOGGLY_USERNAME" != "" ]; then
 		if [ "$LOGGLY_PASSWORD" = "" ]; then
 			getPassword
