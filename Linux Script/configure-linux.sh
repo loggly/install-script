@@ -6,7 +6,7 @@
 trap ctrl_c INT
 
 function ctrl_c()  {
-	logMsgToConfigSysLog "WARNING" "WARNING: Forcefully exiting the script."
+	logMsgToConfigSysLog "INFO" "INFO: Aborting the script."
 	exit 1
 } 
 
