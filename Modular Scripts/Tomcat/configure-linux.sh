@@ -6,7 +6,7 @@
 trap ctrl_c INT
 
 function ctrl_c()  {
-	logMsgToConfigSysLog "WARNING" "WARNING: Forcefully exiting the script."
+	logMsgToConfigSysLog "INFO" "INFO: Aborting the script."
 	exit 1
 } 
 
@@ -15,7 +15,7 @@ function ctrl_c()  {
 #name of the current script. This will get overwritten by the child script which calls this
 SCRIPT_NAME=configure-linux.sh
 #version of the current script. This will get overwritten by the child script which calls this
-SCRIPT_VERSION=1.0
+SCRIPT_VERSION=1.01
 
 #application tag. This will get overwritten by the child script which calls this
 APP_TAG=
