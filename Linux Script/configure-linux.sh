@@ -78,16 +78,15 @@ MANUAL_CONFIG_INSTRUCTION="Manual instructions to configure rsyslog on Linux are
 #this variable is set if the script is invoked via some other calling script
 IS_INVOKED=
 
+#this variable will hold if the check env function for linux is invoked
+LINUX_ENV_VALIDATED=
 
 ##########  Variable Declarations - End  ##########
 
-# executing the script for loggly to install and configure rsyslog.
-installLogglyConf()
+#check if the Linux environment is compatible with Loggly.
+#Also set few variables after the check.
+checkLinuxLogglyCompatibility()
 {
-
-	#log message indicating starting of Loggly configuration
-	logMsgToConfigSysLog "INFO" "INFO: Initiating Configure Loggly for Linux."
-
 	#check if the user has root permission to run this script
 	checkIfUserHasRootPrivileges
 
@@ -117,11 +116,24 @@ installLogglyConf()
 
 	#check if selinux service is enforced. if yes, ask the user to manually disable and exit the script
 	checkIfSelinuxServiceEnforced
+	
+	LINUX_ENV_VALIDATED="true"
+}
+
+# executing the script for loggly to install and configure rsyslog.
+installLogglyConf()
+{
+	#log message indicating starting of Loggly configuration
+	logMsgToConfigSysLog "INFO" "INFO: Initiating Configure Loggly for Linux."
+
+	if [ "$LINUX_ENV_VALIDATED" = "" ]; then
+		checkLinuxLogglyCompatibility
+	fi
 
 	#if all the above check passes, write the 22-loggly.conf file
 	write22LogglyConfFile
 
-	# Create rsyslog dir if it doesn't exist, Modify the permission on rsyslog directory if exist on Ubuntu
+	#create rsyslog dir if it doesn't exist, Modify the permission on rsyslog directory if exist on Ubuntu
 	createRsyslogDir
 
 	#check if the logs are going to loggly fro linux system now
@@ -131,7 +143,6 @@ installLogglyConf()
 	logMsgToConfigSysLog "SUCCESS" "SUCCESS: Linux system successfully configured to send logs via Loggly."
 
 }
-# End of configure rsyslog for linux
 
 #remove loggly configuration from Linux system
 removeLogglyConf()
@@ -217,7 +228,8 @@ checkIfLogglyServersAccessible()
 	if [ $(curl -s --head  --request GET $LOGGLY_ACCOUNT_URL/login | grep "200 OK" | wc -l) == 1 ]; then
 		echo "INFO: $LOGGLY_ACCOUNT_URL is reachable."
 	else
-		logMsgToConfigSysLog "WARNING" "WARNING: $LOGGLY_ACCOUNT_URL is not reachable. Please check your network and firewall settings. Continuing to configure Loggly on your system."
+		logMsgToConfigSysLog "ERROR" "ERROR: $LOGGLY_ACCOUNT_URL is not reachable. Please check your network and firewall settings."
+		exit 1
 	fi
 
 	echo "INFO: Checking if $LOGS_01_HOST is reachable."
@@ -508,9 +520,9 @@ logMsgToConfigSysLog()
 sendPayloadToConfigSysLog()
 {
 	if [ "$APP_TAG" = "" ]; then
-		var="{\"sub-domain\":\"$LOGGLY_ACCOUNT\", \"user-name\":\"$LOGGLY_USERNAME\", \"host-name\":\"$HOST_NAME\", \"script-name\":\"$SCRIPT_NAME\", \"script-version\":\"$SCRIPT_VERSION\", \"status\":\"$1\", \"time-stamp\":\"$currentTime\", \"linux-distribution\":\"$LINUX_DIST\", \"messages\":\"$2\"}"
+		var="{\"sub-domain\":\"$LOGGLY_ACCOUNT\", \"user-name\":\"$LOGGLY_USERNAME\", \"customer-token\":\"$LOGGLY_AUTH_TOKEN\", \"host-name\":\"$HOST_NAME\", \"script-name\":\"$SCRIPT_NAME\", \"script-version\":\"$SCRIPT_VERSION\", \"status\":\"$1\", \"time-stamp\":\"$currentTime\", \"linux-distribution\":\"$LINUX_DIST\", \"messages\":\"$2\"}"
 	else
-		var="{\"sub-domain\":\"$LOGGLY_ACCOUNT\", \"user-name\":\"$LOGGLY_USERNAME\", \"host-name\":\"$HOST_NAME\", \"script-name\":\"$SCRIPT_NAME\", \"script-version\":\"$SCRIPT_VERSION\", \"status\":\"$1\", \"time-stamp\":\"$currentTime\", \"linux-distribution\":\"$LINUX_DIST\", $APP_TAG, \"messages\":\"$2\"}"
+		var="{\"sub-domain\":\"$LOGGLY_ACCOUNT\", \"user-name\":\"$LOGGLY_USERNAME\", \"customer-token\":\"$LOGGLY_AUTH_TOKEN\", \"host-name\":\"$HOST_NAME\", \"script-name\":\"$SCRIPT_NAME\", \"script-version\":\"$SCRIPT_VERSION\", \"status\":\"$1\", \"time-stamp\":\"$currentTime\", \"linux-distribution\":\"$LINUX_DIST\", $APP_TAG, \"messages\":\"$2\"}"
 	fi
 	curl -s -H "content-type:application/json" -d "$var" $LOGS_01_URL/inputs/$3 > /dev/null 2>&1
 }
