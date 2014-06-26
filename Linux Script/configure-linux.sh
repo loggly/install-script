@@ -236,14 +236,24 @@ checkIfLogglyServersAccessible()
 	if [ $(ping -c 1 $LOGS_01_HOST | grep "1 packets transmitted, 1 received, 0% packet loss" | wc -l) == 1 ]; then
 		echo "INFO: $LOGS_01_HOST is reachable."
 	else
-		logMsgToConfigSysLog "WARNING" "WARNING: $LOGS_01_HOST is not reachable. Please check your network and firewall settings. Continuing to configure Loggly on your system."
+		logMsgToConfigSysLog "ERROR" "ERROR: $LOGS_01_HOST is not reachable. Please check your network and firewall settings. Continuing to configure Loggly on your system."
+		exit 1
 	fi
 	
-	echo "INFO: Checking if Gen2 account"
+	echo "INFO: Checking if $LOGS_01_HOST is reachable via $LOGGLY_SYSLOG_PORT port. This may take some time."
+	if [ $(curl --connect-timeout 10 $LOGS_01_HOST:$LOGGLY_SYSLOG_PORT 2>&1 | grep "Empty reply from server" | wc -l) == 1 ]; then
+		echo "INFO: $LOGS_01_HOST is reachable via $LOGGLY_SYSLOG_PORT port."
+	else
+		logMsgToConfigSysLog "ERROR" "ERROR: $LOGS_01_HOST is not reachable via $LOGGLY_SYSLOG_PORT port. Please check your network and firewall settings. Continuing to configure Loggly on your system."
+		exit 1
+	fi
+	
+	echo "INFO: Checking if Gen2 account."
 	if [ $(curl -s --head  --request GET $LOGGLY_ACCOUNT_URL/apiv2/customer | grep "404 NOT FOUND" | wc -l) == 1 ]; then
 		logMsgToConfigSysLog "ERROR" "ERROR: This scripts need a Gen2 account. Please contact Loggly support."
+		exit 1
 	else
-		echo "INFO: It is a Gen2 account"
+		echo "INFO: It is a Gen2 account."
 	fi
 }
 
@@ -293,6 +303,7 @@ checkIfMultipleRsyslogConfigured()
 {
 	if [ $(ps -ef | grep -v grep | grep "$RSYSLOG_SERVICE" | wc -l) -gt 1 ]; then
 		logMsgToConfigSysLog "ERROR" "ERROR: Multiple (more than 1) $RSYSLOG_SERVICE is running."
+		exit 1
 	fi
 }
 
@@ -317,6 +328,7 @@ checkIfSelinuxServiceEnforced()
 		logMsgToConfigSysLog "INFO" "INFO: selinux status is not enforced."
 	elif [ $(sudo getenforce | grep "Enforcing" | wc -l) -gt 0 ]; then
 		logMsgToConfigSysLog "ERROR" "ERROR: selinux status is 'Enforcing'. Please disable it and start the rsyslog daemon manually."
+		exit 1
 	fi
 }
 
