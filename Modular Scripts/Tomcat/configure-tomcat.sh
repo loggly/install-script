@@ -25,11 +25,6 @@ TOMCAT_SYSLOG_CONFFILE_BACKUP=$SYSLOG_ETCDIR_CONF/21-tomcat.conf.loggly.bk
 #syslog directory
 SYSLOG_DIR=/var/spool/rsyslog
 
-#this variable will hold the host name
-HOST_NAME=
-#this variable will hold the name of the linux distribution
-LINUX_DIST=
-
 #this variable will hold the path to the catalina home
 LOGGLY_CATALINA_HOME=
 #this variable will hold the path to the conf folder within catalina home
@@ -117,7 +112,7 @@ removeLogglyConfForTomcat()
 	checkIfSupportedOS
 
 	#deduce CATALINA_HOME, this sets the value for LOGGLY_CATALINA_HOME variable
-	deduceTomcatHomeAndVersion
+	deduceAndCheckTomcatHomeAndVersion
 
 	#restore original loggly properties file from backup
 	restoreLogglyPropertiesFile
@@ -185,6 +180,11 @@ deduceAndCheckTomcatHomeAndVersion()
 		#if the user has provided catalina_home, then we need to check if it is a valid catalina home and what is the correct version of the tomcat.
 		#Let us assume service name is tomcat for now, which will be updated later.
 		SERVICE=tomcat
+		
+		#set the flag to true
+		validTomcatHome="true"
+		
+		#check if the tomcat home provided by user is valid
 		checkIfValidTomcatHome validTomcatHome
 
 		if [ "$validTomcatHome" = "true" ]; then
@@ -200,11 +200,11 @@ deduceAndCheckTomcatHomeAndVersion()
 			checkIfSupportedTomcatVersion
 
 			#update the service name
-			if ["$tomcatMajorVersion" = "7" ]; then
+			if [ "$tomcatMajorVersion" = "7" ]; then
 				SERVICE=tomcat7
-			elif ["$tomcatMajorVersion" = "6" ]; then
+			elif [ "$tomcatMajorVersion" = "6" ]; then
 				SERVICE=tomcat6
-			fi
+			fi			
 		else
 			logMsgToConfigSysLog "ERROR" "ERROR: Provided Catalina Home is not correct. Please recheck."
 		fi
@@ -258,6 +258,11 @@ setTomcatVariables()
 	LOGGLY_CATALINA_BACKUP_PROPFILE=$LOGGLY_CATALINA_PROPFILE.loggly.bk
 
 	LOGGLY_CATALINA_LOG_HOME=/var/log/$SERVICE
+	
+	#if tomcat is not installed as service, then tomcat logs will be created at would be $CATALINA_HOME/log
+	if [ ! -f "$LOGGLY_CATALINA_LOG_HOME" ]; then
+		LOGGLY_CATALINA_LOG_HOME=$LOGGLY_CATALINA_HOME/logs
+	fi
 
 	#default path for catalina.jar
 	CATALINA_JAR_PATH=$LOGGLY_CATALINA_HOME/lib/catalina.jar
@@ -504,6 +509,9 @@ write21TomcatFileContents()
 sudo cat << EOIPFW >> $TOMCAT_SYSLOG_CONFFILE
 $imfileStr
 EOIPFW
+
+	# restart the syslog service.	
+	restartRsyslog
 }
 
 #checks if the tomcat logs made to loggly
@@ -523,9 +531,7 @@ checkIfTomcatLogsMadeToLoggly()
 	#get the initial count of tomcat logs for past 15 minutes
 	searchAndFetch tomcatInitialLogCount "$queryUrl"
 
-	logMsgToConfigSysLog "INFO" "INFO: Restarting rsyslog and tomcat to generate logs for verification."
-	# restart the syslog service.
-	restartRsyslog
+	logMsgToConfigSysLog "INFO" "INFO: Restarting tomcat to generate logs for verification."
 	# restart the tomcat service.
 	restartTomcat
 
@@ -615,9 +621,9 @@ restartTomcat()
 usage()
 {
 cat << EOF
-usage: ltomcatsetup [-a loggly auth account or subdomain] [-t loggly token] [-u username] [-p password (optional)] [-ch catalina home (optional)]
-usage: ltomcatsetup [-r to rollback] [-ch catalina home (optional)]
-usage: ltomcatsetup [-h for help]
+usage: configure-tomcat [-a loggly auth account or subdomain] [-t loggly token] [-u username] [-p password (optional)] [-ch catalina home (optional)]
+usage: configure-tomcat [-r to rollback] [-a loggly auth account or subdomain] [-ch catalina home (optional)]
+usage: configure-tomcat [-h for help]
 EOF
 }
 
@@ -670,7 +676,7 @@ elif [ "$LOGGLY_AUTH_TOKEN" != "" -a "$LOGGLY_ACCOUNT" != "" -a "$LOGGLY_USERNAM
 		getPassword
 	fi
     installLogglyConfForTomcat
-elif [ "$LOGGLY_ROLLBACK" != "" ]; then
+elif [ "$LOGGLY_ROLLBACK" != "" -a "$LOGGLY_ACCOUNT" != "" ]; then
     removeLogglyConfForTomcat
 else
 	usage
