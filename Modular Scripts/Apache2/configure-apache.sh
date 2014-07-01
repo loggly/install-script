@@ -1,7 +1,10 @@
 #!/bin/bash
 
+#downloads configure-linux.sh
+echo "INFO: Downloading dependencies - configure-linux.sh"
+curl -s -o configure-linux.sh https://raw.githubusercontent.com/psquickitjayant/install-script/master/Linux%20Script/configure-linux.sh
 source configure-linux.sh "being-invoked"
-
+	
 ##########  Variable Declarations - Start  ##########
 #name of the current script
 SCRIPT_NAME=configure-apache.sh
@@ -13,6 +16,10 @@ APP_TAG="\"apache-version\":\"\""
 
 #name of the service, in this case apache2
 SERVICE=
+#name of apache access log file
+APACHE_ACCESS_LOG_FILE=
+#name of apache error log file
+APACHE_ERROR_LOG_FILE=
 #directory location for syslog
 SYSLOG_ETCDIR_CONF=/etc/rsyslog.d
 #name and location of apache syslog file
@@ -63,7 +70,7 @@ installLogglyConfForApache()
 	installLogglyConf
 
 	#check for the apache log file size
-	checkLogFileSize $LOGGLY_APACHE_LOG_HOME/access.log $LOGGLY_APACHE_LOG_HOME/error.log
+	checkLogFileSize $LOGGLY_APACHE_LOG_HOME/$APACHE_ACCESS_LOG_FILE $LOGGLY_APACHE_LOG_HOME/$APACHE_ERROR_LOG_FILE
 	
 	#create 21apache.conf file
 	write21ApacheConfFile
@@ -122,12 +129,18 @@ getApacheServiceName()
 	case "$LINUX_DIST" in
 		*"Ubuntu"* )
 		SERVICE="apache2"
+		APACHE_ACCESS_LOG_FILE="access.log"
+		ERROR_ACCESS_LOG_FILE="error.log"
 		;;
 		*"Red Hat"* )
 		SERVICE="httpd"
+		APACHE_ACCESS_LOG_FILE="access_log"
+		ERROR_ACCESS_LOG_FILE="error_log"
 		;;
 		*"CentOS"* )
 		SERVICE="httpd"
+		APACHE_ACCESS_LOG_FILE="access_log"
+		ERROR_ACCESS_LOG_FILE="error_log"
 		;;
 	esac	
 }
@@ -227,7 +240,7 @@ write21ApacheFileContents()
 
 	imfileStr+="
 	# Apache access file:
-	\$InputFileName $LOGGLY_APACHE_LOG_HOME/access.log
+	\$InputFileName $LOGGLY_APACHE_LOG_HOME/$APACHE_ACCESS_LOG_FILE
 	\$InputFileTag apache-access:
 	\$InputFileStateFile stat-apache-access
 	\$InputFileSeverity info
@@ -235,7 +248,7 @@ write21ApacheFileContents()
 	\$InputRunFileMonitor
 
 	#Apache Error file: 
-	\$InputFileName $LOGGLY_APACHE_LOG_HOME/error.log
+	\$InputFileName $LOGGLY_APACHE_LOG_HOME/$APACHE_ERROR_LOG_FILE
 	\$InputFileTag apache-error:
 	\$InputFileStateFile stat-apache-error
 	\$InputFileSeverity error
@@ -341,7 +354,7 @@ while [ "$1" != "" ]; do
          ;;
       -u | --username ) shift
          LOGGLY_USERNAME=$1
-         echo "Username is set"
+         echo "Userna.loggly.com isme is set"
          ;;
 	  -p | --password ) shift
           LOGGLY_PASSWORD=$1
@@ -360,11 +373,13 @@ fi
 
 if [ "$LOGGLY_DEBUG" != ""  -a  "$LOGGLY_AUTH_TOKEN" != "" -a "$LOGGLY_ACCOUNT" != "" -a "$LOGGLY_USERNAME" != "" ]; then
 	if [ "$LOGGLY_PASSWORD" = "" ]; then
-		getPassword
+		downloadConfigureLinuxScript
+		downloadConfigureLinuxScriptgetPassword
 	fi
     debug
 elif [ "$LOGGLY_AUTH_TOKEN" != "" -a "$LOGGLY_ACCOUNT" != "" -a "$LOGGLY_USERNAME" != "" ]; then
 	if [ "$LOGGLY_PASSWORD" = "" ]; then
+		downloadConfigureLinuxScript
 		getPassword
 	fi
     installLogglyConfForApache
