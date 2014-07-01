@@ -1,5 +1,8 @@
 #!/bin/bash
 
+#downloads configure-linux.sh
+echo "INFO: Downloading dependencies - configure-linux.sh"
+curl -s -o configure-linux.sh https://raw.githubusercontent.com/psquickitjayant/install-script/master/Linux%20Script/configure-linux.sh
 source configure-linux.sh "being-invoked"
 
 ##########  Variable Declarations - Start  ##########
@@ -531,7 +534,7 @@ checkIfTomcatLogsMadeToLoggly()
 	#get the initial count of tomcat logs for past 15 minutes
 	searchAndFetch tomcatInitialLogCount "$queryUrl"
 
-	logMsgToConfigSysLog "INFO" "INFO: Restarting tomcat to generate logs for verification."
+	logMsgToConfigSysLog "INFO" "INFO: Tomcat needs to be restarted to complete the configuration and verification."
 	# restart the tomcat service.
 	restartTomcat
 
@@ -579,42 +582,56 @@ remove21TomcatConfFile()
 		sudo rm -rf "$TOMCAT_SYSLOG_CONFFILE"
 	fi
 	echo "INFO: Removed all the modified files."
+	
+	logMsgToConfigSysLog "INFO" "INFO: Tomcat needs to be restarted to rollback the configuration."
 	restartTomcat
 }
 
 #restart tomcat
 restartTomcat()
 {
-	#sudo service tomcat restart or home/bin/start.sh
-	if [ $(ps -ef | grep -v grep | grep "$SERVICE" | wc -l) -gt 0 ]; then
-		logMsgToConfigSysLog "INFO" "INFO: $SERVICE is running."
-		if [ -f /etc/init.d/$SERVICE ]; then
-			logMsgToConfigSysLog "INFO" "INFO: $SERVICE is running as service."
-			logMsgToConfigSysLog "INFO" "INFO: Restarting the tomcat service."
-			sudo service $SERVICE restart
-			if [ $? -ne 0 ]; then
-				logMsgToConfigSysLog "WARNING" "WARNING: Tomcat did not restart gracefully. Log rotation may not be disabled. Please restart tomcat manually."
-			fi
-		else
-			logMsgToConfigSysLog "INFO" "INFO: $SERVICE is not running as service."
-			# To be commented only for test
-			logMsgToConfigSysLog "INFO" "INFO: Shutting down tomcat."
-			sudo $LOGGLY_CATALINA_HOME/bin/shutdown.sh
-			if [ $? -ne 0 ]; then
-				logMsgToConfigSysLog "WARNING" "WARNING: Tomcat did not shut down gracefully."
-			else
-				logMsgToConfigSysLog "INFO" "INFO: Done shutting down tomcat."
-			fi
+	while true; do
+		read -p "Do you wish to restart tomcat server? (yes/no)" yn
+		case $yn in
+			[Yy]* )
+			#sudo service tomcat restart or home/bin/start.sh
+			if [ $(ps -ef | grep -v grep | grep "$SERVICE" | wc -l) -gt 0 ]; then
+				logMsgToConfigSysLog "INFO" "INFO: $SERVICE is running."
+				if [ -f /etc/init.d/$SERVICE ]; then
+					logMsgToConfigSysLog "INFO" "INFO: $SERVICE is running as service."
+					logMsgToConfigSysLog "INFO" "INFO: Restarting the tomcat service."
+					sudo service $SERVICE restart
+					if [ $? -ne 0 ]; then
+						logMsgToConfigSysLog "WARNING" "WARNING: Tomcat did not restart gracefully. Log rotation may not be disabled. Please restart tomcat manually."
+					fi
+				else
+					logMsgToConfigSysLog "INFO" "INFO: $SERVICE is not running as service."
+					# To be commented only for test
+					logMsgToConfigSysLog "INFO" "INFO: Shutting down tomcat."
+					sudo $LOGGLY_CATALINA_HOME/bin/shutdown.sh
+					if [ $? -ne 0 ]; then
+						logMsgToConfigSysLog "WARNING" "WARNING: Tomcat did not shut down gracefully."
+					else
+						logMsgToConfigSysLog "INFO" "INFO: Done shutting down tomcat."
+					fi
 
-			logMsgToConfigSysLog "INFO" "INFO: Starting up tomcat."
-			sudo $LOGGLY_CATALINA_HOME/bin/startup.sh
-			if [ $? -ne 0 ]; then
-				logMsgToConfigSysLog "WARNING" "WARNING: Tomcat did not start up down gracefully."
-			else
-				logMsgToConfigSysLog "INFO" "INFO: Tomcat is up and running."
+					logMsgToConfigSysLog "INFO" "INFO: Starting up tomcat."
+					sudo $LOGGLY_CATALINA_HOME/bin/startup.sh
+					if [ $? -ne 0 ]; then
+						logMsgToConfigSysLog "WARNING" "WARNING: Tomcat did not start up down gracefully."
+					else
+						logMsgToConfigSysLog "INFO" "INFO: Tomcat is up and running."
+					fi
+				fi
 			fi
-		fi
-	fi
+			break;;
+			[Nn]* ) 
+			logMsgToConfigSysLog "INFO" "INFO: Exiting the script based on your input. Please restart Tomcat manually."
+			break;;
+			* ) echo "Please answer yes or no.";;
+		esac
+	done
+	
 }
 
 #display usage syntax
