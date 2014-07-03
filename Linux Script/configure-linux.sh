@@ -8,7 +8,7 @@ trap ctrl_c INT
 function ctrl_c()  {
 	logMsgToConfigSysLog "INFO" "INFO: Aborting the script."
 	exit 1
-} 
+}
 
 ##########  Variable Declarations - Start  ##########
 
@@ -116,7 +116,7 @@ checkLinuxLogglyCompatibility()
 
 	#check if selinux service is enforced. if yes, ask the user to manually disable and exit the script
 	checkIfSelinuxServiceEnforced
-	
+
 	LINUX_ENV_VALIDATED="true"
 }
 
@@ -161,7 +161,7 @@ removeLogglyConf()
 
 	#remove 22-loggly.conf file
 	remove22LogglyConfFile
-	
+
 	#restart rsyslog service
 	restartRsyslog
 
@@ -182,31 +182,43 @@ checkIfUserHasRootPrivileges()
 #check if supported operating system
 checkIfSupportedOS()
 {
-	#set value for linux distribution name
-	LINUX_DIST=$(lsb_release -ds)
-
-	if [ $? -ne 0 ]; then
-		logMsgToConfigSysLog "ERROR" "ERROR: This operating system is not supported by the script."
+	getOs
+	
+	case "$LINUX_DIST" in
+		*"Ubuntu"* )
+		echo "INFO: Operating system is Ubuntu."
+		;;
+		*"Red Hat"* )
+		echo "INFO: Operating system is Red Hat."
+		;;
+		*"CentOS"* )
+		echo "INFO: Operating system is CentOS."
+		;;
+		* )
+		logMsgToConfigSysLog "ERROR" "ERROR: '$LINUX_DIST' operating system is not supported by the script."
 		exit 1
-	else
-		#remove double quotes (if any) from the linux distribution name
-		LINUX_DIST="${LINUX_DIST%\"}"
-		LINUX_DIST="${LINUX_DIST#\"}"
-		case "$LINUX_DIST" in
-			*"Ubuntu"* )
-			echo "INFO: Operating system is Ubuntu."
-			;;
-			*"Red Hat"* )
-			echo "INFO: Operating system is Red Hat."
-			;;
-			*"CentOS"* )
-			echo "INFO: Operating system is CentOS."
-			;;
-			* )
-			logMsgToConfigSysLog "ERROR" "ERROR: This operating system is not supported by the script."
-			exit 1
-			;;
-		esac
+		;;
+	esac
+}
+
+getOs()
+{
+	# Determine OS platform
+	UNAME=$(uname | tr "[:upper:]" "[:lower:]")
+	# If Linux, try to determine specific distribution
+	if [ "$UNAME" == "linux" ]; then
+		# If available, use LSB to identify distribution
+		if [ -f /etc/lsb-release -o -d /etc/lsb-release.d ]; then
+			LINUX_DIST=$(lsb_release -i | cut -d: -f2 | sed s/'^\t'//)
+		# Otherwise, use release info file
+		else
+			LINUX_DIST=$(ls -d /etc/[A-Za-z]*[_-][rv]e[lr]* | grep -v "lsb" | cut -d'/' -f3 | cut -d'-' -f1 | cut -d'_' -f1)
+		fi
+	fi
+
+	# For everything else (or if above failed), just use generic identifier
+	if [ "$LINUX_DIST" == "" ]; then
+		LINUX_DIST=$(uname)
 	fi
 }
 
@@ -239,7 +251,7 @@ checkIfLogglyServersAccessible()
 		logMsgToConfigSysLog "ERROR" "ERROR: $LOGS_01_HOST is not reachable. Please check your network and firewall settings. Continuing to configure Loggly on your system."
 		exit 1
 	fi
-	
+
 	echo "INFO: Checking if $LOGS_01_HOST is reachable via $LOGGLY_SYSLOG_PORT port. This may take some time."
 	if [ $(curl --connect-timeout 10 $LOGS_01_HOST:$LOGGLY_SYSLOG_PORT 2>&1 | grep "Empty reply from server" | wc -l) == 1 ]; then
 		echo "INFO: $LOGS_01_HOST is reachable via $LOGGLY_SYSLOG_PORT port."
@@ -247,7 +259,7 @@ checkIfLogglyServersAccessible()
 		logMsgToConfigSysLog "ERROR" "ERROR: $LOGS_01_HOST is not reachable via $LOGGLY_SYSLOG_PORT port. Please check your network and firewall settings. Continuing to configure Loggly on your system."
 		exit 1
 	fi
-	
+
 	echo "INFO: Checking if Gen2 account."
 	if [ $(curl -s --head  --request GET $LOGGLY_ACCOUNT_URL/apiv2/customer | grep "404 NOT FOUND" | wc -l) == 1 ]; then
 		logMsgToConfigSysLog "ERROR" "ERROR: This scripts need a Gen2 account. Please contact Loggly support."
@@ -631,7 +643,7 @@ if [ "$1" != "being-invoked" ]; then
 	fi
 
 	if [ "$LOGGLY_REMOVE" != "" -a "$LOGGLY_ACCOUNT" != "" ]; then
-		removeLogglyConf		
+		removeLogglyConf
 	elif [ "$LOGGLY_AUTH_TOKEN" != "" -a "$LOGGLY_ACCOUNT" != "" -a "$LOGGLY_USERNAME" != "" ]; then
 		if [ "$LOGGLY_PASSWORD" = "" ]; then
 			getPassword
