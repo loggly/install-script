@@ -130,17 +130,17 @@ getApacheServiceName()
 		*"Ubuntu"* )
 		SERVICE="apache2"
 		APACHE_ACCESS_LOG_FILE="access.log"
-		ERROR_ACCESS_LOG_FILE="error.log"
+		APACHE_ERROR_LOG_FILE="error.log"
 		;;
-		*"Red Hat"* )
+		*"RedHat"* )
 		SERVICE="httpd"
 		APACHE_ACCESS_LOG_FILE="access_log"
-		ERROR_ACCESS_LOG_FILE="error_log"
+		APACHE_ERROR_LOG_FILE="error_log"
 		;;
 		*"CentOS"* )
 		SERVICE="httpd"
 		APACHE_ACCESS_LOG_FILE="access_log"
-		ERROR_ACCESS_LOG_FILE="error_log"
+		APACHE_ERROR_LOG_FILE="error_log"
 		;;
 	esac	
 }
@@ -224,7 +224,6 @@ write21ApacheConfFile()
 #function to write the contents of apache syslog config file
 write21ApacheFileContents()
 {
-
 	logMsgToConfigSysLog "INFO" "INFO: Creating file $APACHE_SYSLOG_CONFFILE"
 	sudo touch $APACHE_SYSLOG_CONFFILE
 	sudo chmod o+w $APACHE_SYSLOG_CONFFILE
@@ -373,13 +372,11 @@ fi
 
 if [ "$LOGGLY_DEBUG" != ""  -a  "$LOGGLY_AUTH_TOKEN" != "" -a "$LOGGLY_ACCOUNT" != "" -a "$LOGGLY_USERNAME" != "" ]; then
 	if [ "$LOGGLY_PASSWORD" = "" ]; then
-		downloadConfigureLinuxScript
-		downloadConfigureLinuxScriptgetPassword
+		getPassword
 	fi
     debug
 elif [ "$LOGGLY_AUTH_TOKEN" != "" -a "$LOGGLY_ACCOUNT" != "" -a "$LOGGLY_USERNAME" != "" ]; then
 	if [ "$LOGGLY_PASSWORD" = "" ]; then
-		downloadConfigureLinuxScript
 		getPassword
 	fi
     installLogglyConfForApache
