@@ -62,13 +62,13 @@ checkTomcatLogglyCompatibility()
 {
 	#check if the linux environment is compatible for Loggly
 	checkLinuxLogglyCompatibility
-	
+
 	#deduce CATALINA_HOME, this sets the value for LOGGLY_CATALINA_HOME variable
 	deduceAndCheckTomcatHomeAndVersion
 
 	#check if tomcat is configured with log4j. If yes, then exit
 	checkIfTomcatConfiguredWithLog4J
-	
+
 	TOMCAT_ENV_VALIDATED="true"
 }
 
@@ -78,12 +78,15 @@ installLogglyConfForTomcat()
 {
 	#log message indicating starting of Loggly configuration
 	logMsgToConfigSysLog "INFO" "INFO: Initiating Configure Loggly for Tomcat."
-	
+
 	#check if tomcat environment is compatible with Loggly
 	if [ "$TOMCAT_ENV_VALIDATED" = "" ]; then
 		checkTomcatLogglyCompatibility
 	fi
-	
+
+	#ask user if tomcat can be restarted
+	canTomcatBeRestarted
+
 	#configure loggly for Linux
 	installLogglyConf
 
@@ -117,11 +120,14 @@ removeLogglyConfForTomcat()
 	#deduce CATALINA_HOME, this sets the value for LOGGLY_CATALINA_HOME variable
 	deduceAndCheckTomcatHomeAndVersion
 
-	#restore original loggly properties file from backup
-	restoreLogglyPropertiesFile
+	#ask user if tomcat can be restarted
+	canTomcatBeRestarted
 
 	#remove 21tomcat.conf file
 	remove21TomcatConfFile
+	
+	#restore original loggly properties file from backup
+	restoreLogglyPropertiesFile
 
 	logMsgToConfigSysLog "INFO" "INFO: Rollback completed."
 }
@@ -183,10 +189,10 @@ deduceAndCheckTomcatHomeAndVersion()
 		#if the user has provided catalina_home, then we need to check if it is a valid catalina home and what is the correct version of the tomcat.
 		#Let us assume service name is tomcat for now, which will be updated later.
 		SERVICE=tomcat
-		
+
 		#set the flag to true
 		validTomcatHome="true"
-		
+
 		#check if the tomcat home provided by user is valid
 		checkIfValidTomcatHome validTomcatHome
 
@@ -207,7 +213,7 @@ deduceAndCheckTomcatHomeAndVersion()
 				SERVICE=tomcat7
 			elif [ "$tomcatMajorVersion" = "6" ]; then
 				SERVICE=tomcat6
-			fi			
+			fi
 		else
 			logMsgToConfigSysLog "ERROR" "ERROR: Provided Catalina Home is not correct. Please recheck."
 		fi
@@ -223,7 +229,7 @@ assumeTomcatHome()
 			*"Ubuntu"* )
 			LOGGLY_CATALINA_HOME="/var/lib/$1"
 			;;
-			*"Red Hat"* )
+			*"RedHat"* )
 			LOGGLY_CATALINA_HOME="/usr/share/$1"
 			;;
 			*"CentOS"* )
@@ -261,7 +267,7 @@ setTomcatVariables()
 	LOGGLY_CATALINA_BACKUP_PROPFILE=$LOGGLY_CATALINA_PROPFILE.loggly.bk
 
 	LOGGLY_CATALINA_LOG_HOME=/var/log/$SERVICE
-	
+
 	#if tomcat is not installed as service, then tomcat logs will be created at would be $CATALINA_HOME/log
 	if [ ! -f "$LOGGLY_CATALINA_LOG_HOME" ]; then
 		LOGGLY_CATALINA_LOG_HOME=$LOGGLY_CATALINA_HOME/logs
@@ -330,6 +336,21 @@ checkIfTomcatConfiguredWithLog4J()
 	logMsgToConfigSysLog "INFO" "INFO: Tomcat seems not to be configured with log4j logger."
 }
 
+canTomcatBeRestarted()
+{
+	while true; do
+		read -p "Tomcat needs to be restarted during configuration. Do you wish to continue? (yes/no)" yn
+		case $yn in
+			[Yy]* )
+			break;;
+			[Nn]* )
+			logMsgToConfigSysLog "WARN" "WARN: This script must restart Tomcat.  Please run the script again when you are ready to restart it.  No changes have been made to your system.  Exiting."
+			exit 1
+			break;;
+			* ) echo "Please answer yes or no.";;
+		esac
+	done
+}
 #backup the logging.properties file in the CATALINA_HOME folder
 backupLoggingPropertiesFile()
 {
@@ -423,7 +444,6 @@ write21TomcatConfFile()
 #function to write the contents of tomcat syslog config file
 write21TomcatFileContents()
 {
-
 	logMsgToConfigSysLog "INFO" "INFO: Creating file $TOMCAT_SYSLOG_CONFFILE"
 	sudo touch $TOMCAT_SYSLOG_CONFFILE
 	sudo chmod o+w $TOMCAT_SYSLOG_CONFFILE
@@ -513,7 +533,7 @@ sudo cat << EOIPFW >> $TOMCAT_SYSLOG_CONFFILE
 $imfileStr
 EOIPFW
 
-	# restart the syslog service.	
+	#restart the syslog service.
 	restartRsyslog
 }
 
@@ -572,6 +592,9 @@ restoreLogglyPropertiesFile()
 		sudo cp -f $LOGGLY_CATALINA_BACKUP_PROPFILE $LOGGLY_CATALINA_PROPFILE
 		sudo rm -fr $LOGGLY_CATALINA_BACKUP_PROPFILE
 	fi
+	
+	logMsgToConfigSysLog "INFO" "INFO: Tomcat needs to be restarted to rollback the configuration."
+	restartTomcat
 }
 
 #remove 21tomcat.conf file
@@ -581,57 +604,43 @@ remove21TomcatConfFile()
 	if [ -f "$TOMCAT_SYSLOG_CONFFILE" ]; then
 		sudo rm -rf "$TOMCAT_SYSLOG_CONFFILE"
 	fi
-	echo "INFO: Removed all the modified files."
 	
-	logMsgToConfigSysLog "INFO" "INFO: Tomcat needs to be restarted to rollback the configuration."
-	restartTomcat
+	#restart rsyslog
+	restartRsyslog	
 }
 
 #restart tomcat
 restartTomcat()
 {
-	while true; do
-		read -p "Do you wish to restart tomcat server? (yes/no)" yn
-		case $yn in
-			[Yy]* )
-			#sudo service tomcat restart or home/bin/start.sh
-			if [ $(ps -ef | grep -v grep | grep "$SERVICE" | wc -l) -gt 0 ]; then
-				logMsgToConfigSysLog "INFO" "INFO: $SERVICE is running."
-				if [ -f /etc/init.d/$SERVICE ]; then
-					logMsgToConfigSysLog "INFO" "INFO: $SERVICE is running as service."
-					logMsgToConfigSysLog "INFO" "INFO: Restarting the tomcat service."
-					sudo service $SERVICE restart
-					if [ $? -ne 0 ]; then
-						logMsgToConfigSysLog "WARNING" "WARNING: Tomcat did not restart gracefully. Log rotation may not be disabled. Please restart tomcat manually."
-					fi
-				else
-					logMsgToConfigSysLog "INFO" "INFO: $SERVICE is not running as service."
-					# To be commented only for test
-					logMsgToConfigSysLog "INFO" "INFO: Shutting down tomcat."
-					sudo $LOGGLY_CATALINA_HOME/bin/shutdown.sh
-					if [ $? -ne 0 ]; then
-						logMsgToConfigSysLog "WARNING" "WARNING: Tomcat did not shut down gracefully."
-					else
-						logMsgToConfigSysLog "INFO" "INFO: Done shutting down tomcat."
-					fi
-
-					logMsgToConfigSysLog "INFO" "INFO: Starting up tomcat."
-					sudo $LOGGLY_CATALINA_HOME/bin/startup.sh
-					if [ $? -ne 0 ]; then
-						logMsgToConfigSysLog "WARNING" "WARNING: Tomcat did not start up down gracefully."
-					else
-						logMsgToConfigSysLog "INFO" "INFO: Tomcat is up and running."
-					fi
-				fi
+	#sudo service tomcat restart or home/bin/start.sh
+	if [ $(ps -ef | grep -v grep | grep "$SERVICE" | wc -l) -gt 0 ]; then
+		logMsgToConfigSysLog "INFO" "INFO: $SERVICE is running."
+		if [ -f /etc/init.d/$SERVICE ]; then
+			logMsgToConfigSysLog "INFO" "INFO: $SERVICE is running as service."
+			logMsgToConfigSysLog "INFO" "INFO: Restarting the tomcat service."
+			sudo service $SERVICE restart
+			if [ $? -ne 0 ]; then
+				logMsgToConfigSysLog "WARNING" "WARNING: Tomcat did not restart gracefully. Log rotation may not be disabled. Please restart tomcat manually."
 			fi
-			break;;
-			[Nn]* ) 
-			logMsgToConfigSysLog "INFO" "INFO: Exiting the script based on your input. Please restart Tomcat manually."
-			break;;
-			* ) echo "Please answer yes or no.";;
-		esac
-	done
-	
+		else
+			logMsgToConfigSysLog "INFO" "INFO: $SERVICE is not running as service."
+			logMsgToConfigSysLog "INFO" "INFO: Shutting down tomcat."
+			sudo $LOGGLY_CATALINA_HOME/bin/shutdown.sh
+			if [ $? -ne 0 ]; then
+				logMsgToConfigSysLog "WARNING" "WARNING: Tomcat did not shut down gracefully."
+			else
+				logMsgToConfigSysLog "INFO" "INFO: Done shutting down tomcat."
+			fi
+
+			logMsgToConfigSysLog "INFO" "INFO: Starting up tomcat."
+			sudo $LOGGLY_CATALINA_HOME/bin/startup.sh
+			if [ $? -ne 0 ]; then
+				logMsgToConfigSysLog "WARNING" "WARNING: Tomcat did not start up down gracefully."
+			else
+				logMsgToConfigSysLog "INFO" "INFO: Tomcat is up and running."
+			fi
+		fi
+	fi
 }
 
 #display usage syntax
