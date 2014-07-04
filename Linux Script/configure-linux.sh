@@ -188,7 +188,7 @@ checkIfSupportedOS()
 		*"Ubuntu"* )
 		echo "INFO: Operating system is Ubuntu."
 		;;
-		*"RedHat"* )
+		*"Red Hat"* )
 		echo "INFO: Operating system is Red Hat."
 		;;
 		*"CentOS"* )
