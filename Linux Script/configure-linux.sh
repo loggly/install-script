@@ -81,6 +81,9 @@ IS_INVOKED=
 #this variable will hold if the check env function for linux is invoked
 LINUX_ENV_VALIDATED=
 
+#this variable will inform if verification needs to be performed
+LINUX_DO_VERIFICATION=
+
 ##########  Variable Declarations - End  ##########
 
 #check if the Linux environment is compatible with Loggly.
@@ -129,19 +132,20 @@ installLogglyConf()
 	if [ "$LINUX_ENV_VALIDATED" = "" ]; then
 		checkLinuxLogglyCompatibility
 	fi
-
+	
 	#if all the above check passes, write the 22-loggly.conf file
 	write22LogglyConfFile
 
 	#create rsyslog dir if it doesn't exist, Modify the permission on rsyslog directory if exist on Ubuntu
 	createRsyslogDir
-
-	#check if the logs are going to loggly fro linux system now
-	checkIfLogsMadeToLoggly
-
-	#log success message
-	logMsgToConfigSysLog "SUCCESS" "SUCCESS: Linux system successfully configured to send logs via Loggly."
-
+	
+	if [ "$LINUX_DO_VERIFICATION" = "" ]; then
+		#check if the logs are going to loggly fro linux system now
+		checkIfLogsMadeToLoggly
+		
+		#log success message
+		logMsgToConfigSysLog "SUCCESS" "SUCCESS: Linux system successfully configured to send logs via Loggly."
+	fi
 }
 
 #remove loggly configuration from Linux system
@@ -188,7 +192,7 @@ checkIfSupportedOS()
 		*"Ubuntu"* )
 		echo "INFO: Operating system is Ubuntu."
 		;;
-		*"Red Hat"* )
+		*"RedHat"* )
 		echo "INFO: Operating system is Red Hat."
 		;;
 		*"CentOS"* )
@@ -351,15 +355,18 @@ write22LogglyConfFile()
 	if [ -f "$LOGGLY_RSYSLOG_CONFFILE" ]; then
 		logMsgToConfigSysLog "WARN" "WARN: Loggly rsyslog file $LOGGLY_RSYSLOG_CONFFILE already exist."
 		while true; do
-			read -p "Do you wish to override $LOGGLY_RSYSLOG_CONFFILE? (yes/no)" yn
+			read -p "Do you wish to override $LOGGLY_RSYSLOG_CONFFILE and re-verify configuration? (yes/no)" yn
 			case $yn in
 				[Yy]* )
 				logMsgToConfigSysLog "INFO" "INFO: Going to back up the conf file: $LOGGLY_RSYSLOG_CONFFILE to $LOGGLY_RSYSLOG_CONFFILE_BACKUP";
 				sudo mv -f $LOGGLY_RSYSLOG_CONFFILE $LOGGLY_RSYSLOG_CONFFILE_BACKUP;
 				checkAuthTokenAndWriteContents;
 				break;;
-				[Nn]* ) break;;
-				* ) echo "Please answer yes or no.";;
+				[Nn]* ) 
+				LINUX_DO_VERIFICATION="false"
+				logMsgToConfigSysLog "INFO" "INFO: Skipping Linux verification."
+				break;;
+				* ) echo "Please answer yes or no.";;				
 			esac
 		done
 	else
