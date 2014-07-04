@@ -36,7 +36,7 @@ LOGGLY_APACHE_LOG_HOME=
 #this variable will hold the users apache version
 APACHE_VERSION=
 
-MANUAL_CONFIG_INSTRUCTION="Manual instructions to configure Apache2 is available at https://www.loggly.com/docs/apache-application-server"
+MANUAL_CONFIG_INSTRUCTION="Manual instructions to configure Apache2 is available at https://www.loggly.com/docs/sending-apache-logs/"
 
 #this variable will hold if the check env function for linux is invoked
 APACHE_ENV_VALIDATED=
@@ -195,6 +195,7 @@ checkLogFileSize()
 		done
 	elif [ $fileSize -eq 0 ]; then
 		logMsgToConfigSysLog "WARN" "WARN: There are no recent log files from Apache so verification may not succeed."
+		exit 1
 	fi	
 }
 
@@ -330,7 +331,7 @@ usage()
 {
 cat << EOF
 usage: configure-apache [-a loggly auth account or subdomain] [-t loggly token] [-u username] [-p password (optional)] [-ah apache home (optional)]
-usage: configure-linux [-a loggly auth account or subdomain] [-r to rollback]
+usage: configure-apache [-a loggly auth account or subdomain] [-r to rollback]
 usage: configure-apache [-h for help]
 EOF
 }
@@ -353,7 +354,7 @@ while [ "$1" != "" ]; do
          ;;
       -u | --username ) shift
          LOGGLY_USERNAME=$1
-         echo "Userna.loggly.com isme is set"
+         echo "Username is set"
          ;;
 	  -p | --password ) shift
           LOGGLY_PASSWORD=$1
