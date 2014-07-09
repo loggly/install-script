@@ -20,14 +20,10 @@ SERVICE=
 APACHE_ACCESS_LOG_FILE=
 #name of apache error log file
 APACHE_ERROR_LOG_FILE=
-#directory location for syslog
-SYSLOG_ETCDIR_CONF=/etc/rsyslog.d
 #name and location of apache syslog file
-APACHE_SYSLOG_CONFFILE=$SYSLOG_ETCDIR_CONF/21-apache.conf
+APACHE_SYSLOG_CONFFILE=$RSYSLOG_ETCDIR_CONF/21-apache.conf
 #name and location of apache syslog backup file
-APACHE_SYSLOG_CONFFILE_BACKUP=$SYSLOG_ETCDIR_CONF/21-apache.conf.loggly.bk
-#syslog directory
-SYSLOG_DIR=/var/spool/rsyslog
+APACHE_SYSLOG_CONFFILE_BACKUP=$RSYSLOG_ETCDIR_CONF/21-apache.conf.loggly.bk
 
 #this variable will hold the path to the apache home
 LOGGLY_APACHE_HOME=
@@ -231,7 +227,7 @@ write21ApacheFileContents()
 
 	imfileStr="\$ModLoad imfile
 	\$InputFilePollInterval 10 
-	\$WorkDirectory $SYSLOG_DIR
+	\$WorkDirectory $RSYSLOG_DIR
 	"
 	if [[ "$LINUX_DIST" == *"Ubuntu"* ]]; then
 		imfileStr+="\$PrivDropToGroup adm
@@ -330,7 +326,7 @@ remove21ApacheConfFile()
 usage()
 {
 cat << EOF
-usage: configure-apache [-a loggly auth account or subdomain] [-t loggly token] [-u username] [-p password (optional)] [-ah apache home (optional)]
+usage: configure-apache [-a loggly auth account or subdomain] [-t loggly token] [-u username] [-p password (optional)]
 usage: configure-apache [-a loggly auth account or subdomain] [-r to rollback]
 usage: configure-apache [-h for help]
 EOF
@@ -371,12 +367,7 @@ while [ "$1" != "" ]; do
 done
 fi
 
-if [ "$LOGGLY_DEBUG" != ""  -a  "$LOGGLY_AUTH_TOKEN" != "" -a "$LOGGLY_ACCOUNT" != "" -a "$LOGGLY_USERNAME" != "" ]; then
-	if [ "$LOGGLY_PASSWORD" = "" ]; then
-		getPassword
-	fi
-    debug
-elif [ "$LOGGLY_AUTH_TOKEN" != "" -a "$LOGGLY_ACCOUNT" != "" -a "$LOGGLY_USERNAME" != "" ]; then
+if [ "$LOGGLY_AUTH_TOKEN" != "" -a "$LOGGLY_ACCOUNT" != "" -a "$LOGGLY_USERNAME" != "" ]; then
 	if [ "$LOGGLY_PASSWORD" = "" ]; then
 		getPassword
 	fi
