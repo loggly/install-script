@@ -19,14 +19,10 @@ APP_TAG="\"tomcat-version\":\"\""
 
 #name of the service, in this case tomcat6
 SERVICE=tomcat6
-#directory location for syslog
-SYSLOG_ETCDIR_CONF=/etc/rsyslog.d
 #name and location of tomcat syslog file
-TOMCAT_SYSLOG_CONFFILE=$SYSLOG_ETCDIR_CONF/21-tomcat.conf
+TOMCAT_SYSLOG_CONFFILE=$RSYSLOG_ETCDIR_CONF/21-tomcat.conf
 #name and location of tomcat syslog backup file
-TOMCAT_SYSLOG_CONFFILE_BACKUP=$SYSLOG_ETCDIR_CONF/21-tomcat.conf.loggly.bk
-#syslog directory
-SYSLOG_DIR=/var/spool/rsyslog
+TOMCAT_SYSLOG_CONFFILE_BACKUP=$RSYSLOG_ETCDIR_CONF/21-tomcat.conf.loggly.bk
 
 #this variable will hold the path to the catalina home
 LOGGLY_CATALINA_HOME=
@@ -344,7 +340,7 @@ canTomcatBeRestarted()
 			[Yy]* )
 			break;;
 			[Nn]* )
-			logMsgToConfigSysLog "WARN" "WARN: This script must restart Tomcat.  Please run the script again when you are ready to restart it.  No changes have been made to your system.  Exiting."
+			logMsgToConfigSysLog "WARN" "WARN: This script must restart Tomcat. Please run the script again when you are ready to restart it. No changes have been made to your system. Exiting."
 			exit 1
 			break;;
 			* ) echo "Please answer yes or no.";;
@@ -449,7 +445,7 @@ write21TomcatFileContents()
 	sudo chmod o+w $TOMCAT_SYSLOG_CONFFILE
 
 	imfileStr="\$ModLoad imfile
-	\$WorkDirectory $SYSLOG_DIR
+	\$WorkDirectory $RSYSLOG_DIR
 	"
 	if [[ "$LINUX_DIST" == *"Ubuntu"* ]]; then
 		imfileStr+="\$PrivDropToGroup adm
