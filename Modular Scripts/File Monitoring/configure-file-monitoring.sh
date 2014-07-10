@@ -4,7 +4,7 @@
 echo "INFO: Downloading dependencies - configure-linux.sh"
 curl -s -o configure-linux.sh https://raw.githubusercontent.com/psquickitjayant/install-script/master/Linux%20Script/configure-linux.sh
 source configure-linux.sh "being-invoked"
-	
+
 ##########  Variable Declarations - Start  ##########
 #name of the current script
 SCRIPT_NAME=configure-file-monitoring.sh
@@ -26,7 +26,7 @@ FILE_SYSLOG_CONFFILE=
 #name and location of syslog backup file
 FILE_SYSLOG_CONFFILE_BACKUP=
 
-MANUAL_CONFIG_INSTRUCTION="Manual instructions to configure a file is available at https://www.loggly.com/docs/sending-apache-logs/"
+MANUAL_CONFIG_INSTRUCTION="Manual instructions to configure a file is available at https://www.loggly.com/docs/file-monitoring/"
 
 ##########  Variable Declarations - End  ##########
 
@@ -35,28 +35,28 @@ installLogglyConfForFile()
 {
 	#log message indicating starting of Loggly configuration
 	logMsgToConfigSysLog "INFO" "INFO: Initiating configure Loggly for file monitoring."
-	
+
 	#check if the linux environment is compatible for Loggly
 	checkLinuxLogglyCompatibility
-	
+
 	#construct variables using filename and filealias
 	constructVariables
-	
+
 	#check if file to monitor exists
 	checkIfFileExist
-	
+
 	#check if the alias is already taken
 	checkIfFileAliasExist
-	
+
 	#configure loggly for Linux
 	installLogglyConf
 
 	#check for the log file size
 	checkLogFileSize $LOGGLY_FILE_TO_MONITOR
-	
+
 	#create 21<file alias>.conf file
 	write21ConfFileContents
-	
+
 	#verify if the file logs made it to loggly
 	checkIfFileLogsMadeToLoggly
 
@@ -74,10 +74,10 @@ removeLogglyConfForFile()
 
 	#check if the OS is supported by the script. If no, then exit
 	checkIfSupportedOS
-	
+
 	#construct variables using filename and filealias
 	constructVariables
-	
+
 	#checks if the conf file exists. if not, then exit.
 	checkIfConfFileExist
 
@@ -91,10 +91,10 @@ constructVariables()
 {
 	#conf file name
 	FILE_SYSLOG_CONFFILE="$RSYSLOG_ETCDIR_CONF/21-filemonitoring-$LOGGLY_FILE_TO_MONITOR_ALIAS.conf"
-	
+
 	#conf file backup name
 	FILE_SYSLOG_CONFFILE_BACKUP="$FILE_SYSLOG_CONFFILE.loggly.bk"
-	
+
 	#application tag
 	APP_TAG="\"file-alias\":\"$LOGGLY_FILE_TO_MONITOR_ALIAS\""
 }
@@ -122,7 +122,7 @@ checkIfFileAliasExist()
 				logMsgToConfigSysLog "INFO" "INFO: Going to back up the conf file: $FILE_SYSLOG_CONFFILE to $FILE_SYSLOG_CONFFILE_BACKUP";
 				sudo mv -f $FILE_SYSLOG_CONFFILE $FILE_SYSLOG_CONFFILE_BACKUP;
 				break;;
-				[Nn]* ) 
+				[Nn]* )
 				logMsgToConfigSysLog "INFO" "INFO: Not overwriting the existing configuration. Exiting"
 				exit 1
 				break;;
@@ -137,16 +137,16 @@ checkIfFileAliasExist()
 checkLogFileSize()
 {
 	monitorFileSize=$(wc -c "$1" | cut -f 1 -d ' ')
-	if [ $monitorFileSize -ge 100000000 ]; then
+	if [ $monitorFileSize -ge 102400000 ]; then
 		logMsgToConfigSysLog "INFO" "INFO: "
 		while true; do
 			read -p "WARN: There are currently large log files which may use up your allowed volume. Please rotate your logs before continuing. Would you like to continue now anyway? (yes/no)" yn
 			case $yn in
 				[Yy]* )
-				logMsgToConfigSysLog "INFO" "INFO: Current size is $LOGGLY_FILE_TO_MONITOR is $monitorFileSize. Continuing with File Loggly configuration.";
+				logMsgToConfigSysLog "INFO" "INFO: Current size of $LOGGLY_FILE_TO_MONITOR is $monitorFileSize bytes. Continuing with File Loggly configuration.";
 				break;;
-				[Nn]* ) 
-				logMsgToConfigSysLog "INFO" "INFO: Current size is $LOGGLY_FILE_TO_MONITOR is $monitorFileSize. Discontinuing with File Loggly configuration."
+				[Nn]* )
+				logMsgToConfigSysLog "INFO" "INFO: Current size of $LOGGLY_FILE_TO_MONITOR is $monitorFileSize bytes. Discontinuing with File Loggly configuration."
 				exit 1
 				break;;
 				* ) echo "Please answer yes or no.";;
@@ -155,7 +155,9 @@ checkLogFileSize()
 	elif [ $monitorFileSize -eq 0 ]; then
 		logMsgToConfigSysLog "WARN" "WARN: There are no recent $LOGGLY_FILE_TO_MONITOR log files so verification may not succeed. Exiting."
 		exit 1
-	fi	
+	else
+		logMsgToConfigSysLog "INFO" "INFO: File size of $LOGGLY_FILE_TO_MONITOR is $monitorFileSize bytes."
+	fi
 }
 
 #function to write the contents of syslog config file
@@ -166,7 +168,7 @@ write21ConfFileContents()
 	sudo chmod o+w $FILE_SYSLOG_CONFFILE
 
 	imfileStr="\$ModLoad imfile
-	\$InputFilePollInterval 10 
+	\$InputFilePollInterval 10
 	\$WorkDirectory $RSYSLOG_DIR
 	"
 	if [[ "$LINUX_DIST" == *"Ubuntu"* ]]; then
@@ -264,7 +266,7 @@ remove21ConfFile()
 usage()
 {
 cat << EOF
-usage: configure-file [-a loggly auth account or subdomain] [-t loggly token] [-u username] [-p password (optional)] [-f filename] [-l filealias]
+usage: configure-file [-a loggly auth account or subdomain] [-t loggly token (optional)] [-u username] [-p password (optional)] [-f filename] [-l filealias]
 usage: configure-file [-a loggly auth account or subdomain] [-r to rollback] [-l filealias]
 usage: configure-file [-h for help]
 EOF
@@ -297,7 +299,8 @@ while [ "$1" != "" ]; do
 		  LOGGLY_ROLLBACK="true"
           ;;
 	  -f | --filename ) shift
-		  LOGGLY_FILE_TO_MONITOR=$1
+		  #LOGGLY_FILE_TO_MONITOR=$1
+		  LOGGLY_FILE_TO_MONITOR=$(readlink -f $1)
 		  echo "File to monitor: $LOGGLY_FILE_TO_MONITOR"
 		  ;;
 	  -l | --filealias ) shift
@@ -313,7 +316,7 @@ while [ "$1" != "" ]; do
 done
 fi
 
-if [ "$LOGGLY_AUTH_TOKEN" != "" -a "$LOGGLY_ACCOUNT" != "" -a "$LOGGLY_USERNAME" != "" -a "$LOGGLY_FILE_TO_MONITOR" != "" -a "$LOGGLY_FILE_TO_MONITOR_ALIAS" != "" ]; then
+if [ "$LOGGLY_ACCOUNT" != "" -a "$LOGGLY_USERNAME" != "" -a "$LOGGLY_FILE_TO_MONITOR" != "" -a "$LOGGLY_FILE_TO_MONITOR_ALIAS" != "" ]; then
 	if [ "$LOGGLY_PASSWORD" = "" ]; then
 		getPassword
 	fi
