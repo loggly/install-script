@@ -105,7 +105,10 @@ checkLinuxLogglyCompatibility()
 	#check if user credentials are valid. If no, then exit
 	checkIfValidUserNamePassword
 
-	#check if authentication token is valid. If no, then exit
+	#get authentication token if not provided
+	getAuthToken
+
+	#check if authentication token is valid. If no, then exit.
 	checkIfValidAuthToken
 
 	#check if rsyslog is configured as service. If no, then exit
@@ -132,17 +135,17 @@ installLogglyConf()
 	if [ "$LINUX_ENV_VALIDATED" = "" ]; then
 		checkLinuxLogglyCompatibility
 	fi
-	
+
 	#if all the above check passes, write the 22-loggly.conf file
 	write22LogglyConfFile
 
 	#create rsyslog dir if it doesn't exist, Modify the permission on rsyslog directory if exist on Ubuntu
 	createRsyslogDir
-	
+
 	if [ "$LINUX_DO_VERIFICATION" = "" ]; then
 		#check if the logs are going to loggly fro linux system now
 		checkIfLogsMadeToLoggly
-		
+
 		#log success message
 		logMsgToConfigSysLog "SUCCESS" "SUCCESS: Linux system successfully configured to send logs via Loggly."
 	fi
@@ -187,7 +190,7 @@ checkIfUserHasRootPrivileges()
 checkIfSupportedOS()
 {
 	getOs
-	
+
 	case "$LINUX_DIST" in
 		*"Ubuntu"* )
 		echo "INFO: Operating system is Ubuntu."
@@ -225,7 +228,6 @@ getOs()
 		LINUX_DIST=$(uname)
 	fi
 }
-
 
 #sets linux variables which will be used across various functions
 setLinuxVariables()
@@ -282,6 +284,28 @@ checkIfValidUserNamePassword()
 		exit 1
 	else
 		logMsgToConfigSysLog "INFO" "INFO: Username and password authorized successfully."
+	fi
+}
+
+getAuthToken()
+{
+	if [ "$LOGGLY_AUTH_TOKEN" = "" ]; then
+		logMsgToConfigSysLog "INFO" "INFO: Authentication token not provided. Trying to retrieve it from $LOGGLY_ACCOUNT_URL account."
+		#get authentication token if user has not provided one
+		tokenstr=$(curl -s -u $LOGGLY_USERNAME:$LOGGLY_PASSWORD $LOGGLY_ACCOUNT_URL/apiv2/customer | grep -v "token")
+
+		#get the string from index 0 to first occurence of ,
+		tokenstr=${tokenstr%%,*}
+
+		#get the string from index 0 to last occurence of "
+		tokenstr=${tokenstr%\"*}
+
+		#get the string from first occurence of " to the end
+		tokenstr=${tokenstr#*\"}
+
+		LOGGLY_AUTH_TOKEN=$tokenstr
+		
+		logMsgToConfigSysLog "INFO" "INFO: Retrieved authentication token: $LOGGLY_AUTH_TOKEN"
 	fi
 }
 
@@ -362,11 +386,11 @@ write22LogglyConfFile()
 				sudo mv -f $LOGGLY_RSYSLOG_CONFFILE $LOGGLY_RSYSLOG_CONFFILE_BACKUP;
 				checkAuthTokenAndWriteContents;
 				break;;
-				[Nn]* ) 
+				[Nn]* )
 				LINUX_DO_VERIFICATION="false"
 				logMsgToConfigSysLog "INFO" "INFO: Skipping Linux verification."
 				break;;
-				* ) echo "Please answer yes or no.";;				
+				* ) echo "Please answer yes or no.";;
 			esac
 		done
 	else
@@ -605,7 +629,7 @@ getPassword()
 usage()
 {
 cat << EOF
-usage: configure-linux [-a loggly auth account or subdomain] [-t loggly token] [-u username] [-p password (optional)]
+usage: configure-linux [-a loggly auth account or subdomain] [-t loggly token (optional)] [-u username] [-p password (optional)]
 usage: configure-linux [-a loggly auth account or subdomain] [-r to remove]
 usage: configure-linux [-h for help]
 EOF
@@ -651,7 +675,7 @@ if [ "$1" != "being-invoked" ]; then
 
 	if [ "$LOGGLY_REMOVE" != "" -a "$LOGGLY_ACCOUNT" != "" ]; then
 		removeLogglyConf
-	elif [ "$LOGGLY_AUTH_TOKEN" != "" -a "$LOGGLY_ACCOUNT" != "" -a "$LOGGLY_USERNAME" != "" ]; then
+	elif [ "$LOGGLY_ACCOUNT" != "" -a "$LOGGLY_USERNAME" != "" ]; then
 		if [ "$LOGGLY_PASSWORD" = "" ]; then
 			getPassword
 		fi
