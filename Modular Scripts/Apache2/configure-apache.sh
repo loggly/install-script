@@ -326,7 +326,7 @@ remove21ApacheConfFile()
 usage()
 {
 cat << EOF
-usage: configure-apache [-a loggly auth account or subdomain] [-t loggly token] [-u username] [-p password (optional)]
+usage: configure-apache [-a loggly auth account or subdomain] [-t loggly token (optional)] [-u username] [-p password (optional)]
 usage: configure-apache [-a loggly auth account or subdomain] [-r to rollback]
 usage: configure-apache [-h for help]
 EOF
@@ -367,7 +367,7 @@ while [ "$1" != "" ]; do
 done
 fi
 
-if [ "$LOGGLY_AUTH_TOKEN" != "" -a "$LOGGLY_ACCOUNT" != "" -a "$LOGGLY_USERNAME" != "" ]; then
+if [ "$LOGGLY_ACCOUNT" != "" -a "$LOGGLY_USERNAME" != "" ]; then
 	if [ "$LOGGLY_PASSWORD" = "" ]; then
 		getPassword
 	fi
