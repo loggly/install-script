@@ -180,17 +180,17 @@ checkLogFileSize()
 			read -p "WARN: There are currently large log files which may use up your allowed volume. Please rotate your logs before continuing. Would you like to continue now anyway? (yes/no)" yn
 			case $yn in
 				[Yy]* )
-				logMsgToConfigSysLog "INFO" "INFO: Current apache logs size is $fileSize. Continuing with Apache Loggly configuration.";
+				logMsgToConfigSysLog "INFO" "INFO: Current apache logs size is $fileSize bytes. Continuing with Apache Loggly configuration.";
 				break;;
 				[Nn]* ) 
-				logMsgToConfigSysLog "INFO" "INFO: Current apache logs size is $fileSize. Discontinuing with Apache Loggly configuration."
+				logMsgToConfigSysLog "INFO" "INFO: Current apache logs size is $fileSize bytes. Discontinuing with Apache Loggly configuration."
 				exit 1
 				break;;
 				* ) echo "Please answer yes or no.";;
 			esac
 		done
 	elif [ $fileSize -eq 0 ]; then
-		logMsgToConfigSysLog "WARN" "WARN: There are no recent log files from Apache so verification may not succeed."
+		logMsgToConfigSysLog "WARN" "WARN: There are no recent logs from Apache there so won't be any sent to Loggly. You can generate some logs by visiting a page on your web server."
 		exit 1
 	fi	
 }
