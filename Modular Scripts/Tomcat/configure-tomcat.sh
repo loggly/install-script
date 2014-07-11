@@ -643,7 +643,7 @@ restartTomcat()
 usage()
 {
 cat << EOF
-usage: configure-tomcat [-a loggly auth account or subdomain] [-t loggly token] [-u username] [-p password (optional)] [-ch catalina home (optional)]
+usage: configure-tomcat [-a loggly auth account or subdomain] [-t loggly token (optional)] [-u username] [-p password (optional)] [-ch catalina home (optional)]
 usage: configure-tomcat [-r to rollback] [-a loggly auth account or subdomain] [-ch catalina home (optional)]
 usage: configure-tomcat [-h for help]
 EOF
@@ -688,12 +688,12 @@ while [ "$1" != "" ]; do
 done
 fi
 
-if [ "$LOGGLY_DEBUG" != ""  -a  "$LOGGLY_AUTH_TOKEN" != "" -a "$LOGGLY_ACCOUNT" != "" -a "$LOGGLY_USERNAME" != "" ]; then
+if [ "$LOGGLY_DEBUG" != ""  -a  "$LOGGLY_ACCOUNT" != "" -a "$LOGGLY_USERNAME" != "" ]; then
 	if [ "$LOGGLY_PASSWORD" = "" ]; then
 		getPassword
 	fi
     debug
-elif [ "$LOGGLY_AUTH_TOKEN" != "" -a "$LOGGLY_ACCOUNT" != "" -a "$LOGGLY_USERNAME" != "" ]; then
+elif [ "$LOGGLY_ACCOUNT" != "" -a "$LOGGLY_USERNAME" != "" ]; then
 	if [ "$LOGGLY_PASSWORD" = "" ]; then
 		getPassword
 	fi
