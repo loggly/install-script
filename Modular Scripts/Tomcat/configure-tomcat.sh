@@ -9,7 +9,7 @@ source configure-linux.sh "being-invoked"
 #name of the current script
 SCRIPT_NAME=configure-tomcat.sh
 #version of the current script
-SCRIPT_VERSION=1.0
+SCRIPT_VERSION=1.01
 
 #minimum version of tomcat to enable log rotation
 MIN_TOMCAT_VERSION=6.0.33.0
