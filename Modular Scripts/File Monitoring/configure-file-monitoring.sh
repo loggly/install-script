@@ -191,7 +191,7 @@ write21ConfFileContents()
 
 	imfileStr+="
 	# File access file:
-	\$InputFileName \"$LOGGLY_FILE_TO_MONITOR\"
+	\$InputFileName $LOGGLY_FILE_TO_MONITOR
 	\$InputFileTag $LOGGLY_FILE_TO_MONITOR_ALIAS:
 	\$InputFileStateFile stat-$LOGGLY_FILE_TO_MONITOR_ALIAS
 	\$InputFileSeverity info
