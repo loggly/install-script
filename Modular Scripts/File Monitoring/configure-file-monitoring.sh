@@ -39,6 +39,9 @@ installLogglyConfForFile()
 	#check if the linux environment is compatible for Loggly
 	checkLinuxLogglyCompatibility
 
+	#checks if the file name contain spaces, if yes, the exit
+	checkIfFileLocationContainSpaces
+
 	#construct variables using filename and filealias
 	constructVariables
 
@@ -85,6 +88,16 @@ removeLogglyConfForFile()
 	remove21ConfFile
 
 	logMsgToConfigSysLog "INFO" "INFO: Rollback completed."
+}
+
+checkIfFileLocationContainSpaces()
+{
+	case "$LOGGLY_FILE_TO_MONITOR" in
+		*\ * )
+		logMsgToConfigSysLog "ERROR" "ERROR: File location cannot contain spaces."
+		exit 1;;
+		*) break;;
+	esac
 }
 
 constructVariables()
@@ -153,7 +166,7 @@ checkLogFileSize()
 			esac
 		done
 	elif [ $monitorFileSize -eq 0 ]; then
-		logMsgToConfigSysLog "WARN" "WARN: There are no recent logs from $LOGGLY_FILE_TO_MONITOR there so won't be any data sent to Loggly. You can generate some logs by writing to this file."
+		logMsgToConfigSysLog "WARN" "WARN: There are no recent $LOGGLY_FILE_TO_MONITOR log files so verification may not succeed. Exiting."
 		exit 1
 	else
 		logMsgToConfigSysLog "INFO" "INFO: File size of $LOGGLY_FILE_TO_MONITOR is $monitorFileSize bytes."
@@ -178,7 +191,7 @@ write21ConfFileContents()
 
 	imfileStr+="
 	# File access file:
-	\$InputFileName $LOGGLY_FILE_TO_MONITOR
+	\$InputFileName \"$LOGGLY_FILE_TO_MONITOR\"
 	\$InputFileTag $LOGGLY_FILE_TO_MONITOR_ALIAS:
 	\$InputFileStateFile stat-$LOGGLY_FILE_TO_MONITOR_ALIAS
 	\$InputFileSeverity info
@@ -300,7 +313,7 @@ while [ "$1" != "" ]; do
           ;;
 	  -f | --filename ) shift
 		  #LOGGLY_FILE_TO_MONITOR=$1
-		  LOGGLY_FILE_TO_MONITOR=$(readlink -f $1)
+		  LOGGLY_FILE_TO_MONITOR=$(readlink -f "$1")
 		  echo "File to monitor: $LOGGLY_FILE_TO_MONITOR"
 		  ;;
 	  -l | --filealias ) shift
