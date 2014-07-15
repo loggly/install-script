@@ -96,7 +96,7 @@ checkIfFileLocationContainSpaces()
 		*\ * )
 		logMsgToConfigSysLog "ERROR" "ERROR: File location cannot contain spaces."
 		exit 1;;
-		*) break;;
+		*) ;;
 	esac
 }
 
@@ -166,7 +166,7 @@ checkLogFileSize()
 			esac
 		done
 	elif [ $monitorFileSize -eq 0 ]; then
-		logMsgToConfigSysLog "WARN" "WARN: There are no recent logs from $LOGGLY_FILE_TO_MONITOR there so won't be any data sent to Loggly. You can generate some logs by writing to this file."
+		logMsgToConfigSysLog "WARN" "WARN: There are no recent logs from $LOGGLY_FILE_TO_MONITOR so there won't be any data sent to Loggly. You can generate some logs by writing to this file."
 		exit 1
 	else
 		logMsgToConfigSysLog "INFO" "INFO: File size of $LOGGLY_FILE_TO_MONITOR is $monitorFileSize bytes."
