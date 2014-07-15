@@ -166,7 +166,7 @@ checkLogFileSize()
 			esac
 		done
 	elif [ $monitorFileSize -eq 0 ]; then
-		logMsgToConfigSysLog "WARN" "WARN: There are no recent $LOGGLY_FILE_TO_MONITOR log files so verification may not succeed. Exiting."
+		logMsgToConfigSysLog "WARN" "WARN: There are no recent logs from $LOGGLY_FILE_TO_MONITOR there so won't be any data sent to Loggly. You can generate some logs by writing to this file."
 		exit 1
 	else
 		logMsgToConfigSysLog "INFO" "INFO: File size of $LOGGLY_FILE_TO_MONITOR is $monitorFileSize bytes."
