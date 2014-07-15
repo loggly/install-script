@@ -190,7 +190,7 @@ checkLogFileSize()
 			esac
 		done
 	elif [ $fileSize -eq 0 ]; then
-		logMsgToConfigSysLog "WARN" "WARN: There are no recent logs from Apache there so won't be any sent to Loggly. You can generate some logs by visiting a page on your web server."
+		logMsgToConfigSysLog "WARN" "WARN: There are no recent logs from Apache so there won't be any data sent to Loggly. You can generate some logs by visiting a page on your web server."
 		exit 1
 	fi	
 }
