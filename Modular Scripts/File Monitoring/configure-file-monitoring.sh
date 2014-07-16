@@ -9,7 +9,7 @@ source configure-linux.sh "being-invoked"
 #name of the current script
 SCRIPT_NAME=configure-file-monitoring.sh
 #version of the current script
-SCRIPT_VERSION=1.0
+SCRIPT_VERSION=1.01
 
 #file to monitor (contains complete path and file name) provided by user
 LOGGLY_FILE_TO_MONITOR=
@@ -43,7 +43,7 @@ installLogglyConfForFile()
 	checkIfFileLocationContainSpaces
 
 	#construct variables using filename and filealias
-	constructVariables
+	constructFileVariables
 
 	#check if file to monitor exists
 	checkIfFileExist
@@ -54,11 +54,14 @@ installLogglyConfForFile()
 	#configure loggly for Linux
 	installLogglyConf
 
-	#check for the log file size
-	checkLogFileSize $LOGGLY_FILE_TO_MONITOR
-
 	#create 21<file alias>.conf file
 	write21ConfFileContents
+
+	#restart rsyslog
+	restartRsyslog
+	
+	#check for the log file size
+	checkLogFileSize $LOGGLY_FILE_TO_MONITOR
 
 	#verify if the file logs made it to loggly
 	checkIfFileLogsMadeToLoggly
@@ -79,14 +82,18 @@ removeLogglyConfForFile()
 	checkIfSupportedOS
 
 	#construct variables using filename and filealias
-	constructVariables
+	constructFileVariables
 
 	#checks if the conf file exists. if not, then exit.
 	checkIfConfFileExist
 
 	#remove 21<file-alias>.conf file
 	remove21ConfFile
-
+	
+	#restart rsyslog
+	restartRsyslog
+	
+	#log success message
 	logMsgToConfigSysLog "INFO" "INFO: Rollback completed."
 }
 
@@ -100,7 +107,7 @@ checkIfFileLocationContainSpaces()
 	esac
 }
 
-constructVariables()
+constructFileVariables()
 {
 	#conf file name
 	FILE_SYSLOG_CONFFILE="$RSYSLOG_ETCDIR_CONF/21-filemonitoring-$LOGGLY_FILE_TO_MONITOR_ALIAS.conf"
@@ -210,7 +217,6 @@ sudo cat << EOIPFW >> $FILE_SYSLOG_CONFFILE
 $imfileStr
 EOIPFW
 
-	restartRsyslog
 }
 
 #checks if the apache logs made to loggly
@@ -272,16 +278,15 @@ remove21ConfFile()
 		sudo rm -rf "$FILE_SYSLOG_CONFFILE"
 	fi
 	echo "INFO: Removed all the modified files."
-	restartRsyslog
 }
 
 #display usage syntax
 usage()
 {
 cat << EOF
-usage: configure-file [-a loggly auth account or subdomain] [-t loggly token (optional)] [-u username] [-p password (optional)] [-f filename] [-l filealias]
-usage: configure-file [-a loggly auth account or subdomain] [-r to rollback] [-l filealias]
-usage: configure-file [-h for help]
+usage: configure-file-monitoring [-a loggly auth account or subdomain] [-t loggly token (optional)] [-u username] [-p password (optional)] [-f filename] [-l filealias]
+usage: configure-file-monitoring [-a loggly auth account or subdomain] [-r to rollback] [-l filealias]
+usage: configure-file-monitoring [-h for help]
 EOF
 }
 
