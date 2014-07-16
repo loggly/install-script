@@ -214,7 +214,7 @@ setLinuxVariables()
 checkIfLogglyServersAccessible()
 {
 	echo "INFO: Checking if $LOGGLY_ACCOUNT_URL is reachable."
-	if [ $(curl -s --head  --request GET $LOGGLY_ACCOUNT_URL/login | grep "200 OK" | wc -l) == 1 ]; then
+	if [ $(curl -s --head  --request GET $LOGGLY_ACCOUNT_URL/accounts/login | grep "200 OK" | wc -l) == 1 ]; then
 		echo "INFO: $LOGGLY_ACCOUNT_URL is reachable."
 	else
 		logMsgToConfigSysLog "WARNING" "WARNING: $LOGGLY_ACCOUNT_URL is not reachable. Please check your network and firewall settings. Continuing to configure Loggly on your system."
