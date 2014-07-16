@@ -9,7 +9,7 @@ source configure-linux.sh "being-invoked"
 #name of the current script
 SCRIPT_NAME=configure-apache.sh
 #version of the current script
-SCRIPT_VERSION=1.0
+SCRIPT_VERSION=1.01
 
 #we have not found the apache version yet at this point in the script
 APP_TAG="\"apache-version\":\"\""
@@ -65,11 +65,11 @@ installLogglyConfForApache()
 	#configure loggly for Linux
 	installLogglyConf
 
-	#check for the apache log file size
-	checkLogFileSize $LOGGLY_APACHE_LOG_HOME/$APACHE_ACCESS_LOG_FILE $LOGGLY_APACHE_LOG_HOME/$APACHE_ERROR_LOG_FILE
-	
 	#create 21apache.conf file
 	write21ApacheConfFile
+	
+	#check for the apache log file size
+	checkLogFileSize $LOGGLY_APACHE_LOG_HOME/$APACHE_ACCESS_LOG_FILE $LOGGLY_APACHE_LOG_HOME/$APACHE_ERROR_LOG_FILE
 	
 	#verify if the apache logs made it to loggly
 	checkIfApacheLogsMadeToLoggly
@@ -190,7 +190,7 @@ checkLogFileSize()
 			esac
 		done
 	elif [ $fileSize -eq 0 ]; then
-		logMsgToConfigSysLog "WARN" "WARN: There are no recent logs from Apache so there won't be any data sent to Loggly. You can generate some logs by visiting a page on your web server."
+		logMsgToConfigSysLog "WARN" "WARN: There are no recent logs from Apache there so won't be any sent to Loggly. You can generate some logs by visiting a page on your web server."
 		exit 1
 	fi	
 }
