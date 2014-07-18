@@ -8,6 +8,8 @@ Configure your any text file to send it contents to Loggly
     
 **Note:** File Alias should be unique for each file.
   
+  
+  
 Stop sending your file contents to Loggly
 
     sudo ./configure-file-monitoring.sh -a SUBDOMAIN -l FILE_ALIAS -r
