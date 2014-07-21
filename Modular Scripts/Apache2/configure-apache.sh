@@ -9,7 +9,7 @@ source configure-linux.sh "being-invoked"
 #name of the current script
 SCRIPT_NAME=configure-apache.sh
 #version of the current script
-SCRIPT_VERSION=1.01
+SCRIPT_VERSION=1.1
 
 #we have not found the apache version yet at this point in the script
 APP_TAG="\"apache-version\":\"\""
@@ -35,7 +35,7 @@ APACHE_VERSION=
 MANUAL_CONFIG_INSTRUCTION="Manual instructions to configure Apache2 is available at https://www.loggly.com/docs/sending-apache-logs/"
 
 #this variable will hold if the check env function for linux is invoked
-APACHE_ENV_VALIDATED=
+APACHE_ENV_VALIDATED="false"
 ##########  Variable Declarations - End  ##########
 
 #check if apache environment is compatible for Loggly
@@ -58,7 +58,7 @@ installLogglyConfForApache()
 	logMsgToConfigSysLog "INFO" "INFO: Initiating Configure Loggly for Apache."
 	
 	#check if apache environment is compatible with Loggly
-	if [ "$APACHE_ENV_VALIDATED" = "" ]; then
+	if [ "$APACHE_ENV_VALIDATED" = "false" ]; then
 		checkApacheLogglyCompatibility
 	fi
 	
@@ -155,7 +155,7 @@ getApacheVersion()
 	APACHE_VERSION=${APACHE_VERSION% *}
 	APACHE_VERSION=$APACHE_VERSION | tr -d ' '
 	APP_TAG="\"apache-version\":\"$APACHE_VERSION\""
-	echo "Apache version: " $APACHE_VERSION
+	logMsgToConfigSysLog "INFO" "INFO: Apache version: $APACHE_VERSION"
 }
 
 #checks if the apache version is supported by this script, currently the script
@@ -174,7 +174,7 @@ checkLogFileSize()
 	accessFileSize=$(wc -c "$1" | cut -f 1 -d ' ')
 	errorFileSize=$(wc -c "$2" | cut -f 1 -d ' ')
 	fileSize=$((accessFileSize+errorFileSize))
-	if [ $fileSize -ge 100000000 ]; then
+	if [ $fileSize -ge 102400000 ]; then
 		logMsgToConfigSysLog "INFO" "INFO: "
 		while true; do
 			read -p "WARN: There are currently large log files which may use up your allowed volume. Please rotate your logs before continuing. Would you like to continue now anyway? (yes/no)" yn
