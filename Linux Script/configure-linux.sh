@@ -15,7 +15,7 @@ function ctrl_c()  {
 #name of the current script. This will get overwritten by the child script which calls this
 SCRIPT_NAME=configure-linux.sh
 #version of the current script. This will get overwritten by the child script which calls this
-SCRIPT_VERSION=1.01
+SCRIPT_VERSION=1.1
 
 #application tag. This will get overwritten by the child script which calls this
 APP_TAG=
@@ -79,10 +79,10 @@ MANUAL_CONFIG_INSTRUCTION="Manual instructions to configure rsyslog on Linux are
 IS_INVOKED=
 
 #this variable will hold if the check env function for linux is invoked
-LINUX_ENV_VALIDATED=
+LINUX_ENV_VALIDATED="false"
 
 #this variable will inform if verification needs to be performed
-LINUX_DO_VERIFICATION=
+LINUX_DO_VERIFICATION="false"
 
 ##########  Variable Declarations - End  ##########
 
@@ -132,7 +132,7 @@ installLogglyConf()
 	#log message indicating starting of Loggly configuration
 	logMsgToConfigSysLog "INFO" "INFO: Initiating Configure Loggly for Linux."
 
-	if [ "$LINUX_ENV_VALIDATED" = "" ]; then
+	if [ "$LINUX_ENV_VALIDATED" = "false" ]; then
 		checkLinuxLogglyCompatibility
 	fi
 
@@ -142,7 +142,7 @@ installLogglyConf()
 	#create rsyslog dir if it doesn't exist, Modify the permission on rsyslog directory if exist on Ubuntu
 	createRsyslogDir
 
-	if [ "$LINUX_DO_VERIFICATION" = "" ]; then
+	if [ "$LINUX_DO_VERIFICATION" = "true" ]; then
 		#check if the logs are going to loggly fro linux system now
 		checkIfLogsMadeToLoggly
 
@@ -382,6 +382,7 @@ write22LogglyConfFile()
 			read -p "Do you wish to override $LOGGLY_RSYSLOG_CONFFILE and re-verify configuration? (yes/no)" yn
 			case $yn in
 				[Yy]* )
+				LINUX_DO_VERIFICATION="true"
 				logMsgToConfigSysLog "INFO" "INFO: Going to back up the conf file: $LOGGLY_RSYSLOG_CONFFILE to $LOGGLY_RSYSLOG_CONFFILE_BACKUP";
 				sudo mv -f $LOGGLY_RSYSLOG_CONFFILE $LOGGLY_RSYSLOG_CONFFILE_BACKUP;
 				checkAuthTokenAndWriteContents;
