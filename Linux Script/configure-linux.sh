@@ -82,7 +82,7 @@ IS_INVOKED=
 LINUX_ENV_VALIDATED="false"
 
 #this variable will inform if verification needs to be performed
-LINUX_DO_VERIFICATION="false"
+LINUX_DO_VERIFICATION="true"
 
 ##########  Variable Declarations - End  ##########
 
@@ -190,20 +190,37 @@ checkIfUserHasRootPrivileges()
 checkIfSupportedOS()
 {
 	getOs
-
-	case "$LINUX_DIST" in
-		*"Ubuntu"* )
+	
+	LINUX_DIST_IN_LOWER_CASE=$(echo $LINUX_DIST | tr "[:upper:]" "[:lower:]")
+	
+	case "$LINUX_DIST_IN_LOWER_CASE" in
+		*"ubuntu"* )
 		echo "INFO: Operating system is Ubuntu."
 		;;
-		*"RedHat"* )
+		*"redhat"* )
 		echo "INFO: Operating system is Red Hat."
 		;;
-		*"CentOS"* )
+		*"centos"* )
 		echo "INFO: Operating system is CentOS."
 		;;
-		* )
+		*"darwin"* )
+		#if the OS is mac then exit
 		logMsgToConfigSysLog "ERROR" "ERROR: '$LINUX_DIST' operating system is not supported by the script."
 		exit 1
+		;;
+		* )
+		logMsgToConfigSysLog "WARN" "WARN: The linux distribution '$LINUX_DIST' has not been previously tested with Loggly."
+		while true; do
+			read -p "Would you like to continue anyway? (yes/no)" yn
+			case $yn in
+				[Yy]* )
+				break;;
+				[Nn]* )
+				exit 1	
+				;;
+				* ) echo "Please answer yes or no.";;
+			esac
+		done
 		;;
 	esac
 }
@@ -382,7 +399,6 @@ write22LogglyConfFile()
 			read -p "Do you wish to override $LOGGLY_RSYSLOG_CONFFILE and re-verify configuration? (yes/no)" yn
 			case $yn in
 				[Yy]* )
-				LINUX_DO_VERIFICATION="true"
 				logMsgToConfigSysLog "INFO" "INFO: Going to back up the conf file: $LOGGLY_RSYSLOG_CONFFILE to $LOGGLY_RSYSLOG_CONFFILE_BACKUP";
 				sudo mv -f $LOGGLY_RSYSLOG_CONFFILE $LOGGLY_RSYSLOG_CONFFILE_BACKUP;
 				checkAuthTokenAndWriteContents;
