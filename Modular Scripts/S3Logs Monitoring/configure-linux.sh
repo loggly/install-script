@@ -203,6 +203,9 @@ checkIfSupportedOS()
 		*"centos"* )
 		echo "INFO: Operating system is CentOS."
 		;;
+		*"amazon"* )
+		echo "INFO: Operating system is Amazon AMI."
+		;;
 		*"darwin"* )
 		#if the OS is mac then exit
 		logMsgToConfigSysLog "ERROR" "ERROR: '$LINUX_DIST' operating system is not supported by the script."
@@ -234,6 +237,9 @@ getOs()
 		# If available, use LSB to identify distribution
 		if [ -f /etc/lsb-release -o -d /etc/lsb-release.d ]; then
 			LINUX_DIST=$(lsb_release -i | cut -d: -f2 | sed s/'^\t'//)
+		# If system-release is available, then try to identify the name
+		elif [ -f /etc/system-release ]; then
+			LINUX_DIST=$(cat /etc/system-release  | cut -f 1 -d  " ")
 		# Otherwise, use release info file
 		else
 			LINUX_DIST=$(ls -d /etc/[A-Za-z]*[_-][rv]e[lr]* | grep -v "lsb" | cut -d'/' -f3 | cut -d'-' -f1 | cut -d'_' -f1)
@@ -602,10 +608,7 @@ sendPayloadToConfigSysLog()
 #$1 return the count of records in loggly, $2 is the query param to search in loggly
 searchAndFetch()
 {
-	URL_WITH_SPACE_CHARS=$2
-	
-	#replacing all the spaces with %20
-	url="${URL_WITH_SPACE_CHARS//\ /%20}"
+	url=$2
 	
 	result=$(wget -qO- /dev/null --user "$LOGGLY_USERNAME" --password "$LOGGLY_PASSWORD" "$url")
 	
@@ -627,7 +630,7 @@ searchAndFetch()
 	eval $1="'$count'"
 	if [ "$count" -gt 0 ]; then
 		timestamp=$(echo "$result" | grep timestamp)
-	fi
+	fi	
 }
 
 #get password in the form of asterisk

@@ -36,21 +36,18 @@ IS_ANY_FILE_CONFIGURED="false"
 #value for temp directory
 TEMP_DIR=
 
-#time when the rsyslog is started and we want to monitor if the logs made to loggly
-START_DATE_TIME=
-
 MANUAL_CONFIG_INSTRUCTION="Manual instructions to configure a file is available at https://www.loggly.com/docs/file-monitoring/"
 
 ##########  Variable Declarations - End  ##########
 
 # executing the script for loggly to install and configure syslog
-installLogglyConfForFile()
+installLogglyConfForS3()
 {
 	#log message indicating starting of Loggly configuration
 	logMsgToConfigSysLog "INFO" "INFO: Initiating configure Loggly for file monitoring."
 
 	#check if the provided alias is correct or not
-	checkIfValidAliasForInvoke
+	checkIfS3AliasAlreadyTaken
 
 	#check if the linux environment is compatible for Loggly
 	checkLinuxLogglyCompatibility
@@ -62,7 +59,7 @@ installLogglyConfForFile()
 	checkIfValidS3Bucket
 
 	#check if s3bucket file is valid
-	checkIfValidS3FileName
+	checkIfValidS3File
 	
 	#configure loggly for Linux
 	installLogglyConf
@@ -71,20 +68,17 @@ installLogglyConfForFile()
 	createTempDir
 
 	#download S3 files from bucket to temp directory
-	downloadS3FilesFromBucketToTempDir
+	downloadS3Bucket
 
 	#download S3 file to temp directory
-	downloadS3FilesToTempDir
+	downloadS3File
 
 	#invoke file monitoring on each file after checking if it is a text file or not
-	invokeFileMonitoring
+	invokeS3FileMonitoring
 	
 	if [ "$IS_ANY_FILE_CONFIGURED" != "false" ]; then
 		#check if s3 logs made it to loggly
 		checkIfS3LogsMadeToLoggly
-		
-		#log success message
-		logMsgToConfigSysLog "SUCCESS" "SUCCESS: Successfully configured to send $LOGGLY_FILE_TO_MONITOR logs via Loggly."
 	else
 		logMsgToConfigSysLog "WARN" "WARN: Did not find any files to configure. Nothing to do."
 	fi
@@ -94,8 +88,8 @@ installLogglyConfForFile()
 }
 
 
-#executing script to remove loggly configuration for File
-removeLogglyConfForFile()
+#executing script to remove loggly configuration for S3 files
+removeLogglyConfForS3()
 {
 	logMsgToConfigSysLog "INFO" "INFO: Initiating rollback."
 
@@ -106,16 +100,16 @@ removeLogglyConfForFile()
 	checkIfSupportedOS
 
 	#check if alias provided is the correct one
-	checkIfValidAliasForRevoke
+	checkIfS3AliasExist
 
 	#remove file monitoring
-	removeFileMonitoring
+	removeS3FileMonitoring
 
 	#log success message
 	logMsgToConfigSysLog "INFO" "INFO: Rollback completed."
 }
 
-checkIfValidAliasForInvoke()
+checkIfS3AliasAlreadyTaken()
 {
 	if ls $RSYSLOG_ETCDIR_CONF/*$LOGGLY_S3_ALIAS.conf &> /dev/null; then
 		logMsgToConfigSysLog "ERROR" "ERROR: $LOGGLY_S3_ALIAS is already taken. Please try with another one."
@@ -135,11 +129,12 @@ checkIfS3cmdInstalledAndConfigured()
 		fi
     else
         logMsgToConfigSysLog "ERROR" "ERROR: s3cmd is not present on your system. Setting it up on your system"
-		downloadAndConfigureS3cmd
+		downloadS3cmd
+		configureS3cmd
     fi
 }
-
-downloadAndConfigureS3cmd()
+	
+downloadS3cmd()
 {
 	#download and install s3cmd
 	case "$LINUX_DIST" in
@@ -156,7 +151,6 @@ downloadAndConfigureS3cmd()
 		;;
 	esac
 
-	configureS3cmd
 }
 
 configureS3cmd()
@@ -181,7 +175,7 @@ checkIfValidS3Bucket()
 	fi
 }
 
-checkIfValidS3FileName()
+checkIfValidS3File()
 {
 	if [ "$LOGGLY_S3_FILE_NAME" != "" ]; then
 		logMsgToConfigSysLog "INFO" "INFO: Check if valid S3 file name."	
@@ -213,7 +207,7 @@ createTempDir()
 	fi
 }
 
-downloadS3FilesFromBucketToTempDir()
+downloadS3Bucket()
 {
 	if [ "$LOGGLY_S3_BUCKET_NAME" != "" ]; then
 		#Files are downloaded in nested directory
@@ -227,7 +221,7 @@ downloadS3FilesFromBucketToTempDir()
 	fi
 }
 
-downloadS3FilesToTempDir()
+downloadS3File()
 {
 	if [ "$LOGGLY_S3_FILE_NAME" != "" ]; then
 		cd $TEMP_DIR
@@ -240,12 +234,12 @@ downloadS3FilesToTempDir()
 	fi
 }
 
-invokeFileMonitoring()
+invokeS3FileMonitoring()
 {
 	dir=/tmp/$LOGGLY_S3_ALIAS
 	#TODO: Not supporting multiple files with same name in different directories
 	#only supporting file with naming convention *.*
-	for f in $(find $dir -name '*.*')
+	for f in $(find $dir -name '*')
 	do
 		fileNameWithExt=${f##*/}
         uniqueFileName=$(echo "$fileNameWithExt" | tr . _)
@@ -267,8 +261,6 @@ invokeFileMonitoring()
 	
 	if [ "$IS_ANY_FILE_CONFIGURED" != "false" ]; then
 		restartRsyslog
-		START_DATE_TIME=`date +"%F %T.%3N"`
-		echo "Start time found: $START_DATE_TIME"
 	fi
 }
 
@@ -279,26 +271,19 @@ deleteTempDir()
 
 checkIfS3LogsMadeToLoggly()
 {
-	#LOGGLY_S3_ALIAS
-	#for alias in "${field[@]}"
-	#do
-	#  LOGGLY_FILE_TO_MONITOR_ALIAS="$alias"
-	#   checkIfFileLogsMadeToLoggly
-	#done
 	counter=1
 	maxCounter=10
 
 	fileInitialLogCount=0
 	fileLatestLogCount=0
-	#queryParam="syslog.appName%3A%2A$LOGGLY_S3_ALIAS&from=$START_DATE_TIME&until=now&size=1"
-	queryParam="syslog.appName%3A%2A$LOGGLY_S3_ALIAS&from=-15m&until=now&size=1"
+	queryParam="syslog.appName%3A%2A$LOGGLY_S3_ALIAS&from=-5m&until=now&size=1"
+
 	queryUrl="$LOGGLY_ACCOUNT_URL/apiv2/search?q=$queryParam"
-	logMsgToConfigSysLog "INFO" "INFO: Search URL: ${queryUrl//\ /%20}"
+	logMsgToConfigSysLog "INFO" "INFO: Search URL: $queryUrl"
 
 	logMsgToConfigSysLog "INFO" "INFO: Verifying if the logs made it to Loggly."
 	logMsgToConfigSysLog "INFO" "INFO: Verification # $counter of total $maxCounter."
-	
-	#checking if the s3 logs from start_time to current_time have made to the loggly
+	#get the final count of file logs for past 5 minutes
 	searchAndFetch fileLatestLogCount "$queryUrl"
 	let counter=$counter+1
 
@@ -316,14 +301,15 @@ checkIfS3LogsMadeToLoggly()
 	done
 
 	if [ "$fileLatestLogCount" -gt "$fileInitialLogCount" ]; then
-		logMsgToConfigSysLog "SUCCESS" "SUCCESS: Logs successfully transferred to Loggly! You are now sending $LOGGLY_FILE_TO_MONITOR logs to Loggly."
-		if [ "$IS_FILE_MONITOR_SCRIPT_INVOKED" = "" ]; then
-			exit 0
+		if [ "$LOGGLY_S3_BUCKET_NAME" != "" ]; then
+			logMsgToConfigSysLog "SUCCESS" "SUCCESS: Logs successfully transferred to Loggly! You are now sending $LOGGLY_S3_BUCKET_NAME bucket logs to Loggly."
+		else
+			logMsgToConfigSysLog "SUCCESS" "SUCCESS: Logs successfully transferred to Loggly! You are now sending $LOGGLY_S3_FILE_NAME logs to Loggly."
 		fi
 	fi
 }
 
-checkIfValidAliasForRevoke()
+checkIfS3AliasExist()
 {
 	if ! ls $RSYSLOG_ETCDIR_CONF/*$LOGGLY_S3_ALIAS.conf &> /dev/null; then
 		#logMsgToConfigSysLog "INFO" "INFO: $LOGGLY_S3_ALIAS found."
@@ -333,7 +319,7 @@ checkIfValidAliasForRevoke()
 	fi
 }
 
-removeFileMonitoring()
+removeS3FileMonitoring()
 {
 	FILES=$RSYSLOG_ETCDIR_CONF/*$LOGGLY_S3_ALIAS.conf
 	for f in $FILES
@@ -346,6 +332,7 @@ removeFileMonitoring()
 		constructFileVariables
 		remove21ConfFile
 	done
+	echo "INFO: Removed all the modified files."
 	restartRsyslog
 }
 
@@ -410,9 +397,9 @@ if [ "$LOGGLY_ACCOUNT" != "" -a "$LOGGLY_USERNAME" != "" -a "$LOGGLY_S3_ALIAS" !
 	if [ "$LOGGLY_PASSWORD" = "" ]; then
 		getPassword
 	fi
-    installLogglyConfForFile
+    installLogglyConfForS3
 elif [ "$LOGGLY_ROLLBACK" != "" -a "$LOGGLY_ACCOUNT" != "" -a "$LOGGLY_S3_ALIAS" != "" ]; then
-    removeLogglyConfForFile
+    removeLogglyConfForS3
 else
 	usage
 fi

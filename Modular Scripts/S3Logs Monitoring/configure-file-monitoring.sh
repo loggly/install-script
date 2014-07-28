@@ -1,7 +1,7 @@
 #!/bin/bash
 
 #downloads configure-linux.sh
-echo "INFO: Downloading dependencies - configure-linux.sh"
+#echo "INFO: Downloading dependencies - configure-linux.sh"
 #curl -s -o configure-linux.sh https://raw.githubusercontent.com/psquickitjayant/install-script/master/Linux%20Script/configure-linux.sh
 source configure-linux.sh "being-invoked"
 
@@ -278,10 +278,12 @@ checkIfConfFileExist()
 #remove 21<filemonitoring>.conf file
 remove21ConfFile()
 {
-	echo "INFO: Deleting the loggly file syslog conf file."
+	echo "INFO: Deleting the loggly syslog conf file $FILE_SYSLOG_CONFFILE."
 	if [ -f "$FILE_SYSLOG_CONFFILE" ]; then
 		sudo rm -rf "$FILE_SYSLOG_CONFFILE"
-		echo "INFO: Removed all the modified files."
+		if [ "$IS_FILE_MONITOR_SCRIPT_INVOKED" = "false" ]; then
+			echo "INFO: Removed all the modified files."
+		fi
 	else
 		logMsgToConfigSysLog "WARN" "WARN: $FILE_SYSLOG_CONFFILE file was not found."
 	fi	
