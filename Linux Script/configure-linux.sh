@@ -15,7 +15,7 @@ function ctrl_c()  {
 #name of the current script. This will get overwritten by the child script which calls this
 SCRIPT_NAME=configure-linux.sh
 #version of the current script. This will get overwritten by the child script which calls this
-SCRIPT_VERSION=1.1
+SCRIPT_VERSION=1.3
 
 #application tag. This will get overwritten by the child script which calls this
 APP_TAG=
