@@ -608,10 +608,8 @@ sendPayloadToConfigSysLog()
 #$1 return the count of records in loggly, $2 is the query param to search in loggly
 searchAndFetch()
 {
-	URL_WITH_SPACE_CHARS=$2
+	url=$2
 	
-	#replacing all the spaces with %20
-	url="${URL_WITH_SPACE_CHARS//\ /%20}"
 	result=$(wget -qO- /dev/null --user "$LOGGLY_USERNAME" --password "$LOGGLY_PASSWORD" "$url")
 	
 	if [ -z "$result" ]; then
