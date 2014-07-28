@@ -239,7 +239,7 @@ getOs()
 			LINUX_DIST=$(lsb_release -i | cut -d: -f2 | sed s/'^\t'//)
 		# If system-release is available, then try to identify the name
 		elif [ -f /etc/system-release ]; then
-			LINUX_DIST=$(cat /etc/*-release  | cut -f 1 -d  " ")
+			LINUX_DIST=$(cat /etc/system-release  | cut -f 1 -d  " ")
 		# Otherwise, use release info file
 		else
 			LINUX_DIST=$(ls -d /etc/[A-Za-z]*[_-][rv]e[lr]* | grep -v "lsb" | cut -d'/' -f3 | cut -d'-' -f1 | cut -d'_' -f1)
