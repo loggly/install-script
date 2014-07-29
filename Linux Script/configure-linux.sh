@@ -15,7 +15,7 @@ function ctrl_c()  {
 #name of the current script. This will get overwritten by the child script which calls this
 SCRIPT_NAME=configure-linux.sh
 #version of the current script. This will get overwritten by the child script which calls this
-SCRIPT_VERSION=1.3
+SCRIPT_VERSION=1.4
 
 #application tag. This will get overwritten by the child script which calls this
 APP_TAG=
@@ -265,14 +265,6 @@ setLinuxVariables()
 #checks if all the various endpoints used for configuring loggly are accessible
 checkIfLogglyServersAccessible()
 {
-	echo "INFO: Checking if $LOGGLY_ACCOUNT_URL is reachable."
-	if [ $(curl -s --head  --request GET $LOGGLY_ACCOUNT_URL/login | grep "200 OK" | wc -l) == 1 ]; then
-		echo "INFO: $LOGGLY_ACCOUNT_URL is reachable."
-	else
-		logMsgToConfigSysLog "ERROR" "ERROR: $LOGGLY_ACCOUNT_URL is not reachable. Please check your network and firewall settings."
-		exit 1
-	fi
-
 	echo "INFO: Checking if $LOGS_01_HOST is reachable."
 	if [ $(ping -c 1 $LOGS_01_HOST | grep "1 packets transmitted, 1 received, 0% packet loss" | wc -l) == 1 ]; then
 		echo "INFO: $LOGS_01_HOST is reachable."
@@ -289,6 +281,14 @@ checkIfLogglyServersAccessible()
 		exit 1
 	fi
 
+	echo "INFO: Checking if \"$LOGGLY_ACCOUNT\" subdomain is valid."
+	if [ $(curl -s --head  --request GET $LOGGLY_ACCOUNT_URL/login | grep "200 OK" | wc -l) == 1 ]; then
+		echo "INFO: $LOGGLY_ACCOUNT_URL is valid and reachable."
+	else
+		logMsgToConfigSysLog "ERROR" "ERROR: This is not a recognized subdomain. Please ask the account owner for the subdomain they signed up with."
+		exit 1
+	fi
+	
 	echo "INFO: Checking if Gen2 account."
 	if [ $(curl -s --head  --request GET $LOGGLY_ACCOUNT_URL/apiv2/customer | grep "404 NOT FOUND" | wc -l) == 1 ]; then
 		logMsgToConfigSysLog "ERROR" "ERROR: This scripts need a Gen2 account. Please contact Loggly support."
@@ -303,8 +303,8 @@ checkIfValidUserNamePassword()
 {
 	echo "INFO: Checking if provided username and password is correct."
 	if [ $(curl -s -u $LOGGLY_USERNAME:$LOGGLY_PASSWORD $LOGGLY_ACCOUNT_URL/apiv2/customer | grep "Unauthorized" | wc -l) == 1 ]; then
-		logMsgToConfigSysLog "ERROR" "ERROR: Invalid Loggly username or password."
-		exit 1
+			logMsgToConfigSysLog "ERROR" "ERROR: Invalid Loggly username or password. You may check your username or reset your password at $LOGGLY_ACCOUNT_URL/account/users/"
+			exit 1
 	else
 		logMsgToConfigSysLog "INFO" "INFO: Username and password authorized successfully."
 	fi
@@ -569,7 +569,7 @@ logMsgToConfigSysLog()
 	#for Mac system, we need to use -D switch to decode
 	varUname=$(uname)
 	if [[ $varUname == 'Linux' ]]; then
-		enabler=$(echo MWVjNGU4ZTEtZmJiMi00N2U3LTkyOWItNzVhMWJmZjVmZmUw | base64 -d)
+		enabler=$(echo -n MWVjNGU4ZTEtZmJiMi00N2U3LTkyOWItNzVhMWJmZjVmZmUw | base64 -d)
 	elif [[ $varUname == 'Darwin' ]]; then
 		enabler=$(echo MWVjNGU4ZTEtZmJiMi00N2U3LTkyOWItNzVhMWJmZjVmZmUw | base64 -D)
 	fi
