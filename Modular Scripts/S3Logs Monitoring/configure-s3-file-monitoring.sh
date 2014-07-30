@@ -1,9 +1,8 @@
 #!/bin/bash
 
-#downloads configure-linux.sh
-echo "INFO: Downloading dependencies - configure-linux.sh & configure-file-monitoring.sh"
+#downloads configure-file-monitoring.sh
+#echo "INFO: Downloading dependencies - configure-file-monitoring.sh"
 #curl -s -o configure-linux.sh https://raw.githubusercontent.com/psquickitjayant/install-script/master/Linux%20Script/configure-linux.sh
-#curl -s -o configure-linux.sh https://raw.githubusercontent.com/psquickitjayant/install-script/master/Linux%20Script/configure-file-monitoring.sh
 source configure-file-monitoring.sh "being-invoked"
 
 ##########  Variable Declarations - Start  ##########
@@ -35,6 +34,8 @@ IS_ANY_FILE_CONFIGURED="false"
 
 #value for temp directory
 TEMP_DIR=
+
+IS_S3CMD_CONFIGURED_BY_SCRIPT="false"
 
 MANUAL_CONFIG_INSTRUCTION="Manual instructions to configure a file is available at https://www.loggly.com/docs/file-monitoring/"
 
@@ -120,51 +121,59 @@ checkIfS3AliasAlreadyTaken()
 checkIfS3cmdInstalledAndConfigured()
 {
 	if hash s3cmd 2>/dev/null; then
-		var=$(s3cmd ls 2>/dev/null)
-        if [ "$var" != "" ]; then
-			logMsgToConfigSysLog "INFO" "INFO: s3cmd is already configured on your system"
-		else
-			logMsgToConfigSysLog "INFO" "INFO: s3cmd is not configured on your system. Trying to configure."
-			configureS3cmd
-		fi
+		checkIfS3cmdConfigured
     else
-        logMsgToConfigSysLog "ERROR" "ERROR: s3cmd is not present on your system. Setting it up on your system"
+        logMsgToConfigSysLog "INFO" "INFO: s3cmd is not present on your system. Setting it up on your system"
 		downloadS3cmd
 		configureS3cmd
     fi
 }
-	
+
+checkIfS3cmdConfigured()
+{
+	var=$(s3cmd ls 2>/dev/null)
+	if [ "$var" != "" ]; then
+		if [ "$IS_S3CMD_CONFIGURED_BY_SCRIPT" == "false" ]; then
+			logMsgToConfigSysLog "INFO" "INFO: s3cmd is already configured on your system"
+		else
+			logMsgToConfigSysLog "INFO" "INFO: s3cmd configured successfully"
+		fi
+	else
+		if [ "$IS_S3CMD_CONFIGURED_BY_SCRIPT" == "false" ]; then
+			logMsgToConfigSysLog "INFO" "INFO: s3cmd is not configured on your system. Trying to configure."
+			configureS3cmd
+		else
+			logMsgToConfigSysLog "ERROR" "ERROR: s3cmd is not configured correctly. Please configure s3cmd using command s3cmd --configure"
+			exit 1
+		fi
+	fi
+}
+
 downloadS3cmd()
 {
 	#download and install s3cmd
-	case "$LINUX_DIST" in
-		*"Ubuntu"* )
-		sudo apt-get install s3cmd || { logMsgToConfigSysLog "ERROR" "ERROR: s3cmd installation failed on Ubuntu" ; exit 1; }
-		;;
-		*"RedHat"* )
-		sudo yum install s3cmd || { logMsgToConfigSysLog "ERROR" "ERROR: s3cmd installation failed on Red Hat. Please ensure you have EPEL installed." ; exit 1; }
-		;;
-		*"CentOS"* )
-		sudo yum install s3cmd || { logMsgToConfigSysLog "ERROR" "ERROR: s3cmd installation failed on CentOS. Please ensure you have EPEL installed." ; exit 1; }
-		;;
-		* )
-		;;
-	esac
-
+	
+	#checking if the Linux is yum based or apt-get based
+	YUM_BASED=$(command -v yum)
+	APT_GET_BASED=$(command -v apt-get)
+	
+	if [ "$YUM_BASED" != "" ]; then
+		sudo yum install s3cmd || { logMsgToConfigSysLog "ERROR" "ERROR: s3cmd installation failed on $LINUX_DIST. Please ensure you have EPEL installed." ; exit 1; }
+	elif [ "$APT_GET_BASED" != "" ]; then
+		sudo apt-get install s3cmd || { logMsgToConfigSysLog "ERROR" "ERROR: s3cmd installation failed on $LINUX_DIST." ; exit 1; }
+	else
+		logMsgToConfigSysLog "ERROR" "ERROR: s3cmd installation failed on $LINUX_DIST."
+		exit 1
+	fi
 }
 
 configureS3cmd()
 {
 	#configure s3cmd
 	s3cmd --configure
-
+	IS_S3CMD_CONFIGURED_BY_SCRIPT="true"
 	#check if s3cmd configured successfully now
-	if [ $(s3cmd > /dev/null 2>&1 | grep "ERROR: Missing command. Please run with --help for more information." | wc -l) == 1 ]; then
-		logMsgToConfigSysLog "INFO" "INFO: s3cmd configured successfully"
-	else
-		logMsgToConfigSysLog "ERROR" "ERROR: s3cmd is not configured correctly. Please configure s3cmd using command s3cmd --configure"
-		exit 1
-	fi
+	checkIfS3cmdConfigured
 }
 
 checkIfValidS3Bucket()

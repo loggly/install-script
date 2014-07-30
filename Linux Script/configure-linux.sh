@@ -15,7 +15,7 @@ function ctrl_c()  {
 #name of the current script. This will get overwritten by the child script which calls this
 SCRIPT_NAME=configure-linux.sh
 #version of the current script. This will get overwritten by the child script which calls this
-SCRIPT_VERSION=1.4
+SCRIPT_VERSION=1.5
 
 #application tag. This will get overwritten by the child script which calls this
 APP_TAG=
@@ -208,7 +208,7 @@ checkIfSupportedOS()
 		;;
 		*"darwin"* )
 		#if the OS is mac then exit
-		logMsgToConfigSysLog "ERROR" "ERROR: '$LINUX_DIST' operating system is not supported by the script."
+		logMsgToConfigSysLog "ERROR" "ERROR: This script is for Linux systems, and Darwin or Mac OSX are not currently supported. You can find alternative options here: https://www.loggly.com/docs"
 		exit 1
 		;;
 		* )
@@ -303,7 +303,8 @@ checkIfValidUserNamePassword()
 {
 	echo "INFO: Checking if provided username and password is correct."
 	if [ $(curl -s -u $LOGGLY_USERNAME:$LOGGLY_PASSWORD $LOGGLY_ACCOUNT_URL/apiv2/customer | grep "Unauthorized" | wc -l) == 1 ]; then
-			logMsgToConfigSysLog "ERROR" "ERROR: Invalid Loggly username or password. You may check your username or reset your password at $LOGGLY_ACCOUNT_URL/account/users/"
+			logMsgToConfigSysLog "INFO" "INFO: Please check your username or reset your password at $LOGGLY_ACCOUNT_URL/account/users/"
+			logMsgToConfigSysLog "ERROR" "ERROR: Invalid Loggly username or password."
 			exit 1
 	else
 		logMsgToConfigSysLog "INFO" "INFO: Username and password authorized successfully."
@@ -584,7 +585,9 @@ logMsgToConfigSysLog()
 	#if it is an error, then log message "Script Failed" to config syslog and exit the script
 	if [[ $cslStatus == "ERROR" ]]; then
 		sendPayloadToConfigSysLog "ERROR" "Script Failed" "$enabler"
-		echo $MANUAL_CONFIG_INSTRUCTION
+		if [ "$varUname" != "Darwin" ]; then
+			echo $MANUAL_CONFIG_INSTRUCTION
+		fi
 		exit 1
 	fi
 
