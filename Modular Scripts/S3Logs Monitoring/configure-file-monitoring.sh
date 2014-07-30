@@ -1,15 +1,15 @@
 #!/bin/bash
 
 #downloads configure-linux.sh
-#echo "INFO: Downloading dependencies - configure-linux.sh"
-#curl -s -o configure-linux.sh https://raw.githubusercontent.com/psquickitjayant/install-script/master/Linux%20Script/configure-linux.sh
+echo "INFO: Downloading dependencies - configure-linux.sh"
+curl -s -o configure-linux.sh https://raw.githubusercontent.com/psquickitjayant/install-script/master/Linux%20Script/configure-linux.sh
 source configure-linux.sh "being-invoked"
 
 ##########  Variable Declarations - Start  ##########
 #name of the current script
 SCRIPT_NAME=configure-file-monitoring.sh
 #version of the current script
-SCRIPT_VERSION=1.1
+SCRIPT_VERSION=1.2
 
 #file to monitor (contains complete path and file name) provided by user
 LOGGLY_FILE_TO_MONITOR=
