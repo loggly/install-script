@@ -118,6 +118,7 @@ checkIfS3AliasAlreadyTaken()
 	fi
 }
 
+#check if s3cmd utility is installed and configured
 checkIfS3cmdInstalledAndConfigured()
 {
 	if hash s3cmd 2>/dev/null; then
@@ -129,6 +130,7 @@ checkIfS3cmdInstalledAndConfigured()
     fi
 }
 
+#check if s3cmd utility is configured
 checkIfS3cmdConfigured()
 {
 	var=$(s3cmd ls 2>/dev/null)
@@ -149,10 +151,9 @@ checkIfS3cmdConfigured()
 	fi
 }
 
+#download and install s3cmd
 downloadS3cmd()
 {
-	#download and install s3cmd
-	
 	#checking if the Linux is yum based or apt-get based
 	YUM_BASED=$(command -v yum)
 	APT_GET_BASED=$(command -v apt-get)
@@ -167,15 +168,16 @@ downloadS3cmd()
 	fi
 }
 
+#configure s3cmd
 configureS3cmd()
 {
-	#configure s3cmd
 	s3cmd --configure
 	IS_S3CMD_CONFIGURED_BY_SCRIPT="true"
 	#check if s3cmd configured successfully now
 	checkIfS3cmdConfigured
 }
 
+#check if s3bucket is valid
 checkIfValidS3Bucket()
 {
 	if [ "$LOGGLY_S3_BUCKET_NAME" != "" ]; then
