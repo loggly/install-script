@@ -14,9 +14,6 @@ SCRIPT_VERSION=1.0
 #s3 bucket name to configure
 LOGGLY_S3_BUCKET_NAME=
 
-#s3 bucket file to configure
-LOGGLY_S3_FILE_NAME=
-
 #alias name, will be used as tag & state file name etc. provided by user
 LOGGLY_S3_ALIAS=
 
@@ -59,9 +56,6 @@ installLogglyConfForS3()
 	#check if s3bucket is valid
 	checkIfValidS3Bucket
 
-	#check if s3bucket file is valid
-	checkIfValidS3File
-	
 	#configure loggly for Linux
 	installLogglyConf
 	
@@ -70,9 +64,6 @@ installLogglyConfForS3()
 
 	#download S3 files from bucket to temp directory
 	downloadS3Bucket
-
-	#download S3 file to temp directory
-	downloadS3File
 
 	#invoke file monitoring on each file after checking if it is a text file or not
 	invokeS3FileMonitoring
@@ -182,17 +173,19 @@ checkIfValidS3Bucket()
 {
 	if [ "$LOGGLY_S3_BUCKET_NAME" != "" ]; then
 		logMsgToConfigSysLog "INFO" "INFO: Check if valid S3 Bucket name."
-		sudo s3cmd ls -r $LOGGLY_S3_BUCKET_NAME > /dev/null 2>&1 || { logMsgToConfigSysLog "ERROR" "ERROR: Invalid S3 Bucket name" ; exit 1; }
+		BUCKET_INFO=$(sudo s3cmd ls -r $LOGGLY_S3_BUCKET_NAME 2>&1)
+		case $BUCKET_INFO in
+			ERROR*)
+				logMsgToConfigSysLog "ERROR" "ERROR: Invalid S3 Bucket name $LOGGLY_S3_BUCKET_NAME."
+				exit 1
+				;;
+			"")
+				logMsgToConfigSysLog "ERROR" "ERROR: No files found in the S3 Bucket $LOGGLY_S3_BUCKET_NAME."
+				exit 1
+		esac
 	fi
 }
 
-checkIfValidS3File()
-{
-	if [ "$LOGGLY_S3_FILE_NAME" != "" ]; then
-		logMsgToConfigSysLog "INFO" "INFO: Check if valid S3 file name."	
-		sudo s3cmd ls $LOGGLY_S3_FILE_NAME > /dev/null 2>&1 || { logMsgToConfigSysLog "ERROR" "ERROR: Invalid S3 File name" ; exit 1; }
-	fi
-}
 
 createTempDir()
 {
@@ -232,18 +225,6 @@ downloadS3Bucket()
 	fi
 }
 
-downloadS3File()
-{
-	if [ "$LOGGLY_S3_FILE_NAME" != "" ]; then
-		cd $TEMP_DIR
-		echo "Downloading file, may take some time..."
-		s3cmd get -f $LOGGLY_S3_FILE_NAME > /dev/null 2>&1
-		if [ $? -ne 0 ]; then
-			logMsgToConfigSysLog "ERROR" "ERROR: Error downloading file $LOGGLY_S3_FILE_NAME"
-			exit 1
-		fi
-	fi
-}
 
 invokeS3FileMonitoring()
 {
@@ -313,9 +294,8 @@ checkIfS3LogsMadeToLoggly()
 
 	if [ "$fileLatestLogCount" -gt "$fileInitialLogCount" ]; then
 		if [ "$LOGGLY_S3_BUCKET_NAME" != "" ]; then
-			logMsgToConfigSysLog "SUCCESS" "SUCCESS: Logs successfully transferred to Loggly! You are now sending $LOGGLY_S3_BUCKET_NAME bucket logs to Loggly."
-		else
-			logMsgToConfigSysLog "SUCCESS" "SUCCESS: Logs successfully transferred to Loggly! You are now sending $LOGGLY_S3_FILE_NAME logs to Loggly."
+			logMsgToConfigSysLog "SUCCESS" "SUCCESS: Logs successfully transferred to Loggly! You are now sending $LOGGLY_S3_BUCKET_NAME logs to Loggly."
+		
 		fi
 	fi
 }
@@ -351,8 +331,8 @@ removeS3FileMonitoring()
 usage()
 {
 cat << EOF
-usage: configure-s3-file-monitoring [-a loggly auth account or subdomain] [-t loggly token (optional)] [-u username] [-p password (optional)] [-s3b s3bucketname or -s3f s3filename] [-s3l s3alias]
-usage: configure-s3-file-monitoring [-a loggly auth account or subdomain] [-r to rollback] [-l filealias]
+usage: configure-s3-file-monitoring [-a loggly auth account or subdomain] [-t loggly token (optional)] [-u username] [-p password (optional)] [-s3b s3bucketname ] [-s3l s3alias]
+usage: configure-s3-file-monitoring [-a loggly auth account or subdomain] [-r to rollback] [-s3l s3alias]
 usage: configure-s3-file-monitoring [-h for help]
 EOF
 }
@@ -387,10 +367,7 @@ while [ "$1" != "" ]; do
 			LOGGLY_S3_BUCKET_NAME=$1
 			echo "S3 Bucket Name: $LOGGLY_S3_BUCKET_NAME"
 		;;
-		-s3f | --s3filename ) shift
-			LOGGLY_S3_FILE_NAME=$1
-			echo "S3 File Name: $LOGGLY_S3_FILE_NAME"
-		;;
+		
 		-s3l | --s3alias ) shift
 			LOGGLY_S3_ALIAS=$1
 			echo "File alias: $LOGGLY_S3_ALIAS"
@@ -404,7 +381,7 @@ while [ "$1" != "" ]; do
 done
 fi
 
-if [ "$LOGGLY_ACCOUNT" != "" -a "$LOGGLY_USERNAME" != "" -a "$LOGGLY_S3_ALIAS" != "" -a \( "$LOGGLY_S3_BUCKET_NAME" != "" -o "$LOGGLY_S3_FILE_NAME" != "" \) ]; then
+if [ "$LOGGLY_ACCOUNT" != "" -a "$LOGGLY_USERNAME" != "" -a "$LOGGLY_S3_ALIAS" != "" -a \( "$LOGGLY_S3_BUCKET_NAME" != "" \) ]; then
 	if [ "$LOGGLY_PASSWORD" = "" ]; then
 		getPassword
 	fi
