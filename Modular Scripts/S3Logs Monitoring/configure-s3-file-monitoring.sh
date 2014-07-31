@@ -182,6 +182,7 @@ checkIfValidS3Bucket()
 			"")
 				logMsgToConfigSysLog "ERROR" "ERROR: No files found in the S3 Bucket $LOGGLY_S3_BUCKET_NAME."
 				exit 1
+				;;
 		esac
 	fi
 }
