@@ -124,7 +124,7 @@ checkIfS3cmdInstalledAndConfigured()
 #check if s3cmd utility is configured
 checkIfS3cmdConfigured()
 {
-	var=$(s3cmd ls 2>/dev/null)
+	var=$(sudo s3cmd ls 2>/dev/null)
 	if [ "$var" != "" ]; then
 		if [ "$IS_S3CMD_CONFIGURED_BY_SCRIPT" == "false" ]; then
 			logMsgToConfigSysLog "INFO" "INFO: s3cmd is already configured on your system"
@@ -237,16 +237,17 @@ invokeS3FileMonitoring()
 		fileNameWithExt=${f##*/}
         uniqueFileName=$(echo "$fileNameWithExt" | tr . _)
 		var=$(file $f)
-
-		if [ ${var##*\ } == "text" -o ${var##*\ } == "Text" ]; then
-
+		
+		#it may be possible that the "text" may contain some uppercase letters like "Text"
+		var=$(echo $var | tr "[:upper:]" "[:lower:]")
+		
+		if [[ $var == *text* ]]; then
 			LOGGLY_FILE_TO_MONITOR_ALIAS=$uniqueFileName-$LOGGLY_S3_ALIAS
 			LOGGLY_FILE_TO_MONITOR=$f
 			constructFileVariables
 			checkLogFileSize $LOGGLY_FILE_TO_MONITOR
 			write21ConfFileContents
 			IS_ANY_FILE_CONFIGURED="true"
-
 		else
 			logMsgToConfigSysLog "WARN" "WARN: File $fileNameWithExt is not a text file. Ignoring."
 		fi
@@ -332,7 +333,7 @@ removeS3FileMonitoring()
 usage()
 {
 cat << EOF
-usage: configure-s3-file-monitoring [-a loggly auth account or subdomain] [-t loggly token (optional)] [-u username] [-p password (optional)] [-s3b s3bucketname ] [-s3l s3alias]
+usage: configure-s3-file-monitoring [-a loggly auth account or subdomain] [-t loggly token (optional)] [-u username] [-p password (optional)] [-s3url s3bucketname ] [-s3l s3alias]
 usage: configure-s3-file-monitoring [-a loggly auth account or subdomain] [-r to rollback] [-s3l s3alias]
 usage: configure-s3-file-monitoring [-h for help]
 EOF
@@ -364,7 +365,7 @@ while [ "$1" != "" ]; do
 		-r | --rollback )
 			LOGGLY_ROLLBACK="true"
 		;;
-		-s3b | --s3bucketname ) shift
+		-s3url | --s3bucketname ) shift
 			LOGGLY_S3_BUCKET_NAME=$1
 			echo "S3 Bucket Name: $LOGGLY_S3_BUCKET_NAME"
 		;;
