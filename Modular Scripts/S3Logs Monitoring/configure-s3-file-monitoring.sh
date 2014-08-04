@@ -171,17 +171,27 @@ configureS3cmd()
 #check if s3bucket is valid
 checkIfValidS3Bucket()
 {
+	#check if valid Bucket name
+	if [[ $LOGGLY_S3_BUCKET_NAME != s3://* ]]; then
+		logMsgToConfigSysLog "Error" "Error: Invalid s3 Bucket name. Bucket name should start with \"s3://\""
+		exit 1
+	fi
+
 	if [ "$LOGGLY_S3_BUCKET_NAME" != "" ]; then
 		logMsgToConfigSysLog "INFO" "INFO: Check if valid S3 Bucket name."
 		BUCKET_INFO=$(sudo s3cmd ls -r $LOGGLY_S3_BUCKET_NAME 2>&1)
 		case $BUCKET_INFO in
 			ERROR*)
-				logMsgToConfigSysLog "ERROR" "ERROR: Invalid S3 Bucket name $LOGGLY_S3_BUCKET_NAME."
+				#logging actual error message returned by s3cmd
+				logMsgToConfigSysLog "ERROR" "$BUCKET_INFO" 
 				exit 1
 				;;
 			"")
 				logMsgToConfigSysLog "ERROR" "ERROR: No files found in the S3 Bucket $LOGGLY_S3_BUCKET_NAME."
 				exit 1
+				;;
+			*)
+				logMsgToConfigSysLog "INFO" "INFO: \"$LOGGLY_S3_BUCKET_NAME\" is a valid Bucket and accessible."
 				;;
 		esac
 	fi
