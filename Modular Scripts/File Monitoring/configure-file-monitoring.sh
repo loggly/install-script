@@ -9,7 +9,7 @@ source configure-linux.sh "being-invoked"
 #name of the current script
 SCRIPT_NAME=configure-file-monitoring.sh
 #version of the current script
-SCRIPT_VERSION=1.1
+SCRIPT_VERSION=1.2
 
 #file to monitor (contains complete path and file name) provided by user
 LOGGLY_FILE_TO_MONITOR=
@@ -27,6 +27,9 @@ FILE_SYSLOG_CONFFILE=
 FILE_SYSLOG_CONFFILE_BACKUP=
 
 MANUAL_CONFIG_INSTRUCTION="Manual instructions to configure a file is available at https://www.loggly.com/docs/file-monitoring/"
+
+#this variable is set if the script is invoked via some other calling script
+IS_FILE_MONITOR_SCRIPT_INVOKED="false"
 
 ##########  Variable Declarations - End  ##########
 
@@ -257,7 +260,9 @@ checkIfFileLogsMadeToLoggly()
 
 	if [ "$fileLatestLogCount" -gt "$fileInitialLogCount" ]; then
 		logMsgToConfigSysLog "SUCCESS" "SUCCESS: Logs successfully transferred to Loggly! You are now sending $LOGGLY_FILE_TO_MONITOR logs to Loggly."
-		exit 0
+		if [ "$IS_FILE_MONITOR_SCRIPT_INVOKED" = "false" ]; then
+			exit 0
+		fi
 	fi
 }
 
@@ -273,11 +278,15 @@ checkIfConfFileExist()
 #remove 21<filemonitoring>.conf file
 remove21ConfFile()
 {
-	echo "INFO: Deleting the loggly file syslog conf file."
+	echo "INFO: Deleting the loggly syslog conf file $FILE_SYSLOG_CONFFILE."
 	if [ -f "$FILE_SYSLOG_CONFFILE" ]; then
 		sudo rm -rf "$FILE_SYSLOG_CONFFILE"
-	fi
-	echo "INFO: Removed all the modified files."
+		if [ "$IS_FILE_MONITOR_SCRIPT_INVOKED" = "false" ]; then
+			echo "INFO: Removed all the modified files."
+		fi
+	else
+		logMsgToConfigSysLog "WARN" "WARN: $FILE_SYSLOG_CONFFILE file was not found."
+	fi	
 }
 
 #display usage syntax
@@ -291,58 +300,60 @@ EOF
 }
 
 ##########  Get Inputs from User - Start  ##########
-
-if [ $# -eq 0 ]; then
-    usage
-	exit
-else
-while [ "$1" != "" ]; do
-    case $1 in
-      -t | --token ) shift
-         LOGGLY_AUTH_TOKEN=$1
-         echo "AUTH TOKEN $LOGGLY_AUTH_TOKEN"
-         ;;
-      -a | --account ) shift
-         LOGGLY_ACCOUNT=$1
-         echo "Loggly account or subdomain: $LOGGLY_ACCOUNT"
-         ;;
-      -u | --username ) shift
-         LOGGLY_USERNAME=$1
-         echo "Username is set"
-         ;;
-	  -p | --password ) shift
-          LOGGLY_PASSWORD=$1
-         ;;
-      -r | --rollback )
-		  LOGGLY_ROLLBACK="true"
-          ;;
-	  -f | --filename ) shift
-		  #LOGGLY_FILE_TO_MONITOR=$1
-		  LOGGLY_FILE_TO_MONITOR=$(readlink -f "$1")
-		  echo "File to monitor: $LOGGLY_FILE_TO_MONITOR"
-		  ;;
-	  -l | --filealias ) shift
-		  LOGGLY_FILE_TO_MONITOR_ALIAS=$1
-		  echo "File alias: $LOGGLY_FILE_TO_MONITOR_ALIAS"
-		  ;;
-      -h | --help)
-          usage
-          exit
-          ;;
-    esac
-    shift
-done
-fi
-
-if [ "$LOGGLY_ACCOUNT" != "" -a "$LOGGLY_USERNAME" != "" -a "$LOGGLY_FILE_TO_MONITOR" != "" -a "$LOGGLY_FILE_TO_MONITOR_ALIAS" != "" ]; then
-	if [ "$LOGGLY_PASSWORD" = "" ]; then
-		getPassword
+if [ "$1" != "being-invoked" ]; then
+	if [ $# -eq 0 ]; then
+		usage
+		exit
+	else
+	while [ "$1" != "" ]; do
+		case $1 in
+		  -t | --token ) shift
+			 LOGGLY_AUTH_TOKEN=$1
+			 echo "AUTH TOKEN $LOGGLY_AUTH_TOKEN"
+			 ;;
+		  -a | --account ) shift
+			 LOGGLY_ACCOUNT=$1
+			 echo "Loggly account or subdomain: $LOGGLY_ACCOUNT"
+			 ;;
+		  -u | --username ) shift
+			 LOGGLY_USERNAME=$1
+			 echo "Username is set"
+			 ;;
+		  -p | --password ) shift
+			  LOGGLY_PASSWORD=$1
+			 ;;
+		  -r | --rollback )
+			  LOGGLY_ROLLBACK="true"
+			  ;;
+		  -f | --filename ) shift
+			  #LOGGLY_FILE_TO_MONITOR=$1
+			  LOGGLY_FILE_TO_MONITOR=$(readlink -f "$1")
+			  echo "File to monitor: $LOGGLY_FILE_TO_MONITOR"
+			  ;;
+		  -l | --filealias ) shift
+			  LOGGLY_FILE_TO_MONITOR_ALIAS=$1
+			  echo "File alias: $LOGGLY_FILE_TO_MONITOR_ALIAS"
+			  ;;
+		  -h | --help)
+			  usage
+			  exit
+			  ;;
+		esac
+		shift
+	done
 	fi
-    installLogglyConfForFile
-elif [ "$LOGGLY_ROLLBACK" != "" -a "$LOGGLY_ACCOUNT" != "" -a "$LOGGLY_FILE_TO_MONITOR_ALIAS" != "" ]; then
-    removeLogglyConfForFile
-else
-	usage
-fi
 
+	if [ "$LOGGLY_ACCOUNT" != "" -a "$LOGGLY_USERNAME" != "" -a "$LOGGLY_FILE_TO_MONITOR" != "" -a "$LOGGLY_FILE_TO_MONITOR_ALIAS" != "" ]; then
+		if [ "$LOGGLY_PASSWORD" = "" ]; then
+			getPassword
+		fi
+		installLogglyConfForFile
+	elif [ "$LOGGLY_ROLLBACK" != "" -a "$LOGGLY_ACCOUNT" != "" -a "$LOGGLY_FILE_TO_MONITOR_ALIAS" != "" ]; then
+		removeLogglyConfForFile
+	else
+		usage
+	fi
+else
+	IS_FILE_MONITOR_SCRIPT_INVOKED="true"
+fi
 ##########  Get Inputs from User - End  ##########
