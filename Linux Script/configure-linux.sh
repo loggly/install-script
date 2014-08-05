@@ -281,7 +281,7 @@ checkIfLogglyServersAccessible()
 		exit 1
 	fi
 
-	echo "INFO: Checking if \"$LOGGLY_ACCOUNT\" subdomain is valid."
+	echo "INFO: Checking if '$LOGGLY_ACCOUNT' subdomain is valid."
 	if [ $(curl -s --head  --request GET $LOGGLY_ACCOUNT_URL/login | grep "200 OK" | wc -l) == 1 ]; then
 		echo "INFO: $LOGGLY_ACCOUNT_URL is valid and reachable."
 	else
