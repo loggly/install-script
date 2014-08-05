@@ -1,8 +1,7 @@
 #!/bin/bash
 
-#downloads configure-linux.sh
-#echo "INFO: Downloading dependencies - configure-file-monitoring.sh"
-#curl -s -o configure-linux.sh https://raw.githubusercontent.com/psquickitjayant/install-script/master/Linux%20Script/configure-linux.sh
+echo "INFO: Downloading dependencies - configure-file-monitoring.sh"
+curl -s -o configure-file-monitoring.sh https://raw.githubusercontent.com/psquickitjayant/install-script/master/Modular%20Scripts/File%20Monitoring/configure-file-monitoring.sh
 source configure-file-monitoring.sh "being-invoked"
 
 ##########  Variable Declarations - Start  ##########
@@ -76,7 +75,7 @@ installLogglyConfForS3()
 	fi
 	
 	#delete temporary directory
-	deleteTempDir
+	#deleteTempDir
 }
 
 
@@ -173,7 +172,7 @@ checkIfValidS3Bucket()
 {
 	#check if valid Bucket name
 	if [[ $LOGGLY_S3_BUCKET_NAME != s3://* ]]; then
-		logMsgToConfigSysLog "Error" "Error: Invalid s3 Bucket name. Bucket name should start with \"s3://\""
+		logMsgToConfigSysLog "Error" "Error: Invalid s3 Bucket name. Bucket name should start with 's3://'"
 		exit 1
 	fi
 
@@ -191,7 +190,7 @@ checkIfValidS3Bucket()
 				exit 1
 				;;
 			*)
-				logMsgToConfigSysLog "INFO" "INFO: \"$LOGGLY_S3_BUCKET_NAME\" is a valid Bucket and accessible."
+				logMsgToConfigSysLog "INFO" "INFO: '$LOGGLY_S3_BUCKET_NAME' is a valid Bucket and accessible."
 				;;
 		esac
 	fi
@@ -258,7 +257,8 @@ invokeS3FileMonitoring()
 			checkLogFileSize $LOGGLY_FILE_TO_MONITOR
 			write21ConfFileContents
 			IS_ANY_FILE_CONFIGURED="true"
-		else
+		#ignoring directory
+		elif [[ $var != *directory* ]]; then
 			logMsgToConfigSysLog "WARN" "WARN: File $fileNameWithExt is not a text file. Ignoring."
 		fi
 	done
