@@ -96,6 +96,10 @@ removeLogglyConfForS3()
 	#remove file monitoring
 	removeS3FileMonitoring
 
+	#delete temporary directory if exists
+	TEMP_DIR=/tmp/$LOGGLY_S3_ALIAS
+	deleteTempDir
+	
 	#log success message
 	logMsgToConfigSysLog "INFO" "INFO: Rollback completed."
 }
@@ -269,8 +273,10 @@ invokeS3FileMonitoring()
 }
 
 deleteTempDir()
-{
-	rm -fr $TEMP_DIR
+{	
+	if [ -d "$TEMP_DIR" ]; then
+		sudo rm -fr $TEMP_DIR
+	fi
 }
 
 checkIfS3LogsMadeToLoggly()
