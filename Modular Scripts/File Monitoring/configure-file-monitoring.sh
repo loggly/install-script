@@ -31,6 +31,9 @@ MANUAL_CONFIG_INSTRUCTION="Manual instructions to configure a file is available 
 #this variable is set if the script is invoked via some other calling script
 IS_FILE_MONITOR_SCRIPT_INVOKED="false"
 
+#file as tag sent with the logs
+LOGGLY_FILE_TAG="file"
+
 ##########  Variable Declarations - End  ##########
 
 # executing the script for loggly to install and configure syslog
@@ -209,7 +212,7 @@ write21ConfFileContents()
 	\$InputRunFileMonitor
 
 	#Add a tag for file events
-	\$template LogglyFormatFile,\"<%pri%>%protocol-version% %timestamp:::date-rfc3339% %HOSTNAME% %app-name% %procid% %msgid% [$LOGGLY_AUTH_TOKEN@41058 tag=\\\"file\\\"] %msg%\n\"
+	\$template LogglyFormatFile,\"<%pri%>%protocol-version% %timestamp:::date-rfc3339% %HOSTNAME% %app-name% %procid% %msgid% [$LOGGLY_AUTH_TOKEN@41058 tag=\\\"$LOGGLY_FILE_TAG\\\"] %msg%\n\"
 
 	if \$programname == '$LOGGLY_FILE_TO_MONITOR_ALIAS' then @@logs-01.loggly.com:514;LogglyFormatFile
 	if \$programname == '$LOGGLY_FILE_TO_MONITOR_ALIAS' then ~
