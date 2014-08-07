@@ -257,6 +257,7 @@ invokeS3FileMonitoring()
 		if [[ $var == *text* ]]; then
 			LOGGLY_FILE_TO_MONITOR_ALIAS=$uniqueFileName-$LOGGLY_S3_ALIAS
 			LOGGLY_FILE_TO_MONITOR=$f
+			LOGGLY_FILE_TAG="s3file"
 			constructFileVariables
 			checkLogFileSize $LOGGLY_FILE_TO_MONITOR
 			write21ConfFileContents
