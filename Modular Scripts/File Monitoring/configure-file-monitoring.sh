@@ -32,7 +32,7 @@ MANUAL_CONFIG_INSTRUCTION="Manual instructions to configure a file is available 
 IS_FILE_MONITOR_SCRIPT_INVOKED="false"
 
 #file as tag sent with the logs
-LOGGLY_FILE_TAG="file"
+LOGGLY_FILE_TAG=
 
 ##########  Variable Declarations - End  ##########
 
@@ -49,6 +49,7 @@ installLogglyConfForFile()
 	checkIfFileLocationContainSpaces
 
 	#construct variables using filename and filealias
+	LOGGLY_FILE_TAG="file"
 	constructFileVariables
 
 	#check if file to monitor exists
