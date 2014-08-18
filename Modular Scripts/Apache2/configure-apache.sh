@@ -9,7 +9,7 @@ source configure-linux.sh "being-invoked"
 #name of the current script
 SCRIPT_NAME=configure-apache.sh
 #version of the current script
-SCRIPT_VERSION=1.1
+SCRIPT_VERSION=1.2
 
 #we have not found the apache version yet at this point in the script
 APP_TAG="\"apache-version\":\"\""
@@ -122,23 +122,20 @@ checkApacheDetails()
 #Get the apache service name on various linux flavors
 getApacheServiceName()
 {
-	case "$LINUX_DIST" in
-		*"Ubuntu"* )
+	#checking if the Linux is yum based or apt-get based
+	YUM_BASED=$(command -v yum)
+	APT_GET_BASED=$(command -v apt-get)
+	
+	if [ "$YUM_BASED" != "" ]; then
+		SERVICE="httpd"
+		APACHE_ACCESS_LOG_FILE="access_log"
+		APACHE_ERROR_LOG_FILE="error_log"
+	
+	elif [ "$APT_GET_BASED" != "" ]; then
 		SERVICE="apache2"
 		APACHE_ACCESS_LOG_FILE="access.log"
 		APACHE_ERROR_LOG_FILE="error.log"
-		;;
-		*"RedHat"* )
-		SERVICE="httpd"
-		APACHE_ACCESS_LOG_FILE="access_log"
-		APACHE_ERROR_LOG_FILE="error_log"
-		;;
-		*"CentOS"* )
-		SERVICE="httpd"
-		APACHE_ACCESS_LOG_FILE="access_log"
-		APACHE_ERROR_LOG_FILE="error_log"
-		;;
-	esac	
+	fi
 }
 
 #sets apache variables which will be used across various functions
