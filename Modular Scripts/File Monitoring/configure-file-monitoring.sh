@@ -9,7 +9,7 @@ source configure-linux.sh "being-invoked"
 #name of the current script
 SCRIPT_NAME=configure-file-monitoring.sh
 #version of the current script
-SCRIPT_VERSION=1.2
+SCRIPT_VERSION=1.3
 
 #file to monitor (contains complete path and file name) provided by user
 LOGGLY_FILE_TO_MONITOR=
@@ -33,6 +33,9 @@ IS_FILE_MONITOR_SCRIPT_INVOKED="false"
 
 #file as tag sent with the logs
 LOGGLY_FILE_TAG="file"
+
+#format name for the conf file. Can be set by calling script
+CONF_FILE_FORMAT_NAME="LogglyFormatFile"
 
 ##########  Variable Declarations - End  ##########
 
@@ -212,9 +215,9 @@ write21ConfFileContents()
 	\$InputRunFileMonitor
 
 	#Add a tag for file events
-	\$template LogglyFormatFile,\"<%pri%>%protocol-version% %timestamp:::date-rfc3339% %HOSTNAME% %app-name% %procid% %msgid% [$LOGGLY_AUTH_TOKEN@41058 tag=\\\"$LOGGLY_FILE_TAG\\\"] %msg%\n\"
+	\$template $CONF_FILE_FORMAT_NAME,\"<%pri%>%protocol-version% %timestamp:::date-rfc3339% %HOSTNAME% %app-name% %procid% %msgid% [$LOGGLY_AUTH_TOKEN@41058 tag=\\\"$LOGGLY_FILE_TAG\\\"] %msg%\n\"
 
-	if \$programname == '$LOGGLY_FILE_TO_MONITOR_ALIAS' then @@logs-01.loggly.com:514;LogglyFormatFile
+	if \$programname == '$LOGGLY_FILE_TO_MONITOR_ALIAS' then @@logs-01.loggly.com:514;$CONF_FILE_FORMAT_NAME
 	if \$programname == '$LOGGLY_FILE_TO_MONITOR_ALIAS' then ~
 	"
 
