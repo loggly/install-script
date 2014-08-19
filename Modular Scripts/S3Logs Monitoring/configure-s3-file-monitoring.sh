@@ -8,7 +8,7 @@ source configure-file-monitoring.sh "being-invoked"
 #name of the current script
 SCRIPT_NAME=configure-s3-file-monitoring.sh
 #version of the current script
-SCRIPT_VERSION=1.0
+SCRIPT_VERSION=1.1
 
 #s3 bucket name to configure
 LOGGLY_S3_BUCKET_NAME=
@@ -258,6 +258,7 @@ invokeS3FileMonitoring()
 			LOGGLY_FILE_TO_MONITOR_ALIAS=$uniqueFileName-$LOGGLY_S3_ALIAS
 			LOGGLY_FILE_TO_MONITOR=$f
 			LOGGLY_FILE_TAG="s3file"
+			CONF_FILE_FORMAT_NAME="LogglyFormatS3"
 			constructFileVariables
 			checkLogFileSize $LOGGLY_FILE_TO_MONITOR
 			write21ConfFileContents
