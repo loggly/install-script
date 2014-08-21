@@ -1,7 +1,7 @@
 #!/bin/bash
 
 echo "INFO: Downloading dependencies - configure-file-monitoring.sh"
-curl -s -o configure-file-monitoring.sh https://raw.githubusercontent.com/psquickitjayant/install-script/master/Modular%20Scripts/File%20Monitoring/configure-file-monitoring.sh
+curl -s -o configure-file-monitoring.sh https://www.loggly.com/install/configure-file-monitoring.sh
 source configure-file-monitoring.sh "being-invoked"
 
 ##########  Variable Declarations - Start  ##########
