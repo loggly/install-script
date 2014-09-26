@@ -568,7 +568,7 @@ checkIfTomcatLogsMadeToLoggly()
 		searchAndFetch tomcatLatestLogCount "$queryUrl"
 		let counter=$counter+1
 		if [ "$counter" -gt "$maxCounter" ]; then
-			logMsgToConfigSysLog "ERROR" "ERROR: Tomcat logs did not make to Loggly in time. Please check your token & network/firewall settings and retry."
+			logMsgToConfigSysLog "ERROR" "ERROR: Tomcat logs did not make to Loggly in time. Please check network and firewall settings and retry."
 			exit 1
 		fi
 	done

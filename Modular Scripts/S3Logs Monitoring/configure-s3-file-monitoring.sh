@@ -8,7 +8,7 @@ source configure-file-monitoring.sh "being-invoked"
 #name of the current script
 SCRIPT_NAME=configure-s3-file-monitoring.sh
 #version of the current script
-SCRIPT_VERSION=1.1
+SCRIPT_VERSION=1.3
 
 #s3 bucket name to configure
 LOGGLY_S3_BUCKET_NAME=
@@ -67,15 +67,16 @@ installLogglyConfForS3()
 	#invoke file monitoring on each file after checking if it is a text file or not
 	invokeS3FileMonitoring
 	
+	#install a cron job to sync the downloaded files after each 5 minutes 
+	installCronToSyncS3BucketPeriodically
+	
 	if [ "$IS_ANY_FILE_CONFIGURED" != "false" ]; then
 		#check if s3 logs made it to loggly
 		checkIfS3LogsMadeToLoggly
 	else
 		logMsgToConfigSysLog "WARN" "WARN: Did not find any files to configure. Nothing to do."
 	fi
-	
-	#delete temporary directory
-	#deleteTempDir
+
 }
 
 
@@ -95,9 +96,12 @@ removeLogglyConfForS3()
 
 	#remove file monitoring
 	removeS3FileMonitoring
+        
+	#delete the s3 sync cron from the crontab
+	deleteS3CronFromCrontab
 
 	#delete temporary directory if exists
-	TEMP_DIR=/tmp/$LOGGLY_S3_ALIAS
+	TEMP_DIR=/tmp/s3monitoring/$LOGGLY_S3_ALIAS
 	deleteTempDir
 	
 	#log success message
@@ -165,8 +169,8 @@ downloadS3cmd()
 #configure s3cmd
 configureS3cmd()
 {
-	s3cmd --configure
-	IS_S3CMD_CONFIGURED_BY_SCRIPT="true"
+	sudo s3cmd --configure
+	IS_S3CMD_CONFIGURED_BY_SCRIPT="true"	
 	#check if s3cmd configured successfully now
 	checkIfS3cmdConfigured
 }
@@ -203,7 +207,7 @@ checkIfValidS3Bucket()
 
 createTempDir()
 {
-	TEMP_DIR=/tmp/$LOGGLY_S3_ALIAS
+	TEMP_DIR=/tmp/s3monitoring/$LOGGLY_S3_ALIAS
 	if [ -d "$TEMP_DIR" ]; then
 		if [ "$(ls -A $TEMP_DIR)" ]; then
 			logMsgToConfigSysLog "WARN" "WARN: There are some files/folders already present in $TEMP_DIR. If you continue, the files currently inside the $TEMP_DIR will also be configured to send logs to loggly."
@@ -221,7 +225,12 @@ createTempDir()
 			done
 		fi		
 	else
-		mkdir /tmp/$LOGGLY_S3_ALIAS
+		if [ -d "/tmp/s3monitoring" ]; then
+			mkdir /tmp/s3monitoring/$LOGGLY_S3_ALIAS
+		else
+			mkdir /tmp/s3monitoring
+			mkdir /tmp/s3monitoring/$LOGGLY_S3_ALIAS
+		fi
 	fi
 }
 
@@ -231,7 +240,7 @@ downloadS3Bucket()
 		#Files are downloaded in nested directory
 		cd $TEMP_DIR
 		echo "Downloading files, may take some time..."
-		s3cmd get -r -f $LOGGLY_S3_BUCKET_NAME > /dev/null 2>&1
+		sudo s3cmd get -r -f $LOGGLY_S3_BUCKET_NAME > /dev/null 2>&1
 		if [ $? -ne 0 ]; then
 			logMsgToConfigSysLog "ERROR" "ERROR: Error downloading files recursively from $LOGGLY_S3_BUCKET_NAME"
 			exit 1
@@ -242,7 +251,7 @@ downloadS3Bucket()
 
 invokeS3FileMonitoring()
 {
-	dir=/tmp/$LOGGLY_S3_ALIAS
+	dir=/tmp/s3monitoring/$LOGGLY_S3_ALIAS
 	#TODO: Not supporting multiple files with same name in different directories
 	#only supporting file with naming convention *.*
 	for f in $(find $dir -name '*')
@@ -260,6 +269,7 @@ invokeS3FileMonitoring()
 			LOGGLY_FILE_TAG="s3file"
 			CONF_FILE_FORMAT_NAME="LogglyFormatS3"
 			constructFileVariables
+			checkFileReadPermission
 			checkLogFileSize $LOGGLY_FILE_TO_MONITOR
 			write21ConfFileContents
 			IS_ANY_FILE_CONFIGURED="true"
@@ -272,6 +282,68 @@ invokeS3FileMonitoring()
 	if [ "$IS_ANY_FILE_CONFIGURED" != "false" ]; then
 		restartRsyslog
 	fi
+}
+
+installCronToSyncS3BucketPeriodically()
+{
+	while true; do
+		read -p "Would you like install a Cron job to sync the files currently in your bucket every 5 minutes? (yes/no)" yn
+		case $yn in
+			[Yy]* )
+			
+				#copying .s3cfg file to /root so that it can be used by crontab for sync
+				if ! sudo test -f "/root/.s3cfg" ; then
+					sudo cp $HOME/.s3cfg /root
+				fi
+			
+				CRON_FILE="/tmp/s3monitoring/cron_$LOGGLY_S3_ALIAS"
+				CRON_SYNC_PATH="/tmp/s3monitoring/$LOGGLY_S3_ALIAS"
+				
+				#checking if the provided s3 path if of directory or file
+				IS_DIR="true"
+				BUCKET_URL_LAST_VALUE=$(echo ${LOGGLY_S3_BUCKET_NAME##*/})
+				
+				if [ "$BUCKET_URL_LAST_VALUE" != "" ]; then
+					for fle in $(find $CRON_SYNC_PATH -name $BUCKET_URL_LAST_VALUE)
+					do
+						if [ -f $fle ]; then
+							IS_DIR="false"
+							break
+						fi
+					done
+				fi
+				
+				#adding file name to the sync folder as the bucket path is
+				#provided upto a file
+				if [ "$IS_DIR" == "false" ]; then
+					CRON_SYNC_PATH="$CRON_SYNC_PATH/$BUCKET_URL_LAST_VALUE"
+				fi
+				
+				logMsgToConfigSysLog "INFO" "INFO: Creating a Cron job to sync $LOGGLY_S3_BUCKET_NAME files to $CRON_SYNC_PATH in every five minutes."
+				
+				#setting up cron job
+				CRON_JOB_TO_SYNC_S3_BUCKET="*/5 * * * * s3cmd sync $LOGGLY_S3_BUCKET_NAME --preserve $CRON_SYNC_PATH"
+				
+				EXISTING_CRONS=$(sudo crontab -l 2>&1)
+				case $EXISTING_CRONS in
+					no*)
+						;;
+					*)
+						echo "$EXISTING_CRONS" >> $CRON_FILE
+						;;
+				esac
+				
+				echo "$CRON_JOB_TO_SYNC_S3_BUCKET" >> $CRON_FILE
+				sudo crontab $CRON_FILE
+				sudo rm -fr $CRON_FILE
+				break;;
+			[Nn]* ) 
+				logMsgToConfigSysLog "INFO" "INFO: Skipping Cron installation."
+				break;;
+			* ) echo "Please answer yes or no.";;
+		esac
+	done
+	
 }
 
 deleteTempDir()
@@ -307,7 +379,7 @@ checkIfS3LogsMadeToLoggly()
 		searchAndFetch fileLatestLogCount "$queryUrl"
 		let counter=$counter+1
 		if [ "$counter" -gt "$maxCounter" ]; then
-			logMsgToConfigSysLog "ERROR" "ERROR: Logs did not make to Loggly in time. Please check your token & network/firewall settings and retry."
+			logMsgToConfigSysLog "ERROR" "ERROR: S3 logs did not make to Loggly in time. Please check network and firewall settings and retry."
 			exit 1
 		fi
 	done
@@ -345,6 +417,12 @@ removeS3FileMonitoring()
 	done
 	echo "INFO: Removed all the modified files."
 	restartRsyslog
+}
+
+deleteS3CronFromCrontab()
+{
+	logMsgToConfigSysLog "INFO" "INFO: Deleting sync Cron."
+	sudo crontab -l | grep -v  "/tmp/s3monitoring/$LOGGLY_S3_ALIAS" | crontab -
 }
 
 #display usage syntax

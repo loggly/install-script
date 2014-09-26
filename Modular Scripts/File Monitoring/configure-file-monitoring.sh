@@ -9,7 +9,7 @@ source configure-linux.sh "being-invoked"
 #name of the current script
 SCRIPT_NAME=configure-file-monitoring.sh
 #version of the current script
-SCRIPT_VERSION=1.3
+SCRIPT_VERSION=1.4
 
 #file to monitor (contains complete path and file name) provided by user
 LOGGLY_FILE_TO_MONITOR=
@@ -57,6 +57,9 @@ installLogglyConfForFile()
 	#check if file to monitor exists
 	checkIfFileExist
 
+	#checks if the file has proper read permission
+	checkFileReadPermission
+	
 	#check if the alias is already taken
 	checkIfFileAliasExist
 
@@ -189,6 +192,18 @@ checkLogFileSize()
 	fi
 }
 
+
+#checks the input file has proper read permissions 
+checkFileReadPermission()
+{
+	FILE_PERMISSIONS=$(ls -l $LOGGLY_FILE_TO_MONITOR)
+	#checking if the file has read permission for others
+	PERMISSION_READ_OTHERS=${FILE_PERMISSIONS:7:1}
+	if [ $PERMISSION_READ_OTHERS != r ]; then 
+		logMsgToConfigSysLog "WARN" "WARN: $LOGGLY_FILE_TO_MONITOR does not have proper read permissions. Verification step may fail."
+	fi
+}
+
 #function to write the contents of syslog config file
 write21ConfFileContents()
 {
@@ -259,7 +274,7 @@ checkIfFileLogsMadeToLoggly()
 		searchAndFetch fileLatestLogCount "$queryUrl"
 		let counter=$counter+1
 		if [ "$counter" -gt "$maxCounter" ]; then
-			logMsgToConfigSysLog "ERROR" "ERROR: Logs did not make to Loggly in time. Please check your token & network/firewall settings and retry."
+			logMsgToConfigSysLog "ERROR" "ERROR: File logs did not make to Loggly in time. Please check network and firewall settings and retry."
 			exit 1
 		fi
 	done
