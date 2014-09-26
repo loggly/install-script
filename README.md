@@ -1,7 +1,7 @@
 install-script
 ==============
 
-Loggly Sender Installation Script. Sends Linux, Tomcat, Apache and Text file logs/ contents to Loggly.
+Loggly Sender Installation Script. Sends Linux, Tomcat, Apache, Text file and S3 bucket logs to Loggly.
 
 ***Note:*** These scripts support only Loggly **Gen2** account.
 
