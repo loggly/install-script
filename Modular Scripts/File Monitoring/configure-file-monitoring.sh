@@ -196,12 +196,25 @@ checkLogFileSize()
 #checks the input file has proper read permissions 
 checkFileReadPermission()
 {
-	FILE_PERMISSIONS=$(ls -l $LOGGLY_FILE_TO_MONITOR)
-	#checking if the file has read permission for others
-	PERMISSION_READ_OTHERS=${FILE_PERMISSIONS:7:1}
-	if [ $PERMISSION_READ_OTHERS != r ]; then 
-		logMsgToConfigSysLog "WARN" "WARN: $LOGGLY_FILE_TO_MONITOR does not have proper read permissions. Verification step may fail."
-	fi
+	
+	LINUX_DIST_IN_LOWER_CASE=$(echo $LINUX_DIST | tr "[:upper:]" "[:lower:]")
+	
+	#no need to check read permissions with RedHat and CentOS as they also work with ---------- (000)permissions
+	case "$LINUX_DIST_IN_LOWER_CASE" in
+		*"redhat"* )
+		;;
+		*"centos"* )
+		;;
+		* )
+			FILE_PERMISSIONS=$(ls -l $LOGGLY_FILE_TO_MONITOR)
+			#checking if the file has read permission for others
+			PERMISSION_READ_OTHERS=${FILE_PERMISSIONS:7:1}
+			if [ $PERMISSION_READ_OTHERS != r ]; then 
+				logMsgToConfigSysLog "WARN" "WARN: $LOGGLY_FILE_TO_MONITOR does not have proper read permissions. Verification step may fail."
+			fi
+		;;
+	esac
+	
 }
 
 #function to write the contents of syslog config file
