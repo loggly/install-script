@@ -11,4 +11,4 @@ Configure your S3 bucket and file logs to send to Loggly with synchronization
   
 Stop sending your S3 bucket logs to Loggly
 
-    sudo ./configure-s3-file-monitoring.sh -a SUBDOMAIN -s3l S3-BUCKET-ALIAS -r
+    sudo bash configure-s3-file-monitoring.sh -a SUBDOMAIN -s3l S3-BUCKET-ALIAS -r
