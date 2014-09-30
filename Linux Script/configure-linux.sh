@@ -442,7 +442,7 @@ checkIfConfigurationChanged()
 	done
 	
 	if [ "$ASK_FOR_VERIFICATION" == "true" ]; then
-		logMsgToConfigSysLog "WARN" "WARN: Loggly rsyslog file $LOGGLY_RSYSLOG_CONFFILE content is incorrect."
+		logMsgToConfigSysLog "WARN" "WARN: Loggly rsyslog file /etc/rsyslog.d/22-loggly.conf content has changed."
 		while true; 
 		do
 			read -p "Do you wish to override $LOGGLY_RSYSLOG_CONFFILE and re-verify configuration? (yes/no)" yn
