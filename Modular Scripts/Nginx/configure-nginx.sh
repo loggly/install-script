@@ -32,7 +32,7 @@ LOGGLY_NGINX_LOG_HOME=
 #this variable will hold the users nginx version
 NGINX_VERSION=
 
-MANUAL_CONFIG_INSTRUCTION="Manual instructions to configure nginx is available at https://www.loggly.com/docs/sending-nginx-logs/"
+MANUAL_CONFIG_INSTRUCTION="Manual instructions to configure nginx is available at https://www.loggly.com/docs/nginx-server-logs#manual"
 
 #this variable will hold if the check env function for linux is invoked
 NGINX_ENV_VALIDATED="false"
