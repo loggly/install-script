@@ -9,7 +9,7 @@ source configure-linux.sh "being-invoked"
 #name of the current script
 SCRIPT_NAME=configure-file-monitoring.sh
 #version of the current script
-SCRIPT_VERSION=1.4
+SCRIPT_VERSION=1.5
 
 #file to monitor (contains complete path and file name) provided by user
 LOGGLY_FILE_TO_MONITOR=
@@ -327,7 +327,7 @@ remove21ConfFile()
 usage()
 {
 cat << EOF
-usage: configure-file-monitoring [-a loggly auth account or subdomain] [-t loggly token (optional)] [-u username] [-p password (optional)] [-f filename] [-l filealias]
+usage: configure-file-monitoring [-a loggly auth account or subdomain] [-t loggly token (optional)] [-u username] [-p password (optional)] [-f filename] [-tag filetag (optional)] [-l filealias]
 usage: configure-file-monitoring [-a loggly auth account or subdomain] [-r to rollback] [-l filealias]
 usage: configure-file-monitoring [-h for help]
 EOF
@@ -366,7 +366,12 @@ if [ "$1" != "being-invoked" ]; then
 			  ;;
 		  -l | --filealias ) shift
 			  LOGGLY_FILE_TO_MONITOR_ALIAS=$1
+			  CONF_FILE_FORMAT_NAME=$CONF_FILE_FORMAT_NAME$1
 			  echo "File alias: $LOGGLY_FILE_TO_MONITOR_ALIAS"
+			  ;;
+		 -tag| --filetag ) shift
+			  LOGGLY_FILE_TAG=$1
+			  echo "File tag: $LOGGLY_FILE_TAG"
 			  ;;
 		  -h | --help)
 			  usage
