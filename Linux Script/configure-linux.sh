@@ -8,14 +8,14 @@ trap ctrl_c INT
 function ctrl_c()  {
 	logMsgToConfigSysLog "INFO" "INFO: Aborting the script."
 	exit 1
-} 
+}
 
 ##########  Variable Declarations - Start  ##########
 
 #name of the current script. This will get overwritten by the child script which calls this
 SCRIPT_NAME=configure-linux.sh
 #version of the current script. This will get overwritten by the child script which calls this
-SCRIPT_VERSION=1.01
+SCRIPT_VERSION=1.7
 
 #application tag. This will get overwritten by the child script which calls this
 APP_TAG=
@@ -78,16 +78,18 @@ MANUAL_CONFIG_INSTRUCTION="Manual instructions to configure rsyslog on Linux are
 #this variable is set if the script is invoked via some other calling script
 IS_INVOKED=
 
+#this variable will hold if the check env function for linux is invoked
+LINUX_ENV_VALIDATED="false"
+
+#this variable will inform if verification needs to be performed
+LINUX_DO_VERIFICATION="true"
 
 ##########  Variable Declarations - End  ##########
 
-# executing the script for loggly to install and configure rsyslog.
-installLogglyConf()
+#check if the Linux environment is compatible with Loggly.
+#Also set few variables after the check.
+checkLinuxLogglyCompatibility()
 {
-
-	#log message indicating starting of Loggly configuration
-	logMsgToConfigSysLog "INFO" "INFO: Initiating Configure Loggly for Linux."
-
 	#check if the user has root permission to run this script
 	checkIfUserHasRootPrivileges
 
@@ -103,7 +105,10 @@ installLogglyConf()
 	#check if user credentials are valid. If no, then exit
 	checkIfValidUserNamePassword
 
-	#check if authentication token is valid. If no, then exit
+	#get authentication token if not provided
+	getAuthToken
+
+	#check if authentication token is valid. If no, then exit.
 	checkIfValidAuthToken
 
 	#check if rsyslog is configured as service. If no, then exit
@@ -118,20 +123,35 @@ installLogglyConf()
 	#check if selinux service is enforced. if yes, ask the user to manually disable and exit the script
 	checkIfSelinuxServiceEnforced
 
+	LINUX_ENV_VALIDATED="true"
+}
+
+# executing the script for loggly to install and configure rsyslog.
+installLogglyConf()
+{
+	#log message indicating starting of Loggly configuration
+	logMsgToConfigSysLog "INFO" "INFO: Initiating Configure Loggly for Linux."
+
+	if [ "$LINUX_ENV_VALIDATED" = "false" ]; then
+		checkLinuxLogglyCompatibility
+	fi
+
 	#if all the above check passes, write the 22-loggly.conf file
 	write22LogglyConfFile
 
-	# Create rsyslog dir if it doesn't exist, Modify the permission on rsyslog directory if exist on Ubuntu
+	#create rsyslog dir if it doesn't exist, Modify the permission on rsyslog directory if exist on Ubuntu
 	createRsyslogDir
 
-	#check if the logs are going to loggly fro linux system now
-	checkIfLogsMadeToLoggly
+	if [ "$LINUX_DO_VERIFICATION" = "true" ]; then
+		#check if the logs are going to loggly fro linux system now
+		checkIfLogsMadeToLoggly
+	fi
 
-	#log success message
-	logMsgToConfigSysLog "SUCCESS" "SUCCESS: Linux system successfully configured to send logs via Loggly."
-
+	if [ "$IS_INVOKED" = "" ]; then
+		logMsgToConfigSysLog "SUCCESS" "SUCCESS: Linux system successfully configured to send logs via Loggly."
+	fi
+	
 }
-# End of configure rsyslog for linux
 
 #remove loggly configuration from Linux system
 removeLogglyConf()
@@ -150,7 +170,7 @@ removeLogglyConf()
 
 	#remove 22-loggly.conf file
 	remove22LogglyConfFile
-	
+
 	#restart rsyslog service
 	restartRsyslog
 
@@ -171,34 +191,68 @@ checkIfUserHasRootPrivileges()
 #check if supported operating system
 checkIfSupportedOS()
 {
-	#set value for linux distribution name
-	LINUX_DIST=$(lsb_release -ds)
-
-	if [ $? -ne 0 ]; then
-		logMsgToConfigSysLog "ERROR" "ERROR: This operating system is not supported by the script."
+	getOs
+	
+	LINUX_DIST_IN_LOWER_CASE=$(echo $LINUX_DIST | tr "[:upper:]" "[:lower:]")
+	
+	case "$LINUX_DIST_IN_LOWER_CASE" in
+		*"ubuntu"* )
+		echo "INFO: Operating system is Ubuntu."
+		;;
+		*"redhat"* )
+		echo "INFO: Operating system is Red Hat."
+		;;
+		*"centos"* )
+		echo "INFO: Operating system is CentOS."
+		;;
+		*"amazon"* )
+		echo "INFO: Operating system is Amazon AMI."
+		;;
+		*"darwin"* )
+		#if the OS is mac then exit
+		logMsgToConfigSysLog "ERROR" "ERROR: This script is for Linux systems, and Darwin or Mac OSX are not currently supported. You can find alternative options here: https://www.loggly.com/docs"
 		exit 1
-	else
-		#remove double quotes (if any) from the linux distribution name
-		LINUX_DIST="${LINUX_DIST%\"}"
-		LINUX_DIST="${LINUX_DIST#\"}"
-		case "$LINUX_DIST" in
-			*"Ubuntu"* )
-			echo "INFO: Operating system is Ubuntu."
-			;;
-			*"Red Hat"* )
-			echo "INFO: Operating system is Red Hat."
-			;;
-			*"CentOS"* )
-			echo "INFO: Operating system is CentOS."
-			;;
-			* )
-			logMsgToConfigSysLog "ERROR" "ERROR: This operating system is not supported by the script."
-			exit 1
-			;;
-		esac
-	fi
+		;;
+		* )
+		logMsgToConfigSysLog "WARN" "WARN: The linux distribution '$LINUX_DIST' has not been previously tested with Loggly."
+		while true; do
+			read -p "Would you like to continue anyway? (yes/no)" yn
+			case $yn in
+				[Yy]* )
+				break;;
+				[Nn]* )
+				exit 1	
+				;;
+				* ) echo "Please answer yes or no.";;
+			esac
+		done
+		;;
+	esac
 }
 
+getOs()
+{
+	# Determine OS platform
+	UNAME=$(uname | tr "[:upper:]" "[:lower:]")
+	# If Linux, try to determine specific distribution
+	if [ "$UNAME" == "linux" ]; then
+		# If available, use LSB to identify distribution
+		if [ -f /etc/lsb-release -o -d /etc/lsb-release.d ]; then
+			LINUX_DIST=$(lsb_release -i | cut -d: -f2 | sed s/'^\t'//)
+		# If system-release is available, then try to identify the name
+		elif [ -f /etc/system-release ]; then
+			LINUX_DIST=$(cat /etc/system-release  | cut -f 1 -d  " ")
+		# Otherwise, use release info file
+		else
+			LINUX_DIST=$(ls -d /etc/[A-Za-z]*[_-][rv]e[lr]* | grep -v "lsb" | cut -d'/' -f3 | cut -d'-' -f1 | cut -d'_' -f1)
+		fi
+	fi
+
+	# For everything else (or if above failed), just use generic identifier
+	if [ "$LINUX_DIST" == "" ]; then
+		LINUX_DIST=$(uname)
+	fi
+}
 
 #sets linux variables which will be used across various functions
 setLinuxVariables()
@@ -213,25 +267,36 @@ setLinuxVariables()
 #checks if all the various endpoints used for configuring loggly are accessible
 checkIfLogglyServersAccessible()
 {
-	echo "INFO: Checking if $LOGGLY_ACCOUNT_URL is reachable."
-	if [ $(curl -s --head  --request GET $LOGGLY_ACCOUNT_URL/login | grep "200 OK" | wc -l) == 1 ]; then
-		echo "INFO: $LOGGLY_ACCOUNT_URL is reachable."
-	else
-		logMsgToConfigSysLog "WARNING" "WARNING: $LOGGLY_ACCOUNT_URL is not reachable. Please check your network and firewall settings. Continuing to configure Loggly on your system."
-	fi
-
 	echo "INFO: Checking if $LOGS_01_HOST is reachable."
 	if [ $(ping -c 1 $LOGS_01_HOST | grep "1 packets transmitted, 1 received, 0% packet loss" | wc -l) == 1 ]; then
 		echo "INFO: $LOGS_01_HOST is reachable."
 	else
-		logMsgToConfigSysLog "WARNING" "WARNING: $LOGS_01_HOST is not reachable. Please check your network and firewall settings. Continuing to configure Loggly on your system."
+		logMsgToConfigSysLog "ERROR" "ERROR: $LOGS_01_HOST is not reachable. Please check your network and firewall settings."
+		exit 1
+	fi
+
+	echo "INFO: Checking if $LOGS_01_HOST is reachable via $LOGGLY_SYSLOG_PORT port. This may take some time."
+	if [ $(curl --connect-timeout 10 $LOGS_01_HOST:$LOGGLY_SYSLOG_PORT 2>&1 | grep "Empty reply from server" | wc -l) == 1 ]; then
+		echo "INFO: $LOGS_01_HOST is reachable via $LOGGLY_SYSLOG_PORT port."
+	else
+		logMsgToConfigSysLog "ERROR" "ERROR: $LOGS_01_HOST is not reachable via $LOGGLY_SYSLOG_PORT port. Please check your network and firewall settings."
+		exit 1
+	fi
+
+	echo "INFO: Checking if '$LOGGLY_ACCOUNT' subdomain is valid."
+	if [ $(curl -s --head  --request GET $LOGGLY_ACCOUNT_URL/login | grep "200 OK" | wc -l) == 1 ]; then
+		echo "INFO: $LOGGLY_ACCOUNT_URL is valid and reachable."
+	else
+		logMsgToConfigSysLog "ERROR" "ERROR: This is not a recognized subdomain. Please ask the account owner for the subdomain they signed up with."
+		exit 1
 	fi
 	
-	echo "INFO: Checking if Gen2 account"
+	echo "INFO: Checking if Gen2 account."
 	if [ $(curl -s --head  --request GET $LOGGLY_ACCOUNT_URL/apiv2/customer | grep "404 NOT FOUND" | wc -l) == 1 ]; then
 		logMsgToConfigSysLog "ERROR" "ERROR: This scripts need a Gen2 account. Please contact Loggly support."
+		exit 1
 	else
-		echo "INFO: It is a Gen2 account"
+		echo "INFO: It is a Gen2 account."
 	fi
 }
 
@@ -240,10 +305,33 @@ checkIfValidUserNamePassword()
 {
 	echo "INFO: Checking if provided username and password is correct."
 	if [ $(curl -s -u $LOGGLY_USERNAME:$LOGGLY_PASSWORD $LOGGLY_ACCOUNT_URL/apiv2/customer | grep "Unauthorized" | wc -l) == 1 ]; then
-		logMsgToConfigSysLog "ERROR" "ERROR: Invalid Loggly username or password."
-		exit 1
+			logMsgToConfigSysLog "INFO" "INFO: Please check your username or reset your password at $LOGGLY_ACCOUNT_URL/account/users/"
+			logMsgToConfigSysLog "ERROR" "ERROR: Invalid Loggly username or password."
+			exit 1
 	else
 		logMsgToConfigSysLog "INFO" "INFO: Username and password authorized successfully."
+	fi
+}
+
+getAuthToken()
+{
+	if [ "$LOGGLY_AUTH_TOKEN" = "" ]; then
+		logMsgToConfigSysLog "INFO" "INFO: Authentication token not provided. Trying to retrieve it from $LOGGLY_ACCOUNT_URL account."
+		#get authentication token if user has not provided one
+		tokenstr=$(curl -s -u $LOGGLY_USERNAME:$LOGGLY_PASSWORD $LOGGLY_ACCOUNT_URL/apiv2/customer | grep -v "token")
+
+		#get the string from index 0 to first occurence of ,
+		tokenstr=${tokenstr%%,*}
+
+		#get the string from index 0 to last occurence of "
+		tokenstr=${tokenstr%\"*}
+
+		#get the string from first occurence of " to the end
+		tokenstr=${tokenstr#*\"}
+
+		LOGGLY_AUTH_TOKEN=$tokenstr
+		
+		logMsgToConfigSysLog "INFO" "INFO: Retrieved authentication token: $LOGGLY_AUTH_TOKEN"
 	fi
 }
 
@@ -281,6 +369,7 @@ checkIfMultipleRsyslogConfigured()
 {
 	if [ $(ps -ef | grep -v grep | grep "$RSYSLOG_SERVICE" | wc -l) -gt 1 ]; then
 		logMsgToConfigSysLog "ERROR" "ERROR: Multiple (more than 1) $RSYSLOG_SERVICE is running."
+		exit 1
 	fi
 }
 
@@ -305,6 +394,7 @@ checkIfSelinuxServiceEnforced()
 		logMsgToConfigSysLog "INFO" "INFO: selinux status is not enforced."
 	elif [ $(sudo getenforce | grep "Enforcing" | wc -l) -gt 0 ]; then
 		logMsgToConfigSysLog "ERROR" "ERROR: selinux status is 'Enforcing'. Please disable it and start the rsyslog daemon manually."
+		exit 1
 	fi
 }
 
@@ -313,19 +403,8 @@ write22LogglyConfFile()
 {
 	echo "INFO: Checking if loggly sysconf file $LOGGLY_RSYSLOG_CONFFILE exist."
 	if [ -f "$LOGGLY_RSYSLOG_CONFFILE" ]; then
-		logMsgToConfigSysLog "WARN" "WARN: Loggly rsyslog file $LOGGLY_RSYSLOG_CONFFILE already exist."
-		while true; do
-			read -p "Do you wish to override $LOGGLY_RSYSLOG_CONFFILE? (yes/no)" yn
-			case $yn in
-				[Yy]* )
-				logMsgToConfigSysLog "INFO" "INFO: Going to back up the conf file: $LOGGLY_RSYSLOG_CONFFILE to $LOGGLY_RSYSLOG_CONFFILE_BACKUP";
-				sudo mv -f $LOGGLY_RSYSLOG_CONFFILE $LOGGLY_RSYSLOG_CONFFILE_BACKUP;
-				checkAuthTokenAndWriteContents;
-				break;;
-				[Nn]* ) break;;
-				* ) echo "Please answer yes or no.";;
-			esac
-		done
+		logMsgToConfigSysLog "INFO" "INFO: Loggly rsyslog file $LOGGLY_RSYSLOG_CONFFILE already exist."
+		checkIfConfigurationChanged
 	else
 		logMsgToConfigSysLog "INFO" "INFO: Loggly rsyslog file $LOGGLY_RSYSLOG_CONFFILE does not exist, creating file $LOGGLY_RSYSLOG_CONFFILE"
 		checkAuthTokenAndWriteContents
@@ -342,6 +421,48 @@ checkAuthTokenAndWriteContents()
 		logMsgToConfigSysLog "ERROR" "ERROR: Loggly auth token is required to configure rsyslog. Please pass -a <auth token> while running script."
 		exit 1
 	fi
+}
+
+#matches if the content of 22-loggly.conf content is changed
+checkIfConfigurationChanged()
+{
+	ASK_FOR_VERIFICATION="false"
+	
+	#strings to be checked which should be present in the existing 22-loggly.conf. 
+	#If these strings are not same then a warning message will be shown to user to update the 22-loggly.conf file
+	STR_TO_BE_CHECKED[0]="\$template LogglyFormat,\"<%pri%>%protocol-version% %timestamp:::date-rfc3339% %HOSTNAME% %app-name% %procid% %msgid% [$LOGGLY_AUTH_TOKEN@$LOGGLY_DISTRIBUTION_ID] %msg%\""
+	STR_TO_BE_CHECKED[1]="*.*             @@$LOGS_01_HOST:$LOGGLY_SYSLOG_PORT;LogglyFormat"
+
+	for i in "${STR_TO_BE_CHECKED[@]}"
+	do
+		if ! sudo grep -Fxq "$i" $LOGGLY_RSYSLOG_CONFFILE; then
+			ASK_FOR_VERIFICATION="true"
+			break;
+		fi
+	done
+	
+	if [ "$ASK_FOR_VERIFICATION" == "true" ]; then
+		logMsgToConfigSysLog "WARN" "WARN: Loggly rsyslog file /etc/rsyslog.d/22-loggly.conf content has changed."
+		while true; 
+		do
+			read -p "Do you wish to override $LOGGLY_RSYSLOG_CONFFILE and re-verify configuration? (yes/no)" yn
+			case $yn in
+				[Yy]* )
+				logMsgToConfigSysLog "INFO" "INFO: Going to back up the conf file: $LOGGLY_RSYSLOG_CONFFILE to $LOGGLY_RSYSLOG_CONFFILE_BACKUP";
+				sudo mv -f $LOGGLY_RSYSLOG_CONFFILE $LOGGLY_RSYSLOG_CONFFILE_BACKUP;
+				checkAuthTokenAndWriteContents;
+				break;;
+				[Nn]* )
+				LINUX_DO_VERIFICATION="false"
+				logMsgToConfigSysLog "INFO" "INFO: Skipping Linux verification."
+				break;;
+				* ) echo "Please answer yes or no.";;
+			esac
+		done
+	else
+		LINUX_DO_VERIFICATION="false"
+	fi
+	
 }
 
 #write the contents to 22-loggly.conf file
@@ -415,7 +536,7 @@ checkIfLogsMadeToLoggly()
 		let counter=$counter+1
 		if [ "$counter" -gt "$maxCounter" ]; then
 			MANUAL_CONFIG_INSTRUCTION=$MANUAL_CONFIG_INSTRUCTION" Rsyslog troubleshooting instructions are available at https://www.loggly.com/docs/troubleshooting-rsyslog/"
-			logMsgToConfigSysLog "ERROR" "ERROR: Verification logs did not make it to Loggly in time. Please check your token & network/firewall settings and retry."
+			logMsgToConfigSysLog "ERROR" "ERROR: Logs did not make to Loggly in time. Please check network and firewall settings and retry."
 			exit 1
 		fi
 	done
@@ -479,7 +600,7 @@ logMsgToConfigSysLog()
 	#for Mac system, we need to use -D switch to decode
 	varUname=$(uname)
 	if [[ $varUname == 'Linux' ]]; then
-		enabler=$(echo MWVjNGU4ZTEtZmJiMi00N2U3LTkyOWItNzVhMWJmZjVmZmUw | base64 -d)
+		enabler=$(echo -n MWVjNGU4ZTEtZmJiMi00N2U3LTkyOWItNzVhMWJmZjVmZmUw | base64 -d)
 	elif [[ $varUname == 'Darwin' ]]; then
 		enabler=$(echo MWVjNGU4ZTEtZmJiMi00N2U3LTkyOWItNzVhMWJmZjVmZmUw | base64 -D)
 	fi
@@ -494,7 +615,9 @@ logMsgToConfigSysLog()
 	#if it is an error, then log message "Script Failed" to config syslog and exit the script
 	if [[ $cslStatus == "ERROR" ]]; then
 		sendPayloadToConfigSysLog "ERROR" "Script Failed" "$enabler"
-		echo $MANUAL_CONFIG_INSTRUCTION
+		if [ "$varUname" != "Darwin" ]; then
+			echo $MANUAL_CONFIG_INSTRUCTION
+		fi
 		exit 1
 	fi
 
@@ -508,9 +631,9 @@ logMsgToConfigSysLog()
 sendPayloadToConfigSysLog()
 {
 	if [ "$APP_TAG" = "" ]; then
-		var="{\"sub-domain\":\"$LOGGLY_ACCOUNT\", \"user-name\":\"$LOGGLY_USERNAME\", \"host-name\":\"$HOST_NAME\", \"script-name\":\"$SCRIPT_NAME\", \"script-version\":\"$SCRIPT_VERSION\", \"status\":\"$1\", \"time-stamp\":\"$currentTime\", \"linux-distribution\":\"$LINUX_DIST\", \"messages\":\"$2\"}"
+		var="{\"sub-domain\":\"$LOGGLY_ACCOUNT\", \"user-name\":\"$LOGGLY_USERNAME\", \"customer-token\":\"$LOGGLY_AUTH_TOKEN\", \"host-name\":\"$HOST_NAME\", \"script-name\":\"$SCRIPT_NAME\", \"script-version\":\"$SCRIPT_VERSION\", \"status\":\"$1\", \"time-stamp\":\"$currentTime\", \"linux-distribution\":\"$LINUX_DIST\", \"messages\":\"$2\",\"rsyslog-version\":\"$RSYSLOG_VERSION\"}"
 	else
-		var="{\"sub-domain\":\"$LOGGLY_ACCOUNT\", \"user-name\":\"$LOGGLY_USERNAME\", \"host-name\":\"$HOST_NAME\", \"script-name\":\"$SCRIPT_NAME\", \"script-version\":\"$SCRIPT_VERSION\", \"status\":\"$1\", \"time-stamp\":\"$currentTime\", \"linux-distribution\":\"$LINUX_DIST\", $APP_TAG, \"messages\":\"$2\"}"
+		var="{\"sub-domain\":\"$LOGGLY_ACCOUNT\", \"user-name\":\"$LOGGLY_USERNAME\", \"customer-token\":\"$LOGGLY_AUTH_TOKEN\", \"host-name\":\"$HOST_NAME\", \"script-name\":\"$SCRIPT_NAME\", \"script-version\":\"$SCRIPT_VERSION\", \"status\":\"$1\", \"time-stamp\":\"$currentTime\", \"linux-distribution\":\"$LINUX_DIST\", $APP_TAG, \"messages\":\"$2\",\"rsyslog-version\":\"$RSYSLOG_VERSION\"}"
 	fi
 	curl -s -H "content-type:application/json" -d "$var" $LOGS_01_URL/inputs/$3 > /dev/null 2>&1
 }
@@ -519,7 +642,9 @@ sendPayloadToConfigSysLog()
 searchAndFetch()
 {
 	url=$2
+	
 	result=$(wget -qO- /dev/null --user "$LOGGLY_USERNAME" --password "$LOGGLY_PASSWORD" "$url")
+	
 	if [ -z "$result" ]; then
 		logMsgToConfigSysLog "ERROR" "ERROR: Please check your network/firewall settings & ensure Loggly subdomain, username and password is specified correctly."
 		exit 1
@@ -538,7 +663,7 @@ searchAndFetch()
 	eval $1="'$count'"
 	if [ "$count" -gt 0 ]; then
 		timestamp=$(echo "$result" | grep timestamp)
-	fi
+	fi	
 }
 
 #get password in the form of asterisk
@@ -562,7 +687,7 @@ getPassword()
 usage()
 {
 cat << EOF
-usage: configure-linux [-a loggly auth account or subdomain] [-t loggly token] [-u username] [-p password (optional)]
+usage: configure-linux [-a loggly auth account or subdomain] [-t loggly token (optional)] [-u username] [-p password (optional)]
 usage: configure-linux [-a loggly auth account or subdomain] [-r to remove]
 usage: configure-linux [-h for help]
 EOF
@@ -607,8 +732,8 @@ if [ "$1" != "being-invoked" ]; then
 	fi
 
 	if [ "$LOGGLY_REMOVE" != "" -a "$LOGGLY_ACCOUNT" != "" ]; then
-		removeLogglyConf		
-	elif [ "$LOGGLY_AUTH_TOKEN" != "" -a "$LOGGLY_ACCOUNT" != "" -a "$LOGGLY_USERNAME" != "" ]; then
+		removeLogglyConf
+	elif [ "$LOGGLY_ACCOUNT" != "" -a "$LOGGLY_USERNAME" != "" ]; then
 		if [ "$LOGGLY_PASSWORD" = "" ]; then
 			getPassword
 		fi

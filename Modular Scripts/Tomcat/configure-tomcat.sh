@@ -1,12 +1,15 @@
 #!/bin/bash
 
+#downloads configure-linux.sh
+echo "INFO: Downloading dependencies - configure-linux.sh"
+curl -s -o configure-linux.sh https://www.loggly.com/install/configure-linux.sh
 source configure-linux.sh "being-invoked"
 
 ##########  Variable Declarations - Start  ##########
 #name of the current script
 SCRIPT_NAME=configure-tomcat.sh
 #version of the current script
-SCRIPT_VERSION=1.0
+SCRIPT_VERSION=1.1
 
 #minimum version of tomcat to enable log rotation
 MIN_TOMCAT_VERSION=6.0.33.0
@@ -16,19 +19,10 @@ APP_TAG="\"tomcat-version\":\"\""
 
 #name of the service, in this case tomcat6
 SERVICE=tomcat6
-#directory location for syslog
-SYSLOG_ETCDIR_CONF=/etc/rsyslog.d
 #name and location of tomcat syslog file
-TOMCAT_SYSLOG_CONFFILE=$SYSLOG_ETCDIR_CONF/21-tomcat.conf
+TOMCAT_SYSLOG_CONFFILE=$RSYSLOG_ETCDIR_CONF/21-tomcat.conf
 #name and location of tomcat syslog backup file
-TOMCAT_SYSLOG_CONFFILE_BACKUP=$SYSLOG_ETCDIR_CONF/21-tomcat.conf.loggly.bk
-#syslog directory
-SYSLOG_DIR=/var/spool/rsyslog
-
-#this variable will hold the host name
-HOST_NAME=
-#this variable will hold the name of the linux distribution
-LINUX_DIST=
+TOMCAT_SYSLOG_CONFFILE_BACKUP=$RSYSLOG_ETCDIR_CONF/21-tomcat.conf.loggly.bk
 
 #this variable will hold the path to the catalina home
 LOGGLY_CATALINA_HOME=
@@ -54,30 +48,43 @@ LOG4J_FILE_PATH=
 LOGGLY_CATALINA_HOME=
 
 MANUAL_CONFIG_INSTRUCTION="Manual instructions to configure Tomcat is available at https://www.loggly.com/docs/tomcat-application-server"
+
+#this variable will hold if the check env function for linux is invoked
+TOMCAT_ENV_VALIDATED=
 ##########  Variable Declarations - End  ##########
+
+#check if Tomcat environment is compatible for Loggly
+checkTomcatLogglyCompatibility()
+{
+	#check if the linux environment is compatible for Loggly
+	checkLinuxLogglyCompatibility
+
+	#deduce CATALINA_HOME, this sets the value for LOGGLY_CATALINA_HOME variable
+	deduceAndCheckTomcatHomeAndVersion
+
+	#check if tomcat is configured with log4j. If yes, then exit
+	checkIfTomcatConfiguredWithLog4J
+
+	TOMCAT_ENV_VALIDATED="true"
+}
+
 
 # executing the script for loggly to install and configure syslog.
 installLogglyConfForTomcat()
 {
-	installLogglyConf
-
 	#log message indicating starting of Loggly configuration
 	logMsgToConfigSysLog "INFO" "INFO: Initiating Configure Loggly for Tomcat."
 
-	#get CATALINA_HOME, this sets the value for LOGGLY_CATALINA_HOME variable
-	getTomcatHome $SERVICE
+	#check if tomcat environment is compatible with Loggly
+	if [ "$TOMCAT_ENV_VALIDATED" = "" ]; then
+		checkTomcatLogglyCompatibility
+	fi
 
-	#check if the provided or deduced tomcat home is correct or not
-	checkIfValidTomcatHome
+	#ask user if tomcat can be restarted
+	canTomcatBeRestarted
 
-	#set all the required tomcat variables by this script
-	setTomcatVariables
-
-	#check if tomcat version is supported by the script. The script only support tomcat 6 and 7
-	checkIfSupportedTomcatVersion
-
-	#check if tomcat is configured with log4j. If yes, then exit
-	checkIfTomcatConfiguredWithLog4J
+	#configure loggly for Linux
+	installLogglyConf
 
 	#backing up the logging.properties file
 	backupLoggingPropertiesFile
@@ -94,39 +101,123 @@ installLogglyConfForTomcat()
 	#log success message
 	logMsgToConfigSysLog "SUCCESS" "SUCCESS: Tomcat successfully configured to send logs via Loggly."
 }
-# End of configure rsyslog for tomcat
 
-
+#executing script to remove loggly configuration for tomcat
 removeLogglyConfForTomcat()
 {
 	logMsgToConfigSysLog "INFO" "INFO: Initiating rollback."
 
 	#check if the user has root permission to run this script
 	checkIfUserHasRootPrivileges
-	
+
 	#check if the OS is supported by the script. If no, then exit
 	checkIfSupportedOS
 
-	#get CATALINA_HOME, this sets the value for LOGGLY_CATALINA_HOME variable
-	getTomcatHome $SERVICE
+	#deduce CATALINA_HOME, this sets the value for LOGGLY_CATALINA_HOME variable
+	deduceAndCheckTomcatHomeAndVersion
 
-	#check if the provided or deduced tomcat home is correct or not
-	checkIfValidTomcatHome
-
-	#set all the required tomcat variables by this script
-	setTomcatVariables
-
-	#restore original loggly properties file from backup
-	restoreLogglyPropertiesFile
+	#ask user if tomcat can be restarted
+	canTomcatBeRestarted
 
 	#remove 21tomcat.conf file
 	remove21TomcatConfFile
+	
+	#restore original loggly properties file from backup
+	restoreLogglyPropertiesFile
 
 	logMsgToConfigSysLog "INFO" "INFO: Rollback completed."
 }
 
+#identify if tomcat6 or tomcat7 is installed on your system
+deduceAndCheckTomcatHomeAndVersion()
+{
+
+	if [ "$LOGGLY_CATALINA_HOME" = "" ]; then
+		LOGGLY_CATALINA_HOME=
+
+		#lets check if tomcat7 is installed on the system
+		SERVICE=tomcat7
+
+		#try to deduce tomcat home considering tomcat7
+		assumeTomcatHome $SERVICE
+
+		#initialize validTomcatHome variable with value true. This value will be toggled
+		#in the function checkIfValidTomcatHome fails
+		validTomcatHome="true"
+
+		#checks if the deduced tomcat7 home is correct or not
+		checkIfValidTomcatHome validTomcatHome
+
+		#if tomcat7 home is not valid one, move on to check for tomcat6
+		if [ "$validTomcatHome" = "false" ]; then
+
+			LOGGLY_CATALINA_HOME=
+
+			#lets check if tomcat6 is installed on the system
+			SERVICE=tomcat6
+
+			#try to deduce tomcat home considering tomcat6
+			assumeTomcatHome $SERVICE
+
+			#initialize validTomcatHome variable with value true. This value will be toggled
+			#in the function checkIfValidTomcatHome fails
+			validTomcatHome="true"
+
+			#checks if the deduced tomcat7 home is correct or not
+			checkIfValidTomcatHome validTomcatHome
+		fi
+
+		if [ "$validTomcatHome" = "true" ]; then
+			logMsgToConfigSysLog "INFO" "INFO: CATALINA HOME: $LOGGLY_CATALINA_HOME"
+
+			#set all the required tomcat variables by this script
+			setTomcatVariables
+
+			#find tomcat version
+			getTomcatVersion
+
+			#check if tomcat version is supported by the script. The script only support tomcat 6 and 7
+			checkIfSupportedTomcatVersion
+		else
+			logMsgToConfigSysLog "ERROR" "ERROR: Unable to determine correct CATALINA_HOME. Please provide correct Catalina Home using -ch option."
+		fi
+	else
+		#if the user has provided catalina_home, then we need to check if it is a valid catalina home and what is the correct version of the tomcat.
+		#Let us assume service name is tomcat for now, which will be updated later.
+		SERVICE=tomcat
+
+		#set the flag to true
+		validTomcatHome="true"
+
+		#check if the tomcat home provided by user is valid
+		checkIfValidTomcatHome validTomcatHome
+
+		if [ "$validTomcatHome" = "true" ]; then
+			logMsgToConfigSysLog "INFO" "INFO: CATALINA HOME: $LOGGLY_CATALINA_HOME"
+
+			#set tomcat variables
+			setTomcatVariables
+
+			#find tomcat version
+			getTomcatVersion
+
+			#check if tomcat version is supported by the script. The script only support tomcat 6 and 7
+			checkIfSupportedTomcatVersion
+
+			#update the service name
+			if [ "$tomcatMajorVersion" = "7" ]; then
+				SERVICE=tomcat7
+			elif [ "$tomcatMajorVersion" = "6" ]; then
+				SERVICE=tomcat6
+			fi
+		else
+			logMsgToConfigSysLog "ERROR" "ERROR: Provided Catalina Home is not correct. Please recheck."
+		fi
+	fi
+}
+
 #Get default location of tomcat home on various supported OS if user has not provided one
-getTomcatHome()
+assumeTomcatHome()
 {
 	#if user has not provided the catalina home
 	if [ "$LOGGLY_CATALINA_HOME" = "" ]; then
@@ -134,7 +225,7 @@ getTomcatHome()
 			*"Ubuntu"* )
 			LOGGLY_CATALINA_HOME="/var/lib/$1"
 			;;
-			*"Red Hat"* )
+			*"RedHat"* )
 			LOGGLY_CATALINA_HOME="/usr/share/$1"
 			;;
 			*"CentOS"* )
@@ -142,7 +233,6 @@ getTomcatHome()
 			;;
 		esac
 	fi
-	logMsgToConfigSysLog "INFO" "INFO: CATALINA HOME: $LOGGLY_CATALINA_HOME"
 }
 
 #checks if the catalina home is a valid one by searching for logging.properties and
@@ -151,14 +241,14 @@ checkIfValidTomcatHome()
 {
 	#check if logging.properties files  is present
 	if [ ! -f "$LOGGLY_CATALINA_HOME/conf/logging.properties" ]; then
-		logMsgToConfigSysLog "ERROR" "ERROR: Unable to find conf/logging.properties file within $LOGGLY_CATALINA_HOME. Please provide correct Catalina Home using -ch option."
-		exit 1
+		logMsgToConfigSysLog "WARN" "WARN: Unable to find conf/logging.properties file within $LOGGLY_CATALINA_HOME."
+		eval $1="false"
 	#check if tomcat is configured as a service. If no, then check if we have access to startup.sh file
 	elif [ ! -f /etc/init.d/$SERVICE ]; then
 		logMsgToConfigSysLog "INFO" "INFO: Tomcat is not configured as a service"
 		if [ ! -f "$LOGGLY_CATALINA_HOME/bin/startup.sh" ]; then
-			logMsgToConfigSysLog "ERROR" "ERROR: Unable to find bin/startup.sh file within $LOGGLY_CATALINA_HOME. Please provide correct Catalina Home using -ch option."
-			exit 1
+			logMsgToConfigSysLog "WARN" "WARN: Unable to find bin/startup.sh file within $LOGGLY_CATALINA_HOME."
+			eval $1="false"
 		fi
 	fi
 }
@@ -174,13 +264,17 @@ setTomcatVariables()
 
 	LOGGLY_CATALINA_LOG_HOME=/var/log/$SERVICE
 
+	#if tomcat is not installed as service, then tomcat logs will be created at would be $CATALINA_HOME/log
+	if [ ! -f "$LOGGLY_CATALINA_LOG_HOME" ]; then
+		LOGGLY_CATALINA_LOG_HOME=$LOGGLY_CATALINA_HOME/logs
+	fi
+
 	#default path for catalina.jar
 	CATALINA_JAR_PATH=$LOGGLY_CATALINA_HOME/lib/catalina.jar
 }
 
-#checks if the tomcat version is supported by this script, currently the script
-#only supports tomcat 6 and tomcat 7
-checkIfSupportedTomcatVersion()
+#get the version of tomcat
+getTomcatVersion()
 {
 	#check if the identified CATALINA_HOME has the catalina.jar
 	if [ ! -f "$CATALINA_JAR_PATH" ]; then
@@ -202,12 +296,17 @@ checkIfSupportedTomcatVersion()
 		TOMCAT_VERSION=${TOMCAT_VERSION#*: }
 		TOMCAT_VERSION=$TOMCAT_VERSION | tr -d ' '
 		APP_TAG="\"tomcat-version\":\"$TOMCAT_VERSION\""
+	fi
+}
 
-		tomcatMajorVersion=${TOMCAT_VERSION%%.*}
-		if [[ ($tomcatMajorVersion -ne 6 ) &&  ($tomcatMajorVersion -ne 7) ]]; then
-			echo "ERROR" "ERROR: This script only supports Tomcat version 6 or 7."
-			exit 1
-		fi
+#checks if the tomcat version is supported by this script, currently the script
+#only supports tomcat 6 and tomcat 7
+checkIfSupportedTomcatVersion()
+{
+	tomcatMajorVersion=${TOMCAT_VERSION%%.*}
+	if [[ ($tomcatMajorVersion -ne 6 ) &&  ($tomcatMajorVersion -ne 7) ]]; then
+		logMsgToConfigSysLog "ERROR" "ERROR: This script only supports Tomcat version 6 or 7."
+		exit 1
 	fi
 }
 
@@ -233,6 +332,21 @@ checkIfTomcatConfiguredWithLog4J()
 	logMsgToConfigSysLog "INFO" "INFO: Tomcat seems not to be configured with log4j logger."
 }
 
+canTomcatBeRestarted()
+{
+	while true; do
+		read -p "Tomcat needs to be restarted during configuration. Do you wish to continue? (yes/no)" yn
+		case $yn in
+			[Yy]* )
+			break;;
+			[Nn]* )
+			logMsgToConfigSysLog "WARN" "WARN: This script must restart Tomcat. Please run the script again when you are ready to restart it. No changes have been made to your system. Exiting."
+			exit 1
+			break;;
+			* ) echo "Please answer yes or no.";;
+		esac
+	done
+}
 #backup the logging.properties file in the CATALINA_HOME folder
 backupLoggingPropertiesFile()
 {
@@ -326,13 +440,12 @@ write21TomcatConfFile()
 #function to write the contents of tomcat syslog config file
 write21TomcatFileContents()
 {
-
 	logMsgToConfigSysLog "INFO" "INFO: Creating file $TOMCAT_SYSLOG_CONFFILE"
 	sudo touch $TOMCAT_SYSLOG_CONFFILE
 	sudo chmod o+w $TOMCAT_SYSLOG_CONFFILE
-	
+
 	imfileStr="\$ModLoad imfile
-	\$WorkDirectory $SYSLOG_DIR
+	\$WorkDirectory $RSYSLOG_DIR
 	"
 	if [[ "$LINUX_DIST" == *"Ubuntu"* ]]; then
 		imfileStr+="\$PrivDropToGroup adm
@@ -415,6 +528,9 @@ write21TomcatFileContents()
 sudo cat << EOIPFW >> $TOMCAT_SYSLOG_CONFFILE
 $imfileStr
 EOIPFW
+
+	#restart the syslog service.
+	restartRsyslog
 }
 
 #checks if the tomcat logs made to loggly
@@ -434,9 +550,7 @@ checkIfTomcatLogsMadeToLoggly()
 	#get the initial count of tomcat logs for past 15 minutes
 	searchAndFetch tomcatInitialLogCount "$queryUrl"
 
-	logMsgToConfigSysLog "INFO" "INFO: Restarting rsyslog and tomcat to generate logs for verification."
-	# restart the syslog service.
-	restartRsyslog
+	logMsgToConfigSysLog "INFO" "INFO: Tomcat needs to be restarted to complete the configuration and verification."
 	# restart the tomcat service.
 	restartTomcat
 
@@ -454,7 +568,7 @@ checkIfTomcatLogsMadeToLoggly()
 		searchAndFetch tomcatLatestLogCount "$queryUrl"
 		let counter=$counter+1
 		if [ "$counter" -gt "$maxCounter" ]; then
-			logMsgToConfigSysLog "ERROR" "ERROR: Tomcat logs did not make to Loggly in time. Please check your token & network/firewall settings and retry."
+			logMsgToConfigSysLog "ERROR" "ERROR: Tomcat logs did not make to Loggly in time. Please check network and firewall settings and retry."
 			exit 1
 		fi
 	done
@@ -474,6 +588,9 @@ restoreLogglyPropertiesFile()
 		sudo cp -f $LOGGLY_CATALINA_BACKUP_PROPFILE $LOGGLY_CATALINA_PROPFILE
 		sudo rm -fr $LOGGLY_CATALINA_BACKUP_PROPFILE
 	fi
+	
+	logMsgToConfigSysLog "INFO" "INFO: Tomcat needs to be restarted to rollback the configuration."
+	restartTomcat
 }
 
 #remove 21tomcat.conf file
@@ -483,8 +600,9 @@ remove21TomcatConfFile()
 	if [ -f "$TOMCAT_SYSLOG_CONFFILE" ]; then
 		sudo rm -rf "$TOMCAT_SYSLOG_CONFFILE"
 	fi
-	echo "INFO: Removed all the modified files."
-	restartTomcat
+	
+	#restart rsyslog
+	restartRsyslog	
 }
 
 #restart tomcat
@@ -502,7 +620,6 @@ restartTomcat()
 			fi
 		else
 			logMsgToConfigSysLog "INFO" "INFO: $SERVICE is not running as service."
-			# To be commented only for test
 			logMsgToConfigSysLog "INFO" "INFO: Shutting down tomcat."
 			sudo $LOGGLY_CATALINA_HOME/bin/shutdown.sh
 			if [ $? -ne 0 ]; then
@@ -526,9 +643,9 @@ restartTomcat()
 usage()
 {
 cat << EOF
-usage: ltomcatsetup [-a loggly auth account or subdomain] [-t loggly token] [-u username] [-p password (optional)] [-ch catalina home (optional)]
-usage: ltomcatsetup [-r to rollback] [-ch catalina home (optional)]
-usage: ltomcatsetup [-h for help]
+usage: configure-tomcat [-a loggly auth account or subdomain] [-t loggly token (optional)] [-u username] [-p password (optional)] [-ch catalina home (optional)]
+usage: configure-tomcat [-r to rollback] [-a loggly auth account or subdomain] [-ch catalina home (optional)]
+usage: configure-tomcat [-h for help]
 EOF
 }
 
@@ -571,17 +688,17 @@ while [ "$1" != "" ]; do
 done
 fi
 
-if [ "$LOGGLY_DEBUG" != ""  -a  "$LOGGLY_AUTH_TOKEN" != "" -a "$LOGGLY_ACCOUNT" != "" -a "$LOGGLY_USERNAME" != "" ]; then
+if [ "$LOGGLY_DEBUG" != ""  -a  "$LOGGLY_ACCOUNT" != "" -a "$LOGGLY_USERNAME" != "" ]; then
 	if [ "$LOGGLY_PASSWORD" = "" ]; then
 		getPassword
 	fi
     debug
-elif [ "$LOGGLY_AUTH_TOKEN" != "" -a "$LOGGLY_ACCOUNT" != "" -a "$LOGGLY_USERNAME" != "" ]; then
+elif [ "$LOGGLY_ACCOUNT" != "" -a "$LOGGLY_USERNAME" != "" ]; then
 	if [ "$LOGGLY_PASSWORD" = "" ]; then
 		getPassword
 	fi
     installLogglyConfForTomcat
-elif [ "$LOGGLY_ROLLBACK" != "" ]; then
+elif [ "$LOGGLY_ROLLBACK" != "" -a "$LOGGLY_ACCOUNT" != "" ]; then
     removeLogglyConfForTomcat
 else
 	usage
