@@ -15,7 +15,7 @@ function ctrl_c()  {
 #name of the current script. This will get overwritten by the child script which calls this
 SCRIPT_NAME=configure-linux.sh
 #version of the current script. This will get overwritten by the child script which calls this
-SCRIPT_VERSION=1.7
+SCRIPT_VERSION=1.8
 
 #application tag. This will get overwritten by the child script which calls this
 APP_TAG=
@@ -204,6 +204,9 @@ checkIfSupportedOS()
 		;;
 		*"centos"* )
 		echo "INFO: Operating system is CentOS."
+		;;
+		*"debian"* )
+		echo "INFO: Operating system is Debian."
 		;;
 		*"amazon"* )
 		echo "INFO: Operating system is Amazon AMI."
