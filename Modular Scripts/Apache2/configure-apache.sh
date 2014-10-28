@@ -9,7 +9,7 @@ source configure-linux.sh "being-invoked"
 #name of the current script
 SCRIPT_NAME=configure-apache.sh
 #version of the current script
-SCRIPT_VERSION=1.2
+SCRIPT_VERSION=1.3
 
 #we have not found the apache version yet at this point in the script
 APP_TAG="\"apache-version\":\"\""
@@ -75,7 +75,7 @@ installLogglyConfForApache()
 	checkIfApacheLogsMadeToLoggly
 
 	#log success message
-	logMsgToConfigSysLog "SUCCESS" "SUCCESS: Apache successfully configured to send logs via Loggly."
+	logMsgToConfigSysLog "SUCCESS" "SUCCESS: Apache successfully configured to send logs to Loggly."
 }
 
 #executing script to remove loggly configuration for Apache
@@ -297,14 +297,28 @@ checkIfApacheLogsMadeToLoggly()
 		searchAndFetch apacheLatestLogCount "$queryUrl"
 		let counter=$counter+1
 		if [ "$counter" -gt "$maxCounter" ]; then
-			logMsgToConfigSysLog "ERROR" "ERROR: Apache logs did not make to Loggly in time. Please check network and firewall settings and retry."
-			exit 1
+			logMsgToConfigSysLog  "ERROR" "ERROR: Apache logs did not make to Loggly in time. Please check network and firewall settings and retry."
+            exit 1
 		fi
 	done
 
 	if [ "$apacheLatestLogCount" -gt "$apacheInitialLogCount" ]; then
-		logMsgToConfigSysLog "SUCCESS" "SUCCESS: Apache logs successfully transferred to Loggly! You are now sending Apache logs to Loggly."
-		exit 0
+		logMsgToConfigSysLog "INFO" "INFO: Apache logs successfully transferred to Loggly! You are now sending Apache logs to Loggly."
+		checkIfLogsAreParsedInLoggly
+	fi
+}
+#verifying if the logs are being parsed or not
+checkIfLogsAreParsedInLoggly()
+{
+	apacheInitialLogCount=0
+	queryParam="tag%3Aapache%20logtype%3Aapache&from=-15m&until=now&size=1"
+	queryUrl="$LOGGLY_ACCOUNT_URL/apiv2/search?q=$queryParam"
+	searchAndFetch apacheInitialLogCount "$queryUrl"
+	logMsgToConfigSysLog "INFO" "INFO: Verifying if the Apache logs are parsed in Loggly."
+	if [ "$apacheInitialLogCount" -gt 0 ]; then  
+		logMsgToConfigSysLog "INFO" "INFO: Apache logs successfully parsed in Loggly!"
+	else
+		logMsgToConfigSysLog "WARN" "WARN: We received your logs but they do not appear to use one of our automatically parsed formats. You can still do full text search and counts on these logs, but you won't be able to use our field explorer. Please consider switching to one of our automated formats https://www.loggly.com/docs/automated-parsing/"
 	fi
 }
 
