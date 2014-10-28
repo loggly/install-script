@@ -15,7 +15,7 @@ function ctrl_c()  {
 #name of the current script. This will get overwritten by the child script which calls this
 SCRIPT_NAME=configure-linux.sh
 #version of the current script. This will get overwritten by the child script which calls this
-SCRIPT_VERSION=1.8
+SCRIPT_VERSION=1.9
 
 #application tag. This will get overwritten by the child script which calls this
 APP_TAG=
@@ -31,6 +31,8 @@ LOGGLY_RSYSLOG_CONFFILE_BACKUP=$LOGGLY_RSYSLOG_CONFFILE.loggly.bk
 RSYSLOG_DIR=/var/spool/rsyslog
 #rsyslog service name
 RSYSLOG_SERVICE=rsyslog
+#syslog-ng
+SYSLOG_NG_SERVICE=syslog-ng
 #rsyslogd
 RSYSLOGD=rsyslogd
 #minimum version of rsyslog to enable logging to loggly
@@ -356,6 +358,7 @@ checkIfRsyslogConfiguredAsService()
 	if [ -f /etc/init.d/$RSYSLOG_SERVICE ]; then
 		logMsgToConfigSysLog "INFO" "INFO: $RSYSLOG_SERVICE is present as service."
 	else
+		checkifSyslogNgConfiguredAsService
 		logMsgToConfigSysLog "ERROR" "ERROR: $RSYSLOG_SERVICE is not present as service."
 		exit 1
 	fi
@@ -366,6 +369,13 @@ checkIfRsyslogConfiguredAsService()
 	fi
 }
 
+checkifSyslogNgConfiguredAsService()
+{
+	if [ -f /etc/init.d/$SYSLOG_NG_SERVICE ]; then
+		logMsgToConfigSysLog "ERROR" "ERROR: This script does not currently support syslog-ng. Please follow the instructions on this page https://www.loggly.com/docs/syslog-ng-manual-configuration"
+		exit 1
+	fi
+}
 
 #check if multiple versions of rsyslog is configured
 checkIfMultipleRsyslogConfigured()
@@ -627,6 +637,7 @@ logMsgToConfigSysLog()
 	#if it is a success, then log message "Script Succeeded" to config syslog and exit the script
 	if [[ $cslStatus == "SUCCESS" ]]; then
 		sendPayloadToConfigSysLog "SUCCESS" "Script Succeeded" "$enabler"
+		exit 0
 	fi
 }
 
