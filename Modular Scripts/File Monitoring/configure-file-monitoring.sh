@@ -9,7 +9,7 @@ source configure-linux.sh "being-invoked"
 #name of the current script
 SCRIPT_NAME=configure-file-monitoring.sh
 #version of the current script
-SCRIPT_VERSION=1.5
+SCRIPT_VERSION=1.6
 
 #file to monitor (contains complete path and file name) provided by user
 LOGGLY_FILE_TO_MONITOR=
@@ -77,9 +77,11 @@ installLogglyConfForFile()
 
 	#verify if the file logs made it to loggly
 	checkIfFileLogsMadeToLoggly
-
-	#log success message
-	logMsgToConfigSysLog "SUCCESS" "SUCCESS: Successfully configured to send $LOGGLY_FILE_TO_MONITOR logs via Loggly."
+	
+	if [ "$IS_FILE_MONITOR_SCRIPT_INVOKED" = "false" ]; then
+			#log success message
+			logMsgToConfigSysLog "SUCCESS" "SUCCESS: Successfully configured to send $LOGGLY_FILE_TO_MONITOR logs via Loggly."
+	fi
 }
 
 #executing script to remove loggly configuration for File
@@ -293,13 +295,23 @@ checkIfFileLogsMadeToLoggly()
 	done
 
 	if [ "$fileLatestLogCount" -gt "$fileInitialLogCount" ]; then
-		logMsgToConfigSysLog "SUCCESS" "SUCCESS: Logs successfully transferred to Loggly! You are now sending $LOGGLY_FILE_TO_MONITOR logs to Loggly."
-		if [ "$IS_FILE_MONITOR_SCRIPT_INVOKED" = "false" ]; then
-			exit 0
-		fi
+		logMsgToConfigSysLog "INFO" "INFO: Logs successfully transferred to Loggly! You are now sending $LOGGLY_FILE_TO_MONITOR logs to Loggly."
+		checkIfLogsAreParsedInLoggly
 	fi
 }
-
+#verifying if the logs are being parsed or not
+checkIfLogsAreParsedInLoggly()
+{
+	fileInitialLogCount=0
+	queryParam="syslog.appName%3A$LOGGLY_FILE_TO_MONITOR_ALIAS%20tag%3A$LOGGLY_FILE_TAG&from=-15m&until=now&size=1"
+	queryUrl="$LOGGLY_ACCOUNT_URL/apiv2/search?q=$queryParam"
+	searchAndFetch fileInitialLogCount "$queryUrl"
+	if [ "$fileInitialLogCount" -gt 0 ]; then  
+		logMsgToConfigSysLog "INFO" "INFO: File logs successfully parsed in Loggly!"
+	else
+		logMsgToConfigSysLog "WARN" "WARN: We received your logs but they do not appear to use one of our automatically parsed formats. You can still do full text search and counts on these logs, but you won't be able to use our field explorer. Please consider switching to one of our automated formats https://www.loggly.com/docs/automated-parsing/"
+	fi
+}
 #checks if the conf file exist. Name of conf file is constructed using the file alias name provided
 checkIfConfFileExist()
 {
