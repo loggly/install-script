@@ -9,7 +9,7 @@ source configure-linux.sh "being-invoked"
 #name of the current script
 SCRIPT_NAME=configure-nginx.sh
 #version of the current script
-SCRIPT_VERSION=1.0
+SCRIPT_VERSION=1.1
 
 #we have not found the nginx version yet at this point in the script
 APP_TAG="\"nginx-version\":\"\""
@@ -73,9 +73,10 @@ installLogglyConfForNginx()
 	
 	#verify if the nginx logs made it to loggly
 	checkIfNginxLogsMadeToLoggly
+	
 
 	#log success message
-	logMsgToConfigSysLog "SUCCESS" "SUCCESS: Nginx successfully configured to send logs via Loggly."
+	logMsgToConfigSysLog "SUCCESS" "SUCCESS: Nginx successfully configured to send logs to Loggly."
 }
 
 #executing script to remove loggly configuration for Nginx
@@ -229,7 +230,6 @@ EOIPFW
 	restartRsyslog
 }
 
-
 #checks if the nginx logs made to loggly
 checkIfNginxLogsMadeToLoggly()
 {
@@ -267,8 +267,23 @@ checkIfNginxLogsMadeToLoggly()
 	done
 
 	if [ "$nginxLatestLogCount" -gt "$nginxInitialLogCount" ]; then
-		logMsgToConfigSysLog "SUCCESS" "SUCCESS: nginx logs successfully transferred to Loggly! You are now sending nginx logs to Loggly."
-		exit 0
+		logMsgToConfigSysLog "INFO" "INFO: Nginx logs successfully transferred to Loggly! You are now sending Nginx logs to Loggly."
+		checkIfLogsAreParsedInLoggly
+	fi
+}
+
+#verifying if the logs are being parsed or not
+checkIfLogsAreParsedInLoggly()
+{
+	nginxInitialLogCount=0
+	queryParam="tag%3Anginx%20logtype%3Anginx&from=-15m&until=now&size=1"
+	queryUrl="$LOGGLY_ACCOUNT_URL/apiv2/search?q=$queryParam"
+	searchAndFetch nginxInitialLogCount "$queryUrl"
+	logMsgToConfigSysLog "INFO" "INFO: Verifying if the Nginx logs are parsed in Loggly."
+	if [ "$nginxInitialLogCount" -gt 0 ]; then  
+		logMsgToConfigSysLog "INFO" "INFO: Nginx logs successfully parsed in Loggly!"
+	else
+		logMsgToConfigSysLog "WARN" "WARN: We received your logs but they do not appear to use one of our automatically parsed formats. You can still do full text search and counts on these logs, but you won't be able to use our field explorer. Please consider switching to one of our automated formats https://www.loggly.com/docs/automated-parsing/"
 	fi
 }
 
