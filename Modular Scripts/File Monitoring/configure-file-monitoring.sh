@@ -9,7 +9,7 @@ source configure-linux.sh "being-invoked"
 #name of the current script
 SCRIPT_NAME=configure-file-monitoring.sh
 #version of the current script
-SCRIPT_VERSION=1.6
+SCRIPT_VERSION=1.7
 
 #file to monitor (contains complete path and file name) provided by user
 LOGGLY_FILE_TO_MONITOR=
@@ -149,20 +149,25 @@ checkIfFileAliasExist()
 {
 	if [ -f "$FILE_SYSLOG_CONFFILE" ]; then
 		logMsgToConfigSysLog "WARN" "WARN: This file alias is already taken. You must choose a unique file alias for each file."
-		while true; do
-			read -p "Would you like to overwrite the configuration for this file alias (yes/no)?" yn
-			case $yn in
-				[Yy]* )
-				logMsgToConfigSysLog "INFO" "INFO: Going to back up the conf file: $FILE_SYSLOG_CONFFILE to $FILE_SYSLOG_CONFFILE_BACKUP";
-				sudo mv -f $FILE_SYSLOG_CONFFILE $FILE_SYSLOG_CONFFILE_BACKUP;
-				break;;
-				[Nn]* )
-				logMsgToConfigSysLog "INFO" "INFO: Not overwriting the existing configuration. Exiting"
-				exit 1
-				break;;
-				* ) echo "Please answer yes or no.";;
-			esac
-		done
+		if [ "$SUPPRESS_PROMPT" == "false" ]; then
+			while true; do
+				read -p "Would you like to overwrite the configuration for this file alias (yes/no)?" yn
+				case $yn in
+					[Yy]* )
+					logMsgToConfigSysLog "INFO" "INFO: Going to back up the conf file: $FILE_SYSLOG_CONFFILE to $FILE_SYSLOG_CONFFILE_BACKUP";
+					sudo mv -f $FILE_SYSLOG_CONFFILE $FILE_SYSLOG_CONFFILE_BACKUP;
+					break;;
+					[Nn]* )
+					logMsgToConfigSysLog "INFO" "INFO: Not overwriting the existing configuration. Exiting"
+					exit 1
+					break;;
+					* ) echo "Please answer yes or no.";;
+				esac
+			done
+		else
+			logMsgToConfigSysLog "INFO" "INFO: Going to back up the conf file: $FILE_SYSLOG_CONFFILE to $FILE_SYSLOG_CONFFILE_BACKUP";
+			sudo mv -f $FILE_SYSLOG_CONFFILE $FILE_SYSLOG_CONFFILE_BACKUP;
+		fi
 	fi
 }
 
@@ -172,20 +177,24 @@ checkLogFileSize()
 {
 	monitorFileSize=$(wc -c "$1" | cut -f 1 -d ' ')
 	if [ $monitorFileSize -ge 102400000 ]; then
-		logMsgToConfigSysLog "INFO" "INFO: "
-		while true; do
-			read -p "WARN: There are currently large log files which may use up your allowed volume. Please rotate your logs before continuing. Would you like to continue now anyway? (yes/no)" yn
-			case $yn in
-				[Yy]* )
-				logMsgToConfigSysLog "INFO" "INFO: Current size of $LOGGLY_FILE_TO_MONITOR is $monitorFileSize bytes. Continuing with File Loggly configuration.";
-				break;;
-				[Nn]* )
-				logMsgToConfigSysLog "INFO" "INFO: Current size of $LOGGLY_FILE_TO_MONITOR is $monitorFileSize bytes. Discontinuing with File Loggly configuration."
-				exit 1
-				break;;
-				* ) echo "Please answer yes or no.";;
-			esac
-		done
+		if [ "$SUPPRESS_PROMPT" == "false" ]; then
+			while true; do
+				read -p "WARN: There are currently large log files which may use up your allowed volume. Please rotate your logs before continuing. Would you like to continue now anyway? (yes/no)" yn
+				case $yn in
+					[Yy]* )
+					logMsgToConfigSysLog "INFO" "INFO: Current size of $LOGGLY_FILE_TO_MONITOR is $monitorFileSize bytes. Continuing with File Loggly configuration.";
+					break;;
+					[Nn]* )
+					logMsgToConfigSysLog "INFO" "INFO: Current size of $LOGGLY_FILE_TO_MONITOR is $monitorFileSize bytes. Discontinuing with File Loggly configuration."
+					exit 1
+					break;;
+					* ) echo "Please answer yes or no.";;
+				esac
+			done
+		else
+			logMsgToConfigSysLog "WARN" "WARN: There are currently large log files which may use up your allowed volume."
+			logMsgToConfigSysLog "INFO" "INFO: Current size of $LOGGLY_FILE_TO_MONITOR is $monitorFileSize bytes. Continuing with File Loggly configuration.";
+		fi
 	elif [ $monitorFileSize -eq 0 ]; then
 		logMsgToConfigSysLog "WARN" "WARN: There are no recent logs from $LOGGLY_FILE_TO_MONITOR so there won't be any data sent to Loggly. You can generate some logs by writing to this file."
 		exit 1
@@ -200,7 +209,6 @@ checkFileReadPermission()
 {
 	
 	LINUX_DIST_IN_LOWER_CASE=$(echo $LINUX_DIST | tr "[:upper:]" "[:lower:]")
-	
 	#no need to check read permissions with RedHat and CentOS as they also work with ---------- (000)permissions
 	case "$LINUX_DIST_IN_LOWER_CASE" in
 		*"redhat"* )
@@ -339,7 +347,7 @@ remove21ConfFile()
 usage()
 {
 cat << EOF
-usage: configure-file-monitoring [-a loggly auth account or subdomain] [-t loggly token (optional)] [-u username] [-p password (optional)] [-f filename] [-tag filetag (optional)] [-l filealias]
+usage: configure-file-monitoring [-a loggly auth account or subdomain] [-t loggly token (optional)] [-u username] [-p password (optional)] [-f filename] [-tag filetag (optional)] [-l filealias] [-s suppress prompts {optional)]
 usage: configure-file-monitoring [-a loggly auth account or subdomain] [-r to rollback] [-l filealias]
 usage: configure-file-monitoring [-h for help]
 EOF
@@ -384,6 +392,9 @@ if [ "$1" != "being-invoked" ]; then
 		 -tag| --filetag ) shift
 			  LOGGLY_FILE_TAG=$1
 			  echo "File tag: $LOGGLY_FILE_TAG"
+			  ;;
+		  -s | --suppress )
+			  SUPPRESS_PROMPT="true"
 			  ;;
 		  -h | --help)
 			  usage
