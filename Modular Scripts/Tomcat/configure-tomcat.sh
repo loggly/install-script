@@ -9,7 +9,7 @@ source configure-linux.sh "being-invoked"
 #name of the current script
 SCRIPT_NAME=configure-tomcat.sh
 #version of the current script
-SCRIPT_VERSION=1.1
+SCRIPT_VERSION=1.2
 
 #minimum version of tomcat to enable log rotation
 MIN_TOMCAT_VERSION=6.0.33.0
@@ -334,18 +334,22 @@ checkIfTomcatConfiguredWithLog4J()
 
 canTomcatBeRestarted()
 {
-	while true; do
-		read -p "Tomcat needs to be restarted during configuration. Do you wish to continue? (yes/no)" yn
-		case $yn in
-			[Yy]* )
-			break;;
-			[Nn]* )
-			logMsgToConfigSysLog "WARN" "WARN: This script must restart Tomcat. Please run the script again when you are ready to restart it. No changes have been made to your system. Exiting."
-			exit 1
-			break;;
-			* ) echo "Please answer yes or no.";;
-		esac
-	done
+	if [ "$SUPPRESS_PROMPT" == "false" ]; then
+		while true; do
+			read -p "Tomcat needs to be restarted during configuration. Do you wish to continue? (yes/no)" yn
+			case $yn in
+				[Yy]* )
+				break;;
+				[Nn]* )
+				logMsgToConfigSysLog "WARN" "WARN: This script must restart Tomcat. Please run the script again when you are ready to restart it. No changes have been made to your system. Exiting."
+				exit 1
+				break;;
+				* ) echo "Please answer yes or no.";;
+			esac
+		done
+	else
+		logMsgToConfigSysLog "WARN" "WARN:Tomcat needs to be restarted during configuration."
+	fi
 }
 #backup the logging.properties file in the CATALINA_HOME folder
 backupLoggingPropertiesFile()
@@ -420,18 +424,24 @@ write21TomcatConfFile()
 	echo "INFO: Checking if tomcat sysconf file $TOMCAT_SYSLOG_CONFFILE exist."
 	if [ -f "$TOMCAT_SYSLOG_CONFFILE" ]; then
 	   logMsgToConfigSysLog "WARN" "WARN: Tomcat syslog file $TOMCAT_SYSLOG_CONFFILE already exist."
-		while true; do
-			read -p "Do you wish to override $TOMCAT_SYSLOG_CONFFILE? (yes/no)" yn
-			case $yn in
-				[Yy]* )
-				logMsgToConfigSysLog "INFO" "INFO: Going to back up the conf file: $TOMCAT_SYSLOG_CONFFILE to $TOMCAT_SYSLOG_CONFFILE_BACKUP";
-				sudo mv -f $TOMCAT_SYSLOG_CONFFILE $TOMCAT_SYSLOG_CONFFILE_BACKUP;
-				write21TomcatFileContents;
-				break;;
-				[Nn]* ) break;;
-				* ) echo "Please answer yes or no.";;
-			esac
-		done
+	   if [ "$SUPPRESS_PROMPT" == "false" ]; then
+			while true; do
+				read -p "Do you wish to override $TOMCAT_SYSLOG_CONFFILE? (yes/no)" yn
+				case $yn in
+					[Yy]* )
+					logMsgToConfigSysLog "INFO" "INFO: Going to back up the conf file: $TOMCAT_SYSLOG_CONFFILE to $TOMCAT_SYSLOG_CONFFILE_BACKUP";
+					sudo mv -f $TOMCAT_SYSLOG_CONFFILE $TOMCAT_SYSLOG_CONFFILE_BACKUP;
+					write21TomcatFileContents;
+					break;;
+					[Nn]* ) break;;
+					* ) echo "Please answer yes or no.";;
+				esac
+			done
+	   else
+			logMsgToConfigSysLog "INFO" "INFO: Going to back up the conf file: $TOMCAT_SYSLOG_CONFFILE to $TOMCAT_SYSLOG_CONFFILE_BACKUP";
+			sudo mv -f $TOMCAT_SYSLOG_CONFFILE $TOMCAT_SYSLOG_CONFFILE_BACKUP;
+			write21TomcatFileContents;
+	   fi
 	else
 		write21TomcatFileContents
 	fi
@@ -643,7 +653,7 @@ restartTomcat()
 usage()
 {
 cat << EOF
-usage: configure-tomcat [-a loggly auth account or subdomain] [-t loggly token (optional)] [-u username] [-p password (optional)] [-ch catalina home (optional)]
+usage: configure-tomcat [-a loggly auth account or subdomain] [-t loggly token (optional)] [-u username] [-p password (optional)] [-ch catalina home (optional)] [-s suppress prompts {optional)]
 usage: configure-tomcat [-r to rollback] [-a loggly auth account or subdomain] [-ch catalina home (optional)]
 usage: configure-tomcat [-h for help]
 EOF
@@ -679,6 +689,9 @@ while [ "$1" != "" ]; do
       -r | --rollback )
 		  LOGGLY_ROLLBACK="true"
           ;;
+	  -s | --suppress )
+		  SUPPRESS_PROMPT="true"
+		  ;;
       -h | --help)
           usage
           exit
