@@ -15,7 +15,7 @@ function ctrl_c()  {
 #name of the current script. This will get overwritten by the child script which calls this
 SCRIPT_NAME=configure-linux.sh
 #version of the current script. This will get overwritten by the child script which calls this
-SCRIPT_VERSION=1.9
+SCRIPT_VERSION=1.10
 
 #application tag. This will get overwritten by the child script which calls this
 APP_TAG=
@@ -68,6 +68,9 @@ LOGGLY_USERNAME=
 #this variable will hold the password provided by user
 #this is a mandatory input
 LOGGLY_PASSWORD=
+
+#if this variable is set to true then suppress all prompts
+SUPPRESS_PROMPT="false"
 
 #variables used in 22-loggly.conf file
 LOGGLY_SYSLOG_PORT=514
@@ -220,17 +223,19 @@ checkIfSupportedOS()
 		;;
 		* )
 		logMsgToConfigSysLog "WARN" "WARN: The linux distribution '$LINUX_DIST' has not been previously tested with Loggly."
-		while true; do
-			read -p "Would you like to continue anyway? (yes/no)" yn
-			case $yn in
-				[Yy]* )
-				break;;
-				[Nn]* )
-				exit 1	
-				;;
-				* ) echo "Please answer yes or no.";;
-			esac
-		done
+		if [ "$SUPPRESS_PROMPT" == "false" ]; then
+			while true; do
+				read -p "Would you like to continue anyway? (yes/no)" yn
+				case $yn in
+					[Yy]* )
+					break;;
+					[Nn]* )
+					exit 1	
+					;;
+					* ) echo "Please answer yes or no.";;
+				esac
+			done
+		fi
 		;;
 	esac
 }
@@ -456,22 +461,28 @@ checkIfConfigurationChanged()
 	
 	if [ "$ASK_FOR_VERIFICATION" == "true" ]; then
 		logMsgToConfigSysLog "WARN" "WARN: Loggly rsyslog file /etc/rsyslog.d/22-loggly.conf content has changed."
-		while true; 
-		do
-			read -p "Do you wish to override $LOGGLY_RSYSLOG_CONFFILE and re-verify configuration? (yes/no)" yn
-			case $yn in
-				[Yy]* )
-				logMsgToConfigSysLog "INFO" "INFO: Going to back up the conf file: $LOGGLY_RSYSLOG_CONFFILE to $LOGGLY_RSYSLOG_CONFFILE_BACKUP";
-				sudo mv -f $LOGGLY_RSYSLOG_CONFFILE $LOGGLY_RSYSLOG_CONFFILE_BACKUP;
-				checkAuthTokenAndWriteContents;
-				break;;
-				[Nn]* )
-				LINUX_DO_VERIFICATION="false"
-				logMsgToConfigSysLog "INFO" "INFO: Skipping Linux verification."
-				break;;
-				* ) echo "Please answer yes or no.";;
-			esac
-		done
+		if [ "$SUPPRESS_PROMPT" == "false" ]; then
+			while true; 
+			do
+				read -p "Do you wish to override $LOGGLY_RSYSLOG_CONFFILE and re-verify configuration? (yes/no)" yn
+				case $yn in
+					[Yy]* )
+					logMsgToConfigSysLog "INFO" "INFO: Going to back up the conf file: $LOGGLY_RSYSLOG_CONFFILE to $LOGGLY_RSYSLOG_CONFFILE_BACKUP";
+					sudo mv -f $LOGGLY_RSYSLOG_CONFFILE $LOGGLY_RSYSLOG_CONFFILE_BACKUP;
+					checkAuthTokenAndWriteContents;
+					break;;
+					[Nn]* )
+					LINUX_DO_VERIFICATION="false"
+					logMsgToConfigSysLog "INFO" "INFO: Skipping Linux verification."
+					break;;
+					* ) echo "Please answer yes or no.";;
+				esac
+			done
+		else
+			logMsgToConfigSysLog "INFO" "INFO: Going to back up the conf file: $LOGGLY_RSYSLOG_CONFFILE to $LOGGLY_RSYSLOG_CONFFILE_BACKUP";
+			sudo mv -f $LOGGLY_RSYSLOG_CONFFILE $LOGGLY_RSYSLOG_CONFFILE_BACKUP;
+			checkAuthTokenAndWriteContents;
+		fi
 	else
 		LINUX_DO_VERIFICATION="false"
 	fi
@@ -701,7 +712,7 @@ getPassword()
 usage()
 {
 cat << EOF
-usage: configure-linux [-a loggly auth account or subdomain] [-t loggly token (optional)] [-u username] [-p password (optional)]
+usage: configure-linux [-a loggly auth account or subdomain] [-t loggly token (optional)] [-u username] [-p password (optional)] [-s suppress prompts {optional)]
 usage: configure-linux [-a loggly auth account or subdomain] [-r to remove]
 usage: configure-linux [-h for help]
 EOF
@@ -732,6 +743,9 @@ if [ "$1" != "being-invoked" ]; then
 				;;
 			-r | --remove )
 				LOGGLY_REMOVE="true"
+				;;
+			-s | --suppress )
+				SUPPRESS_PROMPT="true"
 				;;
 			-h | --help)
 				usage
