@@ -498,7 +498,7 @@ inputStr="
 #          -------------------------------------------------------
 
 # Define the template used for sending logs to Loggly. Do not change this format.
-\$template LogglyFormat,\"<%pri%>%protocol-version% %timestamp:::date-rfc3339% %HOSTNAME% %app-name% %procid% %msgid% [$2@$3] %msg%\"
+\$template LogglyFormat,\"<%pri%>%protocol-version% %timestamp:::date-rfc3339% %HOSTNAME% %app-name% %procid% %msgid% [$2@$3] %msg%\n\"
 
 # Send messages to Loggly over TCP using the template.
 *.*             @@$4:$5;LogglyFormat
