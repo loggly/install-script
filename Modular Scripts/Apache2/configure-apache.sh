@@ -9,7 +9,7 @@ source configure-linux.sh "being-invoked"
 #name of the current script
 SCRIPT_NAME=configure-apache.sh
 #version of the current script
-SCRIPT_VERSION=1.3
+SCRIPT_VERSION=1.4
 
 #we have not found the apache version yet at this point in the script
 APP_TAG="\"apache-version\":\"\""
@@ -172,20 +172,24 @@ checkLogFileSize()
 	errorFileSize=$(wc -c "$2" | cut -f 1 -d ' ')
 	fileSize=$((accessFileSize+errorFileSize))
 	if [ $fileSize -ge 102400000 ]; then
-		logMsgToConfigSysLog "INFO" "INFO: "
-		while true; do
-			read -p "WARN: There are currently large log files which may use up your allowed volume. Please rotate your logs before continuing. Would you like to continue now anyway? (yes/no)" yn
-			case $yn in
-				[Yy]* )
-				logMsgToConfigSysLog "INFO" "INFO: Current apache logs size is $fileSize bytes. Continuing with Apache Loggly configuration.";
-				break;;
-				[Nn]* ) 
-				logMsgToConfigSysLog "INFO" "INFO: Current apache logs size is $fileSize bytes. Discontinuing with Apache Loggly configuration."
-				exit 1
-				break;;
-				* ) echo "Please answer yes or no.";;
-			esac
-		done
+		if [ "$SUPPRESS_PROMPT" == "false" ]; then
+			while true; do
+				read -p "WARN: There are currently large log files which may use up your allowed volume. Please rotate your logs before continuing. Would you like to continue now anyway? (yes/no)" yn
+				case $yn in
+					[Yy]* )
+					logMsgToConfigSysLog "INFO" "INFO: Current apache logs size is $fileSize bytes. Continuing with Apache Loggly configuration.";
+					break;;
+					[Nn]* ) 
+					logMsgToConfigSysLog "INFO" "INFO: Current apache logs size is $fileSize bytes. Discontinuing with Apache Loggly configuration."
+					exit 1
+					break;;
+					* ) echo "Please answer yes or no.";;
+				esac
+			done
+		else
+			logMsgToConfigSysLog "WARN" "WARN: There are currently large log files which may use up your allowed volume."
+			logMsgToConfigSysLog "INFO" "INFO: Current apache logs size is $fileSize bytes. Continuing with Apache Loggly configuration."
+		fi
 	elif [ $fileSize -eq 0 ]; then
 		logMsgToConfigSysLog "WARN" "WARN: There are no recent logs from Apache there so won't be any sent to Loggly. You can generate some logs by visiting a page on your web server."
 		exit 1
@@ -197,19 +201,26 @@ write21ApacheConfFile()
 	#Create apache syslog config file if it doesn't exist
 	echo "INFO: Checking if apache sysconf file $APACHE_SYSLOG_CONFFILE exist."
 	if [ -f "$APACHE_SYSLOG_CONFFILE" ]; then
+	   
 	   logMsgToConfigSysLog "WARN" "WARN: Apache syslog file $APACHE_SYSLOG_CONFFILE already exist."
-		while true; do
-			read -p "Do you wish to override $APACHE_SYSLOG_CONFFILE? (yes/no)" yn
-			case $yn in
-				[Yy]* )
-				logMsgToConfigSysLog "INFO" "INFO: Going to back up the conf file: $APACHE_SYSLOG_CONFFILE to $APACHE_SYSLOG_CONFFILE_BACKUP";
-				sudo mv -f $APACHE_SYSLOG_CONFFILE $APACHE_SYSLOG_CONFFILE_BACKUP;
-				write21ApacheFileContents;
-				break;;
-				[Nn]* ) break;;
-				* ) echo "Please answer yes or no.";;
-			esac
-		done
+	   if [ "$SUPPRESS_PROMPT" == "false" ]; then
+			while true; do
+				read -p "Do you wish to override $APACHE_SYSLOG_CONFFILE? (yes/no)" yn
+				case $yn in
+					[Yy]* )
+					logMsgToConfigSysLog "INFO" "INFO: Going to back up the conf file: $APACHE_SYSLOG_CONFFILE to $APACHE_SYSLOG_CONFFILE_BACKUP";
+					sudo mv -f $APACHE_SYSLOG_CONFFILE $APACHE_SYSLOG_CONFFILE_BACKUP;
+					write21ApacheFileContents;
+					break;;
+					[Nn]* ) break;;
+					* ) echo "Please answer yes or no.";;
+				esac
+			done
+	   else
+			logMsgToConfigSysLog "INFO" "INFO: Going to back up the conf file: $APACHE_SYSLOG_CONFFILE to $APACHE_SYSLOG_CONFFILE_BACKUP";
+			sudo mv -f $APACHE_SYSLOG_CONFFILE $APACHE_SYSLOG_CONFFILE_BACKUP;
+			write21ApacheFileContents;
+	   fi
 	else
 		write21ApacheFileContents
 	fi
@@ -337,7 +348,7 @@ remove21ApacheConfFile()
 usage()
 {
 cat << EOF
-usage: configure-apache [-a loggly auth account or subdomain] [-t loggly token (optional)] [-u username] [-p password (optional)]
+usage: configure-apache [-a loggly auth account or subdomain] [-t loggly token (optional)] [-u username] [-p password (optional)] [-s suppress prompts {optional)]
 usage: configure-apache [-a loggly auth account or subdomain] [-r to rollback]
 usage: configure-apache [-h for help]
 EOF
@@ -369,6 +380,9 @@ while [ "$1" != "" ]; do
       -r | --rollback )
 		  LOGGLY_ROLLBACK="true"
           ;;
+	  -s | --suppress )
+		  SUPPRESS_PROMPT="true"
+		  ;;
       -h | --help)
           usage
           exit
