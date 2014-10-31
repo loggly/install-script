@@ -9,7 +9,7 @@ source configure-linux.sh "being-invoked"
 #name of the current script
 SCRIPT_NAME=configure-nginx.sh
 #version of the current script
-SCRIPT_VERSION=1.1
+SCRIPT_VERSION=1.2
 
 #we have not found the nginx version yet at this point in the script
 APP_TAG="\"nginx-version\":\"\""
@@ -137,20 +137,24 @@ checkLogFileSize()
 	errorFileSize=$(wc -c "$2" | cut -f 1 -d ' ')
 	fileSize=$((accessFileSize+errorFileSize))
 	if [ $fileSize -ge 102400000 ]; then
-		logMsgToConfigSysLog "INFO" "INFO: "
-		while true; do
-			read -p "WARN: There are currently large log files which may use up your allowed volume. Please rotate your logs before continuing. Would you like to continue now anyway? (yes/no)" yn
-			case $yn in
-				[Yy]* )
-				logMsgToConfigSysLog "INFO" "INFO: Current nginx logs size is $fileSize bytes. Continuing with nginx Loggly configuration.";
-				break;;
-				[Nn]* ) 
-				logMsgToConfigSysLog "INFO" "INFO: Current nginx logs size is $fileSize bytes. Discontinuing with nginx Loggly configuration."
-				exit 1
-				break;;
-				* ) echo "Please answer yes or no.";;
-			esac
-		done
+		if [ "$SUPPRESS_PROMPT" == "false" ]; then
+			while true; do
+				read -p "WARN: There are currently large log files which may use up your allowed volume. Please rotate your logs before continuing. Would you like to continue now anyway? (yes/no)" yn
+				case $yn in
+					[Yy]* )
+					logMsgToConfigSysLog "INFO" "INFO: Current nginx logs size is $fileSize bytes. Continuing with nginx Loggly configuration.";
+					break;;
+					[Nn]* ) 
+					logMsgToConfigSysLog "INFO" "INFO: Current nginx logs size is $fileSize bytes. Discontinuing with nginx Loggly configuration."
+					exit 1
+					break;;
+					* ) echo "Please answer yes or no.";;
+				esac
+			done
+		else
+			logMsgToConfigSysLog "WARN" "WARN: There are currently large log files which may use up your allowed volume."
+			logMsgToConfigSysLog "INFO" "INFO: Current nginx logs size is $fileSize bytes. Continuing with nginx Loggly configuration.";
+		fi
 	elif [ $fileSize -eq 0 ]; then
 		logMsgToConfigSysLog "WARN" "WARN: There are no recent logs from nginx there so won't be any sent to Loggly. You can generate some logs by visiting a page on your web server."
 		exit 1
@@ -162,19 +166,25 @@ write21NginxConfFile()
 	#Create nginx syslog config file if it doesn't exist
 	echo "INFO: Checking if nginx sysconf file $NGINX_SYSLOG_CONFFILE exist."
 	if [ -f "$NGINX_SYSLOG_CONFFILE" ]; then
-	   logMsgToConfigSysLog "WARN" "WARN: nginx syslog file $NGINX_SYSLOG_CONFFILE already exist."
-		while true; do
-			read -p "Do you wish to override $NGINX_SYSLOG_CONFFILE? (yes/no)" yn
-			case $yn in
-				[Yy]* )
-		logMsgToConfigSysLog "INFO" "INFO: Going to back up the conf file: $NGINX_SYSLOG_CONFFILE to $NGINX_SYSLOG_CONFFILE_BACKUP";
-				sudo mv -f $NGINX_SYSLOG_CONFFILE $NGINX_SYSLOG_CONFFILE_BACKUP;
-				write21NginxFileContents;
-				break;;
-				[Nn]* ) break;;
-				* ) echo "Please answer yes or no.";;
-			esac
-		done
+		logMsgToConfigSysLog "WARN" "WARN: nginx syslog file $NGINX_SYSLOG_CONFFILE already exist."
+		if [ "$SUPPRESS_PROMPT" == "false" ]; then
+		   while true; do
+				read -p "Do you wish to override $NGINX_SYSLOG_CONFFILE? (yes/no)" yn
+				case $yn in
+					[Yy]* )
+					logMsgToConfigSysLog "INFO" "INFO: Going to back up the conf file: $NGINX_SYSLOG_CONFFILE to $NGINX_SYSLOG_CONFFILE_BACKUP";
+					sudo mv -f $NGINX_SYSLOG_CONFFILE $NGINX_SYSLOG_CONFFILE_BACKUP;
+					write21NginxFileContents;
+					break;;
+					[Nn]* ) break;;
+					* ) echo "Please answer yes or no.";;
+				esac
+			done
+	   else
+			logMsgToConfigSysLog "INFO" "INFO: Going to back up the conf file: $NGINX_SYSLOG_CONFFILE to $NGINX_SYSLOG_CONFFILE_BACKUP";
+			sudo mv -f $NGINX_SYSLOG_CONFFILE $NGINX_SYSLOG_CONFFILE_BACKUP;
+			write21NginxFileContents;
+	   fi
 	else
 		write21NginxFileContents
 	fi
@@ -302,7 +312,7 @@ remove21NginxConfFile()
 usage()
 {
 cat << EOF
-usage: configure-nginx [-a loggly auth account or subdomain] [-t loggly token (optional)] [-u username] [-p password (optional)]
+usage: configure-nginx [-a loggly auth account or subdomain] [-t loggly token (optional)] [-u username] [-p password (optional)] [-s suppress prompts {optional)]
 usage: configure-nginx [-a loggly auth account or subdomain] [-r to rollback]
 usage: configure-nginx [-h for help]
 EOF
@@ -334,6 +344,9 @@ while [ "$1" != "" ]; do
       -r | --rollback )
 		  LOGGLY_ROLLBACK="true"
           ;;
+	  -s | --suppress )
+		  SUPPRESS_PROMPT="true"
+		  ;;
       -h | --help)
           usage
           exit
