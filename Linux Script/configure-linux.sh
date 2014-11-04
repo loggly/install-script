@@ -448,7 +448,7 @@ checkIfConfigurationChanged()
 	
 	#strings to be checked which should be present in the existing 22-loggly.conf. 
 	#If these strings are not same then a warning message will be shown to user to update the 22-loggly.conf file
-	STR_TO_BE_CHECKED[0]="\$template LogglyFormat,\"<%pri%>%protocol-version% %timestamp:::date-rfc3339% %HOSTNAME% %app-name% %procid% %msgid% [$LOGGLY_AUTH_TOKEN@$LOGGLY_DISTRIBUTION_ID] %msg%\""
+	STR_TO_BE_CHECKED[0]="\$template LogglyFormat,\"<%pri%>%protocol-version% %timestamp:::date-rfc3339% %HOSTNAME% %app-name% %procid% %msgid% [$LOGGLY_AUTH_TOKEN@$LOGGLY_DISTRIBUTION_ID] %msg%\n\""
 	STR_TO_BE_CHECKED[1]="*.*             @@$LOGS_01_HOST:$LOGGLY_SYSLOG_PORT;LogglyFormat"
 
 	for i in "${STR_TO_BE_CHECKED[@]}"
