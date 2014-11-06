@@ -9,7 +9,7 @@ source configure-linux.sh "being-invoked"
 #name of the current script
 SCRIPT_NAME=configure-file-monitoring.sh
 #version of the current script
-SCRIPT_VERSION=1.7
+SCRIPT_VERSION=1.8
 
 #file to monitor (contains complete path and file name) provided by user
 LOGGLY_FILE_TO_MONITOR=
@@ -56,6 +56,9 @@ installLogglyConfForFile()
 
 	#check if file to monitor exists
 	checkIfFileExist
+	
+	#check if logrotation enabled
+	checkIfLogRotationEnabled
 
 	#checks if the file has proper read permission
 	checkFileReadPermission
@@ -141,6 +144,15 @@ checkIfFileExist()
 	else
 		logMsgToConfigSysLog "ERROR" "ERROR: File $LOGGLY_FILE_TO_MONITOR does not exist. Kindly recheck."
 		exit 1
+	fi
+}
+
+#checks if log rotation is enabled on the selected file
+checkIfLogRotationEnabled()
+{	
+	FILENAME="${LOGGLY_FILE_TO_MONITOR##*/}"
+	if [ -f "/etc/logrotate.d/$FILENAME" ]; then
+		logMsgToConfigSysLog "WARN" "WARN: Log rotation is enabled on $FILENAME."
 	fi
 }
 
