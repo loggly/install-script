@@ -150,9 +150,8 @@ checkIfFileExist()
 #checks if log rotation is enabled on the selected file
 checkIfLogRotationEnabled()
 {	
-	FILENAME="${LOGGLY_FILE_TO_MONITOR##*/}"
-	if [ -f "/etc/logrotate.d/$FILENAME" ]; then
-		logMsgToConfigSysLog "WARN" "WARN: Log rotation is enabled on $FILENAME."
+	if [ $(grep -r "$LOGGLY_FILE_TO_MONITOR" /etc/logrotate.d/) ]; then
+		logMsgToConfigSysLog "WARN" "WARN: Log rotation is enabled on $LOGGLY_FILE_TO_MONITOR."
 	fi
 }
 
