@@ -218,7 +218,7 @@ checkIfSupportedOS()
 		;;
 		*"darwin"* )
 		#if the OS is mac then exit
-		logMsgToConfigSysLog "ERROR" "ERROR: This script is for Linux systems, and Darwin or Mac OSX are not currently supported. You can find alternative options here: https://www.loggly.com/docs"
+		logMsgToConfigSysLog "ERROR" "ERROR: This script is for Linux systems, and Darwin or Mac OSX are not currently supported. You can find alternative options here: https://www.loggly.com/docs/send-mac-logs-to-loggly/"
 		exit 1
 		;;
 		* )
