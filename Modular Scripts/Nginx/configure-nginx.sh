@@ -99,6 +99,14 @@ removeLogglyConfForNginx()
 	logMsgToConfigSysLog "INFO" "INFO: Rollback completed."
 }
 
+#checks if log rotation is enabled on the selected file
+checkIfLogRotationEnabled()
+{
+	if [[ $(grep -r "/var/log/$SERVICE/*." /etc/logrotate.d/$SERVICE) ]]; then
+		logMsgToConfigSysLog "WARN" "WARN: Log rotation is enabled on $LOGGLY_NGINX_LOG_HOME/$NGINX_ACCESS_LOG_FILE and $LOGGLY_NGINX_LOG_HOME/$NGINX_ERROR_LOG_FILE."
+	fi
+}
+
 #identify if nginx is installed on your system and is available as a service
 checkNginxDetails()
 {	
@@ -113,6 +121,8 @@ checkNginxDetails()
 	
 	#set all the required nginx variables by this script
 	setNginxVariables
+	
+	checkIfLogRotationEnabled
 }
 
 
