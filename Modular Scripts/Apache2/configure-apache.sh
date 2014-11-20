@@ -117,6 +117,8 @@ checkApacheDetails()
 	
 	#set all the required apache variables by this script
 	setApacheVariables
+	
+	checkIfLogRotationEnabled
 }
 
 #Get the apache service name on various linux flavors
@@ -142,6 +144,15 @@ getApacheServiceName()
 setApacheVariables()
 {
 	LOGGLY_APACHE_LOG_HOME=/var/log/$SERVICE
+}
+
+
+#checks if log rotation is enabled on the selected file
+checkIfLogRotationEnabled()
+{
+	if [[ $(grep -r "/var/log/$SERVICE/*." /etc/logrotate.d/$SERVICE) ]]; then
+		logMsgToConfigSysLog "WARN" "WARN: Log rotation is enabled on $LOGGLY_APACHE_LOG_HOME/$APACHE_ACCESS_LOG_FILE and $LOGGLY_APACHE_LOG_HOME/$APACHE_ERROR_LOG_FILE."
+	fi
 }
 
 #gets the version of apache installed on the unix box
