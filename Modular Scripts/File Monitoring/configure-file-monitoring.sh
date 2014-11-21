@@ -152,7 +152,7 @@ checkIfLogRotationEnabled()
 {	
 	FILENAME="${LOGGLY_FILE_TO_MONITOR%.*}"
 	if [[ $(grep -r "$FILENAME" /etc/logrotate.d/) ]]; then
-		logMsgToConfigSysLog "WARN" "WARN: Log rotation is enabled on $LOGGLY_FILE_TO_MONITOR."
+		logMsgToConfigSysLog "WARN" "WARN: Log rotation is enabled on $LOGGLY_FILE_TO_MONITOR.  Please follow instructions here to update logrotate https://www.loggly.com/docs/log-rotate"
 	fi
 }
 
