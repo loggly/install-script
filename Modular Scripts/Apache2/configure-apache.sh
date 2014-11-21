@@ -151,7 +151,7 @@ setApacheVariables()
 checkIfLogRotationEnabled()
 {
 	if [[ $(grep -r "/var/log/$SERVICE/*." /etc/logrotate.d/$SERVICE) ]]; then
-		logMsgToConfigSysLog "WARN" "WARN: Log rotation is enabled on $LOGGLY_APACHE_LOG_HOME/$APACHE_ACCESS_LOG_FILE and $LOGGLY_APACHE_LOG_HOME/$APACHE_ERROR_LOG_FILE."
+		logMsgToConfigSysLog "WARN" "WARN: Log rotation is enabled on $LOGGLY_APACHE_LOG_HOME/$APACHE_ACCESS_LOG_FILE and $LOGGLY_APACHE_LOG_HOME/$APACHE_ERROR_LOG_FILE.  Please follow instructions here to update logrotate https://www.loggly.com/docs/log-rotate"
 	fi
 }
 
