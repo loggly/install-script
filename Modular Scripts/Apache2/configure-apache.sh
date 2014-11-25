@@ -9,7 +9,7 @@ source configure-linux.sh "being-invoked"
 #name of the current script
 SCRIPT_NAME=configure-apache.sh
 #version of the current script
-SCRIPT_VERSION=1.4
+SCRIPT_VERSION=1.5
 
 #we have not found the apache version yet at this point in the script
 APP_TAG="\"apache-version\":\"\""
@@ -36,6 +36,12 @@ MANUAL_CONFIG_INSTRUCTION="Manual instructions to configure Apache2 is available
 
 #this variable will hold if the check env function for linux is invoked
 APACHE_ENV_VALIDATED="false"
+
+#apache as tag sent with the logs
+LOGGLY_FILE_TAG="apache"
+
+#add tags to the logs
+TAG=
 ##########  Variable Declarations - End  ##########
 
 #check if apache environment is compatible for Loggly
@@ -64,7 +70,10 @@ installLogglyConfForApache()
 	
 	#configure loggly for Linux
 	installLogglyConf
-
+	
+	#multiple tags
+	addTagsInConfiguration
+	
 	#create 21apache.conf file
 	write21ApacheConfFile
 	
@@ -118,6 +127,7 @@ checkApacheDetails()
 	#set all the required apache variables by this script
 	setApacheVariables
 	
+	#to check logrotation
 	checkIfLogRotationEnabled
 }
 
@@ -237,6 +247,15 @@ write21ApacheConfFile()
 	fi
 }
 
+addTagsInConfiguration()
+{
+	#split tags by comman(,)
+	IFS=, read -a array <<< "$LOGGLY_FILE_TAG"
+	for i in "${array[@]}"
+	do
+		TAG="$TAG tag=\\\"$i\\\" "
+	done
+}
 #function to write the contents of apache syslog config file
 write21ApacheFileContents()
 {
@@ -271,7 +290,7 @@ write21ApacheFileContents()
 	\$InputRunFileMonitor
 
 	#Add a tag for apache events
-	\$template LogglyFormatApache,\"<%pri%>%protocol-version% %timestamp:::date-rfc3339% %HOSTNAME% %app-name% %procid% %msgid% [$LOGGLY_AUTH_TOKEN@41058 tag=\\\"apache\\\"] %msg%\n\"
+	\$template LogglyFormatApache,\"<%pri%>%protocol-version% %timestamp:::date-rfc3339% %HOSTNAME% %app-name% %procid% %msgid% [$LOGGLY_AUTH_TOKEN@41058 $TAG] %msg%\n\"
 
 	if \$programname == 'apache-access' then @@logs-01.loggly.com:514;LogglyFormatApache
 	if \$programname == 'apache-access' then ~
@@ -333,7 +352,14 @@ checkIfApacheLogsMadeToLoggly()
 checkIfLogsAreParsedInLoggly()
 {
 	apacheInitialLogCount=0
-	queryParam="tag%3Aapache%20logtype%3Aapache&from=-15m&until=now&size=1"
+	TAG_PARSER=
+	IFS=, read -a array <<< "$LOGGLY_FILE_TAG"
+	
+	for i in "${array[@]}"
+	do
+		TAG_PARSER="$TAG_PARSER%20tag%3A$i "
+	done
+	queryParam="logtype%3Aapache$TAG_PARSER&from=-15m&until=now&size=1"
 	queryUrl="$LOGGLY_ACCOUNT_URL/apiv2/search?q=$queryParam"
 	searchAndFetch apacheInitialLogCount "$queryUrl"
 	logMsgToConfigSysLog "INFO" "INFO: Verifying if the Apache logs are parsed in Loggly."
@@ -359,7 +385,7 @@ remove21ApacheConfFile()
 usage()
 {
 cat << EOF
-usage: configure-apache [-a loggly auth account or subdomain] [-t loggly token (optional)] [-u username] [-p password (optional)] [-s suppress prompts {optional)]
+usage: configure-apache [-a loggly auth account or subdomain] [-t loggly token (optional)] [-u username] [-p password (optional)] [-tag filetag1,filetag2 (optional)] [-s suppress prompts {optional)]
 usage: configure-apache [-a loggly auth account or subdomain] [-r to rollback]
 usage: configure-apache [-h for help]
 EOF
@@ -388,6 +414,10 @@ while [ "$1" != "" ]; do
 	  -p | --password ) shift
           LOGGLY_PASSWORD=$1
          ;;
+	  -tag| --filetag ) shift
+		  LOGGLY_FILE_TAG=$1
+		  echo "File tag: $LOGGLY_FILE_TAG"
+		  ;;
       -r | --rollback )
 		  LOGGLY_ROLLBACK="true"
           ;;
