@@ -9,7 +9,7 @@ source configure-linux.sh "being-invoked"
 #name of the current script
 SCRIPT_NAME=configure-nginx.sh
 #version of the current script
-SCRIPT_VERSION=1.2
+SCRIPT_VERSION=1.3
 
 #we have not found the nginx version yet at this point in the script
 APP_TAG="\"nginx-version\":\"\""
@@ -36,6 +36,13 @@ MANUAL_CONFIG_INSTRUCTION="Manual instructions to configure nginx is available a
 
 #this variable will hold if the check env function for linux is invoked
 NGINX_ENV_VALIDATED="false"
+
+#apache as tag sent with the logs
+LOGGLY_FILE_TAG="nginx"
+
+#add tags to the logs
+TAG=
+
 ##########  Variable Declarations - End  ##########
 
 #check if nginx environment is compatible for Loggly
@@ -65,6 +72,9 @@ installLogglyConfForNginx()
 	#configure loggly for Linux
 	installLogglyConf
 
+	#multiple tags
+	addTagsInConfiguration
+
 	#create 21nginx.conf file
 	write21NginxConfFile
 	
@@ -74,7 +84,6 @@ installLogglyConfForNginx()
 	#verify if the nginx logs made it to loggly
 	checkIfNginxLogsMadeToLoggly
 	
-
 	#log success message
 	logMsgToConfigSysLog "SUCCESS" "SUCCESS: Nginx successfully configured to send logs to Loggly."
 }
@@ -122,6 +131,7 @@ checkNginxDetails()
 	#set all the required nginx variables by this script
 	setNginxVariables
 	
+	#to check logrotation
 	checkIfLogRotationEnabled
 }
 
@@ -200,6 +210,15 @@ write21NginxConfFile()
 	fi
 }
 
+addTagsInConfiguration()
+{
+	#split tags by comman(,)
+	IFS=, read -a array <<< "$LOGGLY_FILE_TAG"
+	for i in "${array[@]}"
+	do
+		TAG="$TAG tag=\\\"$i\\\" "
+	done
+}
 #function to write the contents of nginx syslog config file
 write21NginxFileContents()
 {
@@ -234,7 +253,7 @@ write21NginxFileContents()
 	\$InputRunFileMonitor
 
 	#Add a tag for nginx events
-	\$template LogglyFormatNginx,\"<%pri%>%protocol-version% %timestamp:::date-rfc3339% %HOSTNAME% %app-name% %procid% %msgid% [$LOGGLY_AUTH_TOKEN@41058 tag=\\\"nginx\\\"] %msg%\n\"
+	\$template LogglyFormatNginx,\"<%pri%>%protocol-version% %timestamp:::date-rfc3339% %HOSTNAME% %app-name% %procid% %msgid% [$LOGGLY_AUTH_TOKEN@41058 $TAG] %msg%\n\"
 
 	if \$programname == 'nginx-access' then @@logs-01.loggly.com:514;LogglyFormatNginx
 	if \$programname == 'nginx-access' then ~
@@ -296,7 +315,13 @@ checkIfNginxLogsMadeToLoggly()
 checkIfLogsAreParsedInLoggly()
 {
 	nginxInitialLogCount=0
-	queryParam="tag%3Anginx%20logtype%3Anginx&from=-15m&until=now&size=1"
+	TAG_PARSER=
+	IFS=, read -a array <<< "$LOGGLY_FILE_TAG"
+	for i in "${array[@]}"
+	do
+		TAG_PARSER="$TAG_PARSER%20tag%3A$i "
+	done
+	queryParam="logtype%3Anginx$TAG_PARSER&from=-15m&until=now&size=1"
 	queryUrl="$LOGGLY_ACCOUNT_URL/apiv2/search?q=$queryParam"
 	searchAndFetch nginxInitialLogCount "$queryUrl"
 	logMsgToConfigSysLog "INFO" "INFO: Verifying if the Nginx logs are parsed in Loggly."
@@ -322,7 +347,7 @@ remove21NginxConfFile()
 usage()
 {
 cat << EOF
-usage: configure-nginx [-a loggly auth account or subdomain] [-t loggly token (optional)] [-u username] [-p password (optional)] [-s suppress prompts {optional)]
+usage: configure-nginx [-a loggly auth account or subdomain] [-t loggly token (optional)] [-u username] [-p password (optional)] [-tag filetag1,filetag2 (optional)] [-s suppress prompts {optional)]
 usage: configure-nginx [-a loggly auth account or subdomain] [-r to rollback]
 usage: configure-nginx [-h for help]
 EOF
@@ -351,6 +376,10 @@ while [ "$1" != "" ]; do
 	  -p | --password ) shift
           LOGGLY_PASSWORD=$1
          ;;
+	-tag| --filetag ) shift
+		  LOGGLY_FILE_TAG=$1
+		  echo "File tag: $LOGGLY_FILE_TAG"
+		  ;;
       -r | --rollback )
 		  LOGGLY_ROLLBACK="true"
           ;;
