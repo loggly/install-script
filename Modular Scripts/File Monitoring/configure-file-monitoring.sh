@@ -9,7 +9,7 @@ source configure-linux.sh "being-invoked"
 #name of the current script
 SCRIPT_NAME=configure-file-monitoring.sh
 #version of the current script
-SCRIPT_VERSION=1.8
+SCRIPT_VERSION=1.9
 
 #file to monitor (contains complete path and file name) provided by user
 LOGGLY_FILE_TO_MONITOR=
@@ -36,6 +36,9 @@ LOGGLY_FILE_TAG="file"
 
 #format name for the conf file. Can be set by calling script
 CONF_FILE_FORMAT_NAME="LogglyFormatFile"
+
+#add tags to the logs
+TAG=
 
 ##########  Variable Declarations - End  ##########
 
@@ -68,7 +71,10 @@ installLogglyConfForFile()
 
 	#configure loggly for Linux
 	installLogglyConf
-
+	
+	#multiple tags
+	addTagsInConfiguration
+	
 	#create 21<file alias>.conf file
 	write21ConfFileContents
 
@@ -239,6 +245,17 @@ checkFileReadPermission()
 	
 }
 
+
+addTagsInConfiguration()
+{
+	#split tags by comman(,)
+	IFS=, read -a array <<< "$LOGGLY_FILE_TAG"
+	for i in "${array[@]}"
+	do
+		TAG="$TAG tag=\\\"$i\\\" "
+	done
+}
+
 #function to write the contents of syslog config file
 write21ConfFileContents()
 {
@@ -254,7 +271,7 @@ write21ConfFileContents()
 		imfileStr+="\$PrivDropToGroup adm
 		"
 	fi
-
+	
 	imfileStr+="
 	# File access file:
 	\$InputFileName $LOGGLY_FILE_TO_MONITOR
@@ -265,7 +282,7 @@ write21ConfFileContents()
 	\$InputRunFileMonitor
 
 	#Add a tag for file events
-	\$template $CONF_FILE_FORMAT_NAME,\"<%pri%>%protocol-version% %timestamp:::date-rfc3339% %HOSTNAME% %app-name% %procid% %msgid% [$LOGGLY_AUTH_TOKEN@41058 tag=\\\"$LOGGLY_FILE_TAG\\\"] %msg%\n\"
+	\$template $CONF_FILE_FORMAT_NAME,\"<%pri%>%protocol-version% %timestamp:::date-rfc3339% %HOSTNAME% %app-name% %procid% %msgid% [$LOGGLY_AUTH_TOKEN@41058 $TAG] %msg%\n\"
 
 	if \$programname == '$LOGGLY_FILE_TO_MONITOR_ALIAS' then @@logs-01.loggly.com:514;$CONF_FILE_FORMAT_NAME
 	if \$programname == '$LOGGLY_FILE_TO_MONITOR_ALIAS' then ~
@@ -323,7 +340,14 @@ checkIfFileLogsMadeToLoggly()
 checkIfLogsAreParsedInLoggly()
 {
 	fileInitialLogCount=0
-	queryParam="syslog.appName%3A$LOGGLY_FILE_TO_MONITOR_ALIAS%20tag%3A$LOGGLY_FILE_TAG&from=-15m&until=now&size=1"
+	TAG_PARSER=
+	IFS=, read -a array <<< "$LOGGLY_FILE_TAG"
+	for i in "${array[@]}"
+	do
+		TAG_PARSER="$TAG_PARSER%20tag%3A$i "
+	done
+	
+	queryParam="syslog.appName%3A$LOGGLY_FILE_TO_MONITOR_ALIAS$TAG_PARSER&from=-15m&until=now&size=1"
 	queryUrl="$LOGGLY_ACCOUNT_URL/apiv2/search?q=$queryParam"
 	searchAndFetch fileInitialLogCount "$queryUrl"
 	if [ "$fileInitialLogCount" -gt 0 ]; then  
@@ -359,7 +383,7 @@ remove21ConfFile()
 usage()
 {
 cat << EOF
-usage: configure-file-monitoring [-a loggly auth account or subdomain] [-t loggly token (optional)] [-u username] [-p password (optional)] [-f filename] [-tag filetag (optional)] [-l filealias] [-s suppress prompts {optional)]
+usage: configure-file-monitoring [-a loggly auth account or subdomain] [-t loggly token (optional)] [-u username] [-p password (optional)] [-f filename] [-tag filetag1,filetag2 (optional)] [-l filealias] [-s suppress prompts {optional)]
 usage: configure-file-monitoring [-a loggly auth account or subdomain] [-r to rollback] [-l filealias]
 usage: configure-file-monitoring [-h for help]
 EOF
