@@ -59,9 +59,6 @@ installLogglyConfForFile()
 
 	#check if file to monitor exists
 	checkIfFileExist
-	
-	#check if logrotation enabled
-	checkIfLogRotationEnabled
 
 	#checks if the file has proper read permission
 	checkFileReadPermission
@@ -150,15 +147,6 @@ checkIfFileExist()
 	else
 		logMsgToConfigSysLog "ERROR" "ERROR: File $LOGGLY_FILE_TO_MONITOR does not exist. Kindly recheck."
 		exit 1
-	fi
-}
-
-#checks if log rotation is enabled on the selected file
-checkIfLogRotationEnabled()
-{	
-	FILENAME="${LOGGLY_FILE_TO_MONITOR%.*}"
-	if [[ $(grep -r "$FILENAME" /etc/logrotate.d/) ]]; then
-		logMsgToConfigSysLog "WARN" "WARN: Log rotation is enabled on $LOGGLY_FILE_TO_MONITOR.  Please follow instructions here to update logrotate https://www.loggly.com/docs/log-rotate"
 	fi
 }
 
