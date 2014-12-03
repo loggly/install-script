@@ -303,8 +303,19 @@ checkIfApacheLogsMadeToLoggly()
 
 	apacheInitialLogCount=0
 	apacheLatestLogCount=0
-	queryParam="tag%3Aapache&from=-15m&until=now&size=1"
-
+	
+	TAGS=
+	IFS=, read -a array <<< "$LOGGLY_FILE_TAG"
+	for i in "${array[@]}"
+	do
+		if [ "$TAGS" == "" ]; then
+			TAGS="tag%3A$i" 
+		else
+			TAGS="$TAGS%20tag%3A$i"
+		fi
+	done
+	
+	queryParam="$TAGS&from=-15m&until=now&size=1"
 	queryUrl="$LOGGLY_ACCOUNT_URL/apiv2/search?q=$queryParam"
 	logMsgToConfigSysLog "INFO" "INFO: Search URL: $queryUrl"
 
