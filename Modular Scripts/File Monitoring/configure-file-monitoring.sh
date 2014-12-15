@@ -9,7 +9,7 @@ source configure-linux.sh "being-invoked"
 #name of the current script
 SCRIPT_NAME=configure-file-monitoring.sh
 #version of the current script
-SCRIPT_VERSION=1.9
+SCRIPT_VERSION=1.10
 
 #file to monitor (contains complete path and file name) provided by user
 LOGGLY_FILE_TO_MONITOR=
@@ -150,6 +150,16 @@ checkIfFileExist()
 	fi
 }
 
+#deletes the state file for the current alias, if exists
+deleteStateFile()
+{
+	sudo rm -f $FILE_SYSLOG_CONFFILE
+	restartRsyslog
+	sudo rm -f $RSYSLOG_DIR/stat-$LOGGLY_FILE_TO_MONITOR_ALIAS
+	restartRsyslog
+}
+
+
 #check if the file alias is already taken
 checkIfFileAliasExist()
 {
@@ -161,7 +171,8 @@ checkIfFileAliasExist()
 				case $yn in
 					[Yy]* )
 					logMsgToConfigSysLog "INFO" "INFO: Going to back up the conf file: $FILE_SYSLOG_CONFFILE to $FILE_SYSLOG_CONFFILE_BACKUP";
-					sudo mv -f $FILE_SYSLOG_CONFFILE $FILE_SYSLOG_CONFFILE_BACKUP;
+					sudo mv -f $FILE_SYSLOG_CONFFILE $FILE_SYSLOG_CONFFILE_BACKUP
+					deleteStateFile
 					break;;
 					[Nn]* )
 					logMsgToConfigSysLog "INFO" "INFO: Not overwriting the existing configuration. Exiting"
@@ -172,7 +183,8 @@ checkIfFileAliasExist()
 			done
 		else
 			logMsgToConfigSysLog "INFO" "INFO: Going to back up the conf file: $FILE_SYSLOG_CONFFILE to $FILE_SYSLOG_CONFFILE_BACKUP";
-			sudo mv -f $FILE_SYSLOG_CONFFILE $FILE_SYSLOG_CONFFILE_BACKUP;
+			sudo mv -f $FILE_SYSLOG_CONFFILE $FILE_SYSLOG_CONFFILE_BACKUP
+			deleteStateFile
 		fi
 	fi
 }
