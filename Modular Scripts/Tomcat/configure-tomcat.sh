@@ -53,7 +53,7 @@ TAG=
 #this is not a mandatory input
 LOGGLY_CATALINA_HOME=
 
-MANUAL_CONFIG_INSTRUCTION="Manual instructions to configure Tomcat is available at https://www.loggly.com/docs/tomcat-application-server"
+MANUAL_CONFIG_INSTRUCTION="Manual instructions to configure Tomcat is available at https://www.loggly.com/docs/tomcat-application-server/. Rsyslog troubleshooting instructions are available at https://www.loggly.com/docs/troubleshooting-rsyslog/"
 
 #this variable will hold if the check env function for linux is invoked
 TOMCAT_ENV_VALIDATED=

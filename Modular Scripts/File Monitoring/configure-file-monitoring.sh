@@ -26,7 +26,7 @@ FILE_SYSLOG_CONFFILE=
 #name and location of syslog backup file
 FILE_SYSLOG_CONFFILE_BACKUP=
 
-MANUAL_CONFIG_INSTRUCTION="Manual instructions to configure a file is available at https://www.loggly.com/docs/file-monitoring/"
+MANUAL_CONFIG_INSTRUCTION="Manual instructions to configure a file is available at https://www.loggly.com/docs/file-monitoring/. Rsyslog troubleshooting instructions are available at https://www.loggly.com/docs/troubleshooting-rsyslog/"
 
 #this variable is set if the script is invoked via some other calling script
 IS_FILE_MONITOR_SCRIPT_INVOKED="false"

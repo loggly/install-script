@@ -33,7 +33,7 @@ TEMP_DIR=
 
 IS_S3CMD_CONFIGURED_BY_SCRIPT="false"
 
-MANUAL_CONFIG_INSTRUCTION="Manual instructions to configure a file is available at https://www.loggly.com/docs/file-monitoring/"
+MANUAL_CONFIG_INSTRUCTION="Manual instructions to configure a file is available at https://www.loggly.com/docs/file-monitoring/. Rsyslog troubleshooting instructions are available at https://www.loggly.com/docs/troubleshooting-rsyslog/"
 
 ##########  Variable Declarations - End  ##########
 
