@@ -32,7 +32,7 @@ LOGGLY_APACHE_LOG_HOME=
 #this variable will hold the users apache version
 APACHE_VERSION=
 
-MANUAL_CONFIG_INSTRUCTION="Manual instructions to configure Apache2 is available at https://www.loggly.com/docs/sending-apache-logs/. Rsyslog troubleshooting instructions are available at https://www.loggly.com/docs/troubleshooting-rsyslog/"
+MANUAL_CONFIG_INSTRUCTION="Manual instructions to configure Apache2 is available at https://www.loggly.com/docs/sending-apache-logs/"
 
 #this variable will hold if the check env function for linux is invoked
 APACHE_ENV_VALIDATED="false"
