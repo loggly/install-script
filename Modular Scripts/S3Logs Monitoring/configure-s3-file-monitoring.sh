@@ -8,13 +8,21 @@ source configure-file-monitoring.sh "being-invoked"
 #name of the current script
 SCRIPT_NAME=configure-s3-file-monitoring.sh
 #version of the current script
-SCRIPT_VERSION=1.4
+SCRIPT_VERSION=1.5
 
 #s3 bucket name to configure
 LOGGLY_S3_BUCKET_NAME=
 
 #alias name, will be used as tag & state file name etc. provided by user
 LOGGLY_S3_ALIAS=
+FILE_ALIAS=
+STATE_FILE_ALIAS=
+
+#file as tag sent with the logs
+LOGGLY_FILE_TAG="s3file"
+
+#format name for the conf file. Can be set by calling script
+CONF_FILE_FORMAT_NAME="LogglyFormatS3"
 
 #file alias provided by the user
 APP_TAG="\"s3file-alias\":\"\""
@@ -55,9 +63,6 @@ installLogglyConfForS3()
 	#check if s3bucket is valid
 	checkIfValidS3Bucket
 
-	#configure loggly for Linux
-	installLogglyConf
-	
 	#create temporary directory
 	createTempDir
 
@@ -250,37 +255,15 @@ downloadS3Bucket()
 	fi
 }
 
-
 invokeS3FileMonitoring()
 {
 	dir=/tmp/s3monitoring/$LOGGLY_S3_ALIAS
-	#TODO: Not supporting multiple files with same name in different directories
-	#only supporting file with naming convention *.*
-	for f in $(find $dir -name '*')
-	do
-		fileNameWithExt=${f##*/}
-        uniqueFileName=$(echo "$fileNameWithExt" | tr . _)
-		var=$(file $f)
-		
-		#it may be possible that the "text" may contain some uppercase letters like "Text"
-		var=$(echo $var | tr "[:upper:]" "[:lower:]")
-		
-		if [[ $var == *text* ]]; then
-			LOGGLY_FILE_TO_MONITOR_ALIAS=$uniqueFileName-$LOGGLY_S3_ALIAS
-			LOGGLY_FILE_TO_MONITOR=$f
-			LOGGLY_FILE_TAG="s3file"
-			CONF_FILE_FORMAT_NAME="LogglyFormatS3"
-			constructFileVariables
-			checkFileReadPermission
-			checkLogFileSize $LOGGLY_FILE_TO_MONITOR
-			write21ConfFileContents
-			IS_ANY_FILE_CONFIGURED="true"
-		#ignoring directory
-		elif [[ $var != *directory* ]]; then
-			logMsgToConfigSysLog "WARN" "WARN: File $fileNameWithExt is not a text file. Ignoring."
-		fi
-	done
+	LOGGLY_FILE_TO_MONITOR=$dir
 	
+	configureDirectoryFileMonitoring
+
+	IS_ANY_FILE_CONFIGURED="true"
+
 	if [ "$IS_ANY_FILE_CONFIGURED" != "false" ]; then
 		restartRsyslog
 	fi
@@ -293,7 +276,7 @@ installCronToSyncS3BucketPeriodically()
 			read -p "Would you like install a Cron job to sync the files currently in your bucket every 5 minutes? (yes/no)" yn
 			case $yn in
 				[Yy]* )
-					doCronInstallation
+					doS3CronInstallation
 					break;;
 				[Nn]* ) 
 					logMsgToConfigSysLog "INFO" "INFO: Skipping Cron installation."
@@ -302,11 +285,11 @@ installCronToSyncS3BucketPeriodically()
 			esac
 		done
 	else
-		doCronInstallation
+		doS3CronInstallation
 	fi
 }
 
-doCronInstallation()
+doS3CronInstallation()
 {
 	#copying .s3cfg file to /root so that it can be used by crontab for sync
 	if ! sudo test -f "/root/.s3cfg" ; then
@@ -477,7 +460,9 @@ while [ "$1" != "" ]; do
 		
 		-s3l | --s3alias ) shift
 			LOGGLY_S3_ALIAS=$1
-			echo "File alias: $LOGGLY_S3_ALIAS"
+			FILE_ALIAS=$LOGGLY_S3_ALIAS
+			STATE_FILE_ALIAS=$LOGGLY_S3_ALIAS
+			echo "File alias: $FILE_ALIAS"
 		;;
 		-s | --suppress )
 			SUPPRESS_PROMPT="true"
