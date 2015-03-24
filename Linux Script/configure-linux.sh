@@ -363,11 +363,13 @@ checkIfRsyslogConfiguredAsService()
 	if [ -f /etc/init.d/$RSYSLOG_SERVICE ]; then
 		logMsgToConfigSysLog "INFO" "INFO: $RSYSLOG_SERVICE is present as service."
 	else
-		checkifSyslogNgConfiguredAsService
 		logMsgToConfigSysLog "ERROR" "ERROR: $RSYSLOG_SERVICE is not present as service."
 		exit 1
 	fi
-
+	
+	#checking if syslog-ng is running as a service
+	checkifSyslogNgConfiguredAsService
+	
 	if [ $(ps -A | grep "$RSYSLOG_SERVICE" | wc -l) -eq 0 ]; then
 		logMsgToConfigSysLog "INFO" "INFO: $RSYSLOG_SERVICE is not running. Attempting to start service."
 		sudo service $RSYSLOG_SERVICE start
