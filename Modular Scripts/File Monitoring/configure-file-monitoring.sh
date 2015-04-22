@@ -9,7 +9,7 @@ source configure-linux.sh "being-invoked"
 #name of the current script
 SCRIPT_NAME=configure-file-monitoring.sh
 #version of the current script
-SCRIPT_VERSION=1.11
+SCRIPT_VERSION=1.12
 
 #file to monitor (contains complete path and file name) provided by user
 LOGGLY_FILE_TO_MONITOR=
@@ -125,14 +125,14 @@ removeLogglyConfForFile()
 
 	#remove 21<file-alias>.conf file
 	remove21ConfFile
-	
+
 	#restart rsyslog
 	restartRsyslog
 	
 	removeStatFile
 	
 	#log success message
-	logMsgToConfigSysLog "INFO" "INFO: Rollback completed."
+	logMsgToConfigSysLog "SUCCESS" "SUCCESS: Rollback completed."
 }
 
 checkIfFileLocationContainSpaces()
@@ -377,7 +377,7 @@ sudo cat << EOIPFW >> $CRON_SCRIPT
 $cronScriptStr
 EOIPFW
 
-	CRON_JOB_TO_MONITOR_FILES="*/5 * * * * sudo bash $CRON_SCRIPT"
+	CRON_JOB_TO_MONITOR_FILES="*/10 * * * * sudo bash $CRON_SCRIPT"
 	CRON_FILE="/tmp/File_Monitor_Cron"
 
 	EXISTING_CRONS=$(sudo crontab -l 2>&1)
@@ -419,10 +419,8 @@ write21ConfFileContents()
 	\$InputFileSeverity info
 	\$InputFilePersistStateInterval 20000
 	\$InputRunFileMonitor
-
 	#Add a tag for file events
 	\$template $CONF_FILE_FORMAT_NAME,\"<%pri%>%protocol-version% %timestamp:::date-rfc3339% %HOSTNAME% %app-name% %procid% %msgid% [$LOGGLY_AUTH_TOKEN@41058 $TAG] %msg%\n\"
-
 	if \$programname == '$LOGGLY_FILE_TO_MONITOR_ALIAS' then @@logs-01.loggly.com:514;$CONF_FILE_FORMAT_NAME
 	if \$programname == '$LOGGLY_FILE_TO_MONITOR_ALIAS' then ~
 	"
@@ -501,8 +499,13 @@ checkIfLogsAreParsedInLoggly()
 checkIfConfFileExist()
 {
 	if [[ ! -f "$FILE_SYSLOG_CONFFILE" ]]; then
-		logMsgToConfigSysLog "ERROR" "ERROR: Invalid File Alias provided."
-		exit 1
+		if [ $(sudo crontab -l  2>/dev/null | grep "file-monitoring-cron-$FILE_ALIAS.sh" | wc -l) -eq 1 ]; then
+			logMsgToConfigSysLog "ERROR" "ERROR: Cron is running to refresh configuration. Please try again after sometime."
+			exit 1
+		else
+			logMsgToConfigSysLog "ERROR" "ERROR: Invalid File Alias provided."
+			exit 1
+		fi
 	fi
 }
 
