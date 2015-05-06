@@ -87,7 +87,7 @@ SUPPRESS_PROMPT="false"
 PROP_FILE=
 
 #manual instructions to be show in case of error
-MANUAL_CONFIG_INSTRUCTION="Manual instructions to configure rsyslog on Linux are available at https://www.loggly.com/docs/send-mac-logs-to-loggly/."
+MANUAL_CONFIG_INSTRUCTION="Manual instructions to configure Loggly on Mac are available at https://www.loggly.com/docs/send-mac-logs-to-loggly/."
 
 checkMacLogglyCompatibility()
 {	
