@@ -9,7 +9,7 @@ source configure-linux.sh "being-invoked"
 #name of the current script
 SCRIPT_NAME=configure-nginx.sh
 #version of the current script
-SCRIPT_VERSION=1.0
+SCRIPT_VERSION=1.3
 
 #we have not found the nginx version yet at this point in the script
 APP_TAG="\"nginx-version\":\"\""
@@ -32,10 +32,17 @@ LOGGLY_NGINX_LOG_HOME=
 #this variable will hold the users nginx version
 NGINX_VERSION=
 
-MANUAL_CONFIG_INSTRUCTION="Manual instructions to configure nginx is available at https://www.loggly.com/docs/nginx-server-logs#manual"
+MANUAL_CONFIG_INSTRUCTION="Manual instructions to configure nginx is available at https://www.loggly.com/docs/nginx-server-logs#manual. Rsyslog troubleshooting instructions are available at https://www.loggly.com/docs/troubleshooting-rsyslog/"
 
 #this variable will hold if the check env function for linux is invoked
 NGINX_ENV_VALIDATED="false"
+
+#apache as tag sent with the logs
+LOGGLY_FILE_TAG="nginx"
+
+#add tags to the logs
+TAG=
+
 ##########  Variable Declarations - End  ##########
 
 #check if nginx environment is compatible for Loggly
@@ -65,6 +72,9 @@ installLogglyConfForNginx()
 	#configure loggly for Linux
 	installLogglyConf
 
+	#multiple tags
+	addTagsInConfiguration
+
 	#create 21nginx.conf file
 	write21NginxConfFile
 	
@@ -73,9 +83,9 @@ installLogglyConfForNginx()
 	
 	#verify if the nginx logs made it to loggly
 	checkIfNginxLogsMadeToLoggly
-
+	
 	#log success message
-	logMsgToConfigSysLog "SUCCESS" "SUCCESS: Nginx successfully configured to send logs via Loggly."
+	logMsgToConfigSysLog "SUCCESS" "SUCCESS: Nginx successfully configured to send logs to Loggly."
 }
 
 #executing script to remove loggly configuration for Nginx
@@ -97,6 +107,7 @@ removeLogglyConfForNginx()
 
 	logMsgToConfigSysLog "INFO" "INFO: Rollback completed."
 }
+
 
 #identify if nginx is installed on your system and is available as a service
 checkNginxDetails()
@@ -136,20 +147,24 @@ checkLogFileSize()
 	errorFileSize=$(wc -c "$2" | cut -f 1 -d ' ')
 	fileSize=$((accessFileSize+errorFileSize))
 	if [ $fileSize -ge 102400000 ]; then
-		logMsgToConfigSysLog "INFO" "INFO: "
-		while true; do
-			read -p "WARN: There are currently large log files which may use up your allowed volume. Please rotate your logs before continuing. Would you like to continue now anyway? (yes/no)" yn
-			case $yn in
-				[Yy]* )
-				logMsgToConfigSysLog "INFO" "INFO: Current nginx logs size is $fileSize bytes. Continuing with nginx Loggly configuration.";
-				break;;
-				[Nn]* ) 
-				logMsgToConfigSysLog "INFO" "INFO: Current nginx logs size is $fileSize bytes. Discontinuing with nginx Loggly configuration."
-				exit 1
-				break;;
-				* ) echo "Please answer yes or no.";;
-			esac
-		done
+		if [ "$SUPPRESS_PROMPT" == "false" ]; then
+			while true; do
+				read -p "WARN: There are currently large log files which may use up your allowed volume. Please rotate your logs before continuing. Would you like to continue now anyway? (yes/no)" yn
+				case $yn in
+					[Yy]* )
+					logMsgToConfigSysLog "INFO" "INFO: Current nginx logs size is $fileSize bytes. Continuing with nginx Loggly configuration.";
+					break;;
+					[Nn]* ) 
+					logMsgToConfigSysLog "INFO" "INFO: Current nginx logs size is $fileSize bytes. Discontinuing with nginx Loggly configuration."
+					exit 1
+					break;;
+					* ) echo "Please answer yes or no.";;
+				esac
+			done
+		else
+			logMsgToConfigSysLog "WARN" "WARN: There are currently large log files which may use up your allowed volume."
+			logMsgToConfigSysLog "INFO" "INFO: Current nginx logs size is $fileSize bytes. Continuing with nginx Loggly configuration.";
+		fi
 	elif [ $fileSize -eq 0 ]; then
 		logMsgToConfigSysLog "WARN" "WARN: There are no recent logs from nginx there so won't be any sent to Loggly. You can generate some logs by visiting a page on your web server."
 		exit 1
@@ -161,24 +176,39 @@ write21NginxConfFile()
 	#Create nginx syslog config file if it doesn't exist
 	echo "INFO: Checking if nginx sysconf file $NGINX_SYSLOG_CONFFILE exist."
 	if [ -f "$NGINX_SYSLOG_CONFFILE" ]; then
-	   logMsgToConfigSysLog "WARN" "WARN: nginx syslog file $NGINX_SYSLOG_CONFFILE already exist."
-		while true; do
-			read -p "Do you wish to override $NGINX_SYSLOG_CONFFILE? (yes/no)" yn
-			case $yn in
-				[Yy]* )
-		logMsgToConfigSysLog "INFO" "INFO: Going to back up the conf file: $NGINX_SYSLOG_CONFFILE to $NGINX_SYSLOG_CONFFILE_BACKUP";
-				sudo mv -f $NGINX_SYSLOG_CONFFILE $NGINX_SYSLOG_CONFFILE_BACKUP;
-				write21NginxFileContents;
-				break;;
-				[Nn]* ) break;;
-				* ) echo "Please answer yes or no.";;
-			esac
-		done
+		logMsgToConfigSysLog "WARN" "WARN: nginx syslog file $NGINX_SYSLOG_CONFFILE already exist."
+		if [ "$SUPPRESS_PROMPT" == "false" ]; then
+		   while true; do
+				read -p "Do you wish to override $NGINX_SYSLOG_CONFFILE? (yes/no)" yn
+				case $yn in
+					[Yy]* )
+					logMsgToConfigSysLog "INFO" "INFO: Going to back up the conf file: $NGINX_SYSLOG_CONFFILE to $NGINX_SYSLOG_CONFFILE_BACKUP";
+					sudo mv -f $NGINX_SYSLOG_CONFFILE $NGINX_SYSLOG_CONFFILE_BACKUP;
+					write21NginxFileContents;
+					break;;
+					[Nn]* ) break;;
+					* ) echo "Please answer yes or no.";;
+				esac
+			done
+	   else
+			logMsgToConfigSysLog "INFO" "INFO: Going to back up the conf file: $NGINX_SYSLOG_CONFFILE to $NGINX_SYSLOG_CONFFILE_BACKUP";
+			sudo mv -f $NGINX_SYSLOG_CONFFILE $NGINX_SYSLOG_CONFFILE_BACKUP;
+			write21NginxFileContents;
+	   fi
 	else
 		write21NginxFileContents
 	fi
 }
 
+addTagsInConfiguration()
+{
+	#split tags by comman(,)
+	IFS=, read -a array <<< "$LOGGLY_FILE_TAG"
+	for i in "${array[@]}"
+	do
+		TAG="$TAG tag=\\\"$i\\\" "
+	done
+}
 #function to write the contents of nginx syslog config file
 write21NginxFileContents()
 {
@@ -213,7 +243,7 @@ write21NginxFileContents()
 	\$InputRunFileMonitor
 
 	#Add a tag for nginx events
-	\$template LogglyFormatNginx,\"<%pri%>%protocol-version% %timestamp:::date-rfc3339% %HOSTNAME% %app-name% %procid% %msgid% [$LOGGLY_AUTH_TOKEN@41058 tag=\\\"nginx\\\"] %msg%\n\"
+	\$template LogglyFormatNginx,\"<%pri%>%protocol-version% %timestamp:::date-rfc3339% %HOSTNAME% %app-name% %procid% %msgid% [$LOGGLY_AUTH_TOKEN@41058 $TAG] %msg%\n\"
 
 	if \$programname == 'nginx-access' then @@logs-01.loggly.com:514;LogglyFormatNginx
 	if \$programname == 'nginx-access' then ~
@@ -229,7 +259,6 @@ EOIPFW
 	restartRsyslog
 }
 
-
 #checks if the nginx logs made to loggly
 checkIfNginxLogsMadeToLoggly()
 {
@@ -238,8 +267,19 @@ checkIfNginxLogsMadeToLoggly()
 
 	nginxInitialLogCount=0
 	nginxLatestLogCount=0
-	queryParam="tag%3Anginx&from=-15m&until=now&size=1"
-
+	
+	TAGS=
+	IFS=, read -a array <<< "$LOGGLY_FILE_TAG"
+	for i in "${array[@]}"
+	do
+		if [ "$TAGS" == "" ]; then
+			TAGS="tag%3A$i" 
+		else
+			TAGS="$TAGS%20tag%3A$i"
+		fi
+	done
+	
+	queryParam="$TAGS&from=-15m&until=now&size=1"
 	queryUrl="$LOGGLY_ACCOUNT_URL/apiv2/search?q=$queryParam"
 	logMsgToConfigSysLog "INFO" "INFO: Search URL: $queryUrl"
 
@@ -267,8 +307,29 @@ checkIfNginxLogsMadeToLoggly()
 	done
 
 	if [ "$nginxLatestLogCount" -gt "$nginxInitialLogCount" ]; then
-		logMsgToConfigSysLog "SUCCESS" "SUCCESS: nginx logs successfully transferred to Loggly! You are now sending nginx logs to Loggly."
-		exit 0
+		logMsgToConfigSysLog "INFO" "INFO: Nginx logs successfully transferred to Loggly! You are now sending Nginx logs to Loggly."
+		checkIfLogsAreParsedInLoggly
+	fi
+}
+
+#verifying if the logs are being parsed or not
+checkIfLogsAreParsedInLoggly()
+{
+	nginxInitialLogCount=0
+	TAG_PARSER=
+	IFS=, read -a array <<< "$LOGGLY_FILE_TAG"
+	for i in "${array[@]}"
+	do
+		TAG_PARSER="$TAG_PARSER%20tag%3A$i "
+	done
+	queryParam="logtype%3Anginx$TAG_PARSER&from=-15m&until=now&size=1"
+	queryUrl="$LOGGLY_ACCOUNT_URL/apiv2/search?q=$queryParam"
+	searchAndFetch nginxInitialLogCount "$queryUrl"
+	logMsgToConfigSysLog "INFO" "INFO: Verifying if the Nginx logs are parsed in Loggly."
+	if [ "$nginxInitialLogCount" -gt 0 ]; then  
+		logMsgToConfigSysLog "INFO" "INFO: Nginx logs successfully parsed in Loggly!"
+	else
+		logMsgToConfigSysLog "WARN" "WARN: We received your logs but they do not appear to use one of our automatically parsed formats. You can still do full text search and counts on these logs, but you won't be able to use our field explorer. Please consider switching to one of our automated formats https://www.loggly.com/docs/automated-parsing/"
 	fi
 }
 
@@ -287,7 +348,7 @@ remove21NginxConfFile()
 usage()
 {
 cat << EOF
-usage: configure-nginx [-a loggly auth account or subdomain] [-t loggly token (optional)] [-u username] [-p password (optional)]
+usage: configure-nginx [-a loggly auth account or subdomain] [-t loggly token (optional)] [-u username] [-p password (optional)] [-tag filetag1,filetag2 (optional)] [-s suppress prompts {optional)]
 usage: configure-nginx [-a loggly auth account or subdomain] [-r to rollback]
 usage: configure-nginx [-h for help]
 EOF
@@ -316,9 +377,16 @@ while [ "$1" != "" ]; do
 	  -p | --password ) shift
           LOGGLY_PASSWORD=$1
          ;;
+	-tag| --filetag ) shift
+		  LOGGLY_FILE_TAG=$1
+		  echo "File tag: $LOGGLY_FILE_TAG"
+		  ;;
       -r | --rollback )
 		  LOGGLY_ROLLBACK="true"
           ;;
+	  -s | --suppress )
+		  SUPPRESS_PROMPT="true"
+		  ;;
       -h | --help)
           usage
           exit

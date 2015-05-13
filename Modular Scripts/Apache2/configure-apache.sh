@@ -9,7 +9,7 @@ source configure-linux.sh "being-invoked"
 #name of the current script
 SCRIPT_NAME=configure-apache.sh
 #version of the current script
-SCRIPT_VERSION=1.2
+SCRIPT_VERSION=1.5
 
 #we have not found the apache version yet at this point in the script
 APP_TAG="\"apache-version\":\"\""
@@ -32,10 +32,16 @@ LOGGLY_APACHE_LOG_HOME=
 #this variable will hold the users apache version
 APACHE_VERSION=
 
-MANUAL_CONFIG_INSTRUCTION="Manual instructions to configure Apache2 is available at https://www.loggly.com/docs/sending-apache-logs/"
+MANUAL_CONFIG_INSTRUCTION="Manual instructions to configure Apache2 is available at https://www.loggly.com/docs/sending-apache-logs/. Rsyslog troubleshooting instructions are available at https://www.loggly.com/docs/troubleshooting-rsyslog/"
 
 #this variable will hold if the check env function for linux is invoked
 APACHE_ENV_VALIDATED="false"
+
+#apache as tag sent with the logs
+LOGGLY_FILE_TAG="apache"
+
+#add tags to the logs
+TAG=
 ##########  Variable Declarations - End  ##########
 
 #check if apache environment is compatible for Loggly
@@ -64,7 +70,10 @@ installLogglyConfForApache()
 	
 	#configure loggly for Linux
 	installLogglyConf
-
+	
+	#multiple tags
+	addTagsInConfiguration
+	
 	#create 21apache.conf file
 	write21ApacheConfFile
 	
@@ -75,7 +84,7 @@ installLogglyConfForApache()
 	checkIfApacheLogsMadeToLoggly
 
 	#log success message
-	logMsgToConfigSysLog "SUCCESS" "SUCCESS: Apache successfully configured to send logs via Loggly."
+	logMsgToConfigSysLog "SUCCESS" "SUCCESS: Apache successfully configured to send logs to Loggly."
 }
 
 #executing script to remove loggly configuration for Apache
@@ -172,20 +181,24 @@ checkLogFileSize()
 	errorFileSize=$(wc -c "$2" | cut -f 1 -d ' ')
 	fileSize=$((accessFileSize+errorFileSize))
 	if [ $fileSize -ge 102400000 ]; then
-		logMsgToConfigSysLog "INFO" "INFO: "
-		while true; do
-			read -p "WARN: There are currently large log files which may use up your allowed volume. Please rotate your logs before continuing. Would you like to continue now anyway? (yes/no)" yn
-			case $yn in
-				[Yy]* )
-				logMsgToConfigSysLog "INFO" "INFO: Current apache logs size is $fileSize bytes. Continuing with Apache Loggly configuration.";
-				break;;
-				[Nn]* ) 
-				logMsgToConfigSysLog "INFO" "INFO: Current apache logs size is $fileSize bytes. Discontinuing with Apache Loggly configuration."
-				exit 1
-				break;;
-				* ) echo "Please answer yes or no.";;
-			esac
-		done
+		if [ "$SUPPRESS_PROMPT" == "false" ]; then
+			while true; do
+				read -p "WARN: There are currently large log files which may use up your allowed volume. Please rotate your logs before continuing. Would you like to continue now anyway? (yes/no)" yn
+				case $yn in
+					[Yy]* )
+					logMsgToConfigSysLog "INFO" "INFO: Current apache logs size is $fileSize bytes. Continuing with Apache Loggly configuration.";
+					break;;
+					[Nn]* ) 
+					logMsgToConfigSysLog "INFO" "INFO: Current apache logs size is $fileSize bytes. Discontinuing with Apache Loggly configuration."
+					exit 1
+					break;;
+					* ) echo "Please answer yes or no.";;
+				esac
+			done
+		else
+			logMsgToConfigSysLog "WARN" "WARN: There are currently large log files which may use up your allowed volume."
+			logMsgToConfigSysLog "INFO" "INFO: Current apache logs size is $fileSize bytes. Continuing with Apache Loggly configuration."
+		fi
 	elif [ $fileSize -eq 0 ]; then
 		logMsgToConfigSysLog "WARN" "WARN: There are no recent logs from Apache there so won't be any sent to Loggly. You can generate some logs by visiting a page on your web server."
 		exit 1
@@ -197,24 +210,40 @@ write21ApacheConfFile()
 	#Create apache syslog config file if it doesn't exist
 	echo "INFO: Checking if apache sysconf file $APACHE_SYSLOG_CONFFILE exist."
 	if [ -f "$APACHE_SYSLOG_CONFFILE" ]; then
+	   
 	   logMsgToConfigSysLog "WARN" "WARN: Apache syslog file $APACHE_SYSLOG_CONFFILE already exist."
-		while true; do
-			read -p "Do you wish to override $APACHE_SYSLOG_CONFFILE? (yes/no)" yn
-			case $yn in
-				[Yy]* )
-				logMsgToConfigSysLog "INFO" "INFO: Going to back up the conf file: $APACHE_SYSLOG_CONFFILE to $APACHE_SYSLOG_CONFFILE_BACKUP";
-				sudo mv -f $APACHE_SYSLOG_CONFFILE $APACHE_SYSLOG_CONFFILE_BACKUP;
-				write21ApacheFileContents;
-				break;;
-				[Nn]* ) break;;
-				* ) echo "Please answer yes or no.";;
-			esac
-		done
+	   if [ "$SUPPRESS_PROMPT" == "false" ]; then
+			while true; do
+				read -p "Do you wish to override $APACHE_SYSLOG_CONFFILE? (yes/no)" yn
+				case $yn in
+					[Yy]* )
+					logMsgToConfigSysLog "INFO" "INFO: Going to back up the conf file: $APACHE_SYSLOG_CONFFILE to $APACHE_SYSLOG_CONFFILE_BACKUP";
+					sudo mv -f $APACHE_SYSLOG_CONFFILE $APACHE_SYSLOG_CONFFILE_BACKUP;
+					write21ApacheFileContents;
+					break;;
+					[Nn]* ) break;;
+					* ) echo "Please answer yes or no.";;
+				esac
+			done
+	   else
+			logMsgToConfigSysLog "INFO" "INFO: Going to back up the conf file: $APACHE_SYSLOG_CONFFILE to $APACHE_SYSLOG_CONFFILE_BACKUP";
+			sudo mv -f $APACHE_SYSLOG_CONFFILE $APACHE_SYSLOG_CONFFILE_BACKUP;
+			write21ApacheFileContents;
+	   fi
 	else
 		write21ApacheFileContents
 	fi
 }
 
+addTagsInConfiguration()
+{
+	#split tags by comman(,)
+	IFS=, read -a array <<< "$LOGGLY_FILE_TAG"
+	for i in "${array[@]}"
+	do
+		TAG="$TAG tag=\\\"$i\\\" "
+	done
+}
 #function to write the contents of apache syslog config file
 write21ApacheFileContents()
 {
@@ -249,7 +278,7 @@ write21ApacheFileContents()
 	\$InputRunFileMonitor
 
 	#Add a tag for apache events
-	\$template LogglyFormatApache,\"<%pri%>%protocol-version% %timestamp:::date-rfc3339% %HOSTNAME% %app-name% %procid% %msgid% [$LOGGLY_AUTH_TOKEN@41058 tag=\\\"apache\\\"] %msg%\n\"
+	\$template LogglyFormatApache,\"<%pri%>%protocol-version% %timestamp:::date-rfc3339% %HOSTNAME% %app-name% %procid% %msgid% [$LOGGLY_AUTH_TOKEN@41058 $TAG] %msg%\n\"
 
 	if \$programname == 'apache-access' then @@logs-01.loggly.com:514;LogglyFormatApache
 	if \$programname == 'apache-access' then ~
@@ -274,8 +303,19 @@ checkIfApacheLogsMadeToLoggly()
 
 	apacheInitialLogCount=0
 	apacheLatestLogCount=0
-	queryParam="tag%3Aapache&from=-15m&until=now&size=1"
-
+	
+	TAGS=
+	IFS=, read -a array <<< "$LOGGLY_FILE_TAG"
+	for i in "${array[@]}"
+	do
+		if [ "$TAGS" == "" ]; then
+			TAGS="tag%3A$i" 
+		else
+			TAGS="$TAGS%20tag%3A$i"
+		fi
+	done
+	
+	queryParam="$TAGS&from=-15m&until=now&size=1"
 	queryUrl="$LOGGLY_ACCOUNT_URL/apiv2/search?q=$queryParam"
 	logMsgToConfigSysLog "INFO" "INFO: Search URL: $queryUrl"
 
@@ -297,14 +337,35 @@ checkIfApacheLogsMadeToLoggly()
 		searchAndFetch apacheLatestLogCount "$queryUrl"
 		let counter=$counter+1
 		if [ "$counter" -gt "$maxCounter" ]; then
-			logMsgToConfigSysLog "ERROR" "ERROR: Apache logs did not make to Loggly in time. Please check network and firewall settings and retry."
-			exit 1
+			logMsgToConfigSysLog  "ERROR" "ERROR: Apache logs did not make to Loggly in time. Please check network and firewall settings and retry."
+            exit 1
 		fi
 	done
 
 	if [ "$apacheLatestLogCount" -gt "$apacheInitialLogCount" ]; then
-		logMsgToConfigSysLog "SUCCESS" "SUCCESS: Apache logs successfully transferred to Loggly! You are now sending Apache logs to Loggly."
-		exit 0
+		logMsgToConfigSysLog "INFO" "INFO: Apache logs successfully transferred to Loggly! You are now sending Apache logs to Loggly."
+		checkIfLogsAreParsedInLoggly
+	fi
+}
+#verifying if the logs are being parsed or not
+checkIfLogsAreParsedInLoggly()
+{
+	apacheInitialLogCount=0
+	TAG_PARSER=
+	IFS=, read -a array <<< "$LOGGLY_FILE_TAG"
+	
+	for i in "${array[@]}"
+	do
+		TAG_PARSER="$TAG_PARSER%20tag%3A$i "
+	done
+	queryParam="logtype%3Aapache$TAG_PARSER&from=-15m&until=now&size=1"
+	queryUrl="$LOGGLY_ACCOUNT_URL/apiv2/search?q=$queryParam"
+	searchAndFetch apacheInitialLogCount "$queryUrl"
+	logMsgToConfigSysLog "INFO" "INFO: Verifying if the Apache logs are parsed in Loggly."
+	if [ "$apacheInitialLogCount" -gt 0 ]; then  
+		logMsgToConfigSysLog "INFO" "INFO: Apache logs successfully parsed in Loggly!"
+	else
+		logMsgToConfigSysLog "WARN" "WARN: We received your logs but they do not appear to use one of our automatically parsed formats. You can still do full text search and counts on these logs, but you won't be able to use our field explorer. Please consider switching to one of our automated formats https://www.loggly.com/docs/automated-parsing/"
 	fi
 }
 
@@ -323,7 +384,7 @@ remove21ApacheConfFile()
 usage()
 {
 cat << EOF
-usage: configure-apache [-a loggly auth account or subdomain] [-t loggly token (optional)] [-u username] [-p password (optional)]
+usage: configure-apache [-a loggly auth account or subdomain] [-t loggly token (optional)] [-u username] [-p password (optional)] [-tag filetag1,filetag2 (optional)] [-s suppress prompts {optional)]
 usage: configure-apache [-a loggly auth account or subdomain] [-r to rollback]
 usage: configure-apache [-h for help]
 EOF
@@ -352,9 +413,16 @@ while [ "$1" != "" ]; do
 	  -p | --password ) shift
           LOGGLY_PASSWORD=$1
          ;;
+	  -tag| --filetag ) shift
+		  LOGGLY_FILE_TAG=$1
+		  echo "File tag: $LOGGLY_FILE_TAG"
+		  ;;
       -r | --rollback )
 		  LOGGLY_ROLLBACK="true"
           ;;
+	  -s | --suppress )
+		  SUPPRESS_PROMPT="true"
+		  ;;
       -h | --help)
           usage
           exit

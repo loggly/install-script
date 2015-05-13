@@ -9,7 +9,7 @@ source configure-linux.sh "being-invoked"
 #name of the current script
 SCRIPT_NAME=configure-tomcat.sh
 #version of the current script
-SCRIPT_VERSION=1.1
+SCRIPT_VERSION=1.3
 
 #minimum version of tomcat to enable log rotation
 MIN_TOMCAT_VERSION=6.0.33.0
@@ -43,11 +43,17 @@ TOMCAT_VERSION=
 #this variable will hold the location of log4j files path
 LOG4J_FILE_PATH=
 
+#tomcat as tag sent with the logs
+LOGGLY_FILE_TAG="tomcat"
+
+#add tags to the logs
+TAG=
+
 #this variable will hold the catalina home provide by user.
 #this is not a mandatory input
 LOGGLY_CATALINA_HOME=
 
-MANUAL_CONFIG_INSTRUCTION="Manual instructions to configure Tomcat is available at https://www.loggly.com/docs/tomcat-application-server"
+MANUAL_CONFIG_INSTRUCTION="Manual instructions to configure Tomcat is available at https://www.loggly.com/docs/tomcat-application-server/. Rsyslog troubleshooting instructions are available at https://www.loggly.com/docs/troubleshooting-rsyslog/"
 
 #this variable will hold if the check env function for linux is invoked
 TOMCAT_ENV_VALIDATED=
@@ -91,7 +97,10 @@ installLogglyConfForTomcat()
 
 	#update logging.properties file for log rotation
 	updateLoggingPropertiesFile
-
+	
+	#multiple tags
+	addTagsInConfiguration
+	
 	#create 21tomcat.conf file
 	write21TomcatConfFile
 
@@ -334,18 +343,22 @@ checkIfTomcatConfiguredWithLog4J()
 
 canTomcatBeRestarted()
 {
-	while true; do
-		read -p "Tomcat needs to be restarted during configuration. Do you wish to continue? (yes/no)" yn
-		case $yn in
-			[Yy]* )
-			break;;
-			[Nn]* )
-			logMsgToConfigSysLog "WARN" "WARN: This script must restart Tomcat. Please run the script again when you are ready to restart it. No changes have been made to your system. Exiting."
-			exit 1
-			break;;
-			* ) echo "Please answer yes or no.";;
-		esac
-	done
+	if [ "$SUPPRESS_PROMPT" == "false" ]; then
+		while true; do
+			read -p "Tomcat needs to be restarted during configuration. Do you wish to continue? (yes/no)" yn
+			case $yn in
+				[Yy]* )
+				break;;
+				[Nn]* )
+				logMsgToConfigSysLog "WARN" "WARN: This script must restart Tomcat. Please run the script again when you are ready to restart it. No changes have been made to your system. Exiting."
+				exit 1
+				break;;
+				* ) echo "Please answer yes or no.";;
+			esac
+		done
+	else
+		logMsgToConfigSysLog "WARN" "WARN:Tomcat needs to be restarted during configuration."
+	fi
 }
 #backup the logging.properties file in the CATALINA_HOME folder
 backupLoggingPropertiesFile()
@@ -414,24 +427,41 @@ EOIPFW
 	fi
 }
 
+
+addTagsInConfiguration()
+{
+	#split tags by comman(,)
+	IFS=, read -a array <<< "$LOGGLY_FILE_TAG"
+	for i in "${array[@]}"
+	do
+		TAG="$TAG tag=\\\"$i\\\" "
+	done
+}
+
 write21TomcatConfFile()
 {
 	#Create tomcat syslog config file if it doesn't exist
 	echo "INFO: Checking if tomcat sysconf file $TOMCAT_SYSLOG_CONFFILE exist."
 	if [ -f "$TOMCAT_SYSLOG_CONFFILE" ]; then
 	   logMsgToConfigSysLog "WARN" "WARN: Tomcat syslog file $TOMCAT_SYSLOG_CONFFILE already exist."
-		while true; do
-			read -p "Do you wish to override $TOMCAT_SYSLOG_CONFFILE? (yes/no)" yn
-			case $yn in
-				[Yy]* )
-				logMsgToConfigSysLog "INFO" "INFO: Going to back up the conf file: $TOMCAT_SYSLOG_CONFFILE to $TOMCAT_SYSLOG_CONFFILE_BACKUP";
-				sudo mv -f $TOMCAT_SYSLOG_CONFFILE $TOMCAT_SYSLOG_CONFFILE_BACKUP;
-				write21TomcatFileContents;
-				break;;
-				[Nn]* ) break;;
-				* ) echo "Please answer yes or no.";;
-			esac
-		done
+	   if [ "$SUPPRESS_PROMPT" == "false" ]; then
+			while true; do
+				read -p "Do you wish to override $TOMCAT_SYSLOG_CONFFILE? (yes/no)" yn
+				case $yn in
+					[Yy]* )
+					logMsgToConfigSysLog "INFO" "INFO: Going to back up the conf file: $TOMCAT_SYSLOG_CONFFILE to $TOMCAT_SYSLOG_CONFFILE_BACKUP";
+					sudo mv -f $TOMCAT_SYSLOG_CONFFILE $TOMCAT_SYSLOG_CONFFILE_BACKUP;
+					write21TomcatFileContents;
+					break;;
+					[Nn]* ) break;;
+					* ) echo "Please answer yes or no.";;
+				esac
+			done
+	   else
+			logMsgToConfigSysLog "INFO" "INFO: Going to back up the conf file: $TOMCAT_SYSLOG_CONFFILE to $TOMCAT_SYSLOG_CONFFILE_BACKUP";
+			sudo mv -f $TOMCAT_SYSLOG_CONFFILE $TOMCAT_SYSLOG_CONFFILE_BACKUP;
+			write21TomcatFileContents;
+	   fi
 	else
 		write21TomcatFileContents
 	fi
@@ -455,7 +485,7 @@ write21TomcatFileContents()
 	imfileStr+="
 	#parameterized token here.......
 	#Add a tag for tomcat events
-	\$template LogglyFormatTomcat,\"<%pri%>%protocol-version% %timestamp:::date-rfc3339% %HOSTNAME% %app-name% %procid% %msgid% [$LOGGLY_AUTH_TOKEN@41058 tag=\\\"tomcat\\\"] %msg%\n\"
+	\$template LogglyFormatTomcat,\"<%pri%>%protocol-version% %timestamp:::date-rfc3339% %HOSTNAME% %app-name% %procid% %msgid% [$LOGGLY_AUTH_TOKEN@41058 $TAG] %msg%\n\"
 
 	# catalina.out
 	\$InputFileName $LOGGLY_CATALINA_LOG_HOME/catalina.out
@@ -643,7 +673,7 @@ restartTomcat()
 usage()
 {
 cat << EOF
-usage: configure-tomcat [-a loggly auth account or subdomain] [-t loggly token (optional)] [-u username] [-p password (optional)] [-ch catalina home (optional)]
+usage: configure-tomcat [-a loggly auth account or subdomain] [-t loggly token (optional)] [-u username] [-p password (optional)] [-ch catalina home (optional)] [-tag filetag1,filetag2 (optional)]  [-s suppress prompts {optional)]
 usage: configure-tomcat [-r to rollback] [-a loggly auth account or subdomain] [-ch catalina home (optional)]
 usage: configure-tomcat [-h for help]
 EOF
@@ -675,10 +705,17 @@ while [ "$1" != "" ]; do
          ;;
 	  -p | --password ) shift
           LOGGLY_PASSWORD=$1
-         ;;
+	 ;;
+      -tag| --filetag ) shift
+	  LOGGLY_FILE_TAG=$1
+	  echo "File tag: $LOGGLY_FILE_TAG"
+	  ;;
       -r | --rollback )
-		  LOGGLY_ROLLBACK="true"
+	  LOGGLY_ROLLBACK="true"
           ;;
+      -s | --suppress )
+	  SUPPRESS_PROMPT="true"
+	  ;;
       -h | --help)
           usage
           exit

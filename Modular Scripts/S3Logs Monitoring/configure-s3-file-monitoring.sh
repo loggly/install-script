@@ -8,13 +8,21 @@ source configure-file-monitoring.sh "being-invoked"
 #name of the current script
 SCRIPT_NAME=configure-s3-file-monitoring.sh
 #version of the current script
-SCRIPT_VERSION=1.3
+SCRIPT_VERSION=1.5
 
 #s3 bucket name to configure
 LOGGLY_S3_BUCKET_NAME=
 
 #alias name, will be used as tag & state file name etc. provided by user
 LOGGLY_S3_ALIAS=
+FILE_ALIAS=
+STATE_FILE_ALIAS=
+
+#file as tag sent with the logs
+LOGGLY_FILE_TAG="s3file"
+
+#format name for the conf file. Can be set by calling script
+CONF_FILE_FORMAT_NAME="LogglyFormatS3"
 
 #file alias provided by the user
 APP_TAG="\"s3file-alias\":\"\""
@@ -33,7 +41,7 @@ TEMP_DIR=
 
 IS_S3CMD_CONFIGURED_BY_SCRIPT="false"
 
-MANUAL_CONFIG_INSTRUCTION="Manual instructions to configure a file is available at https://www.loggly.com/docs/file-monitoring/"
+MANUAL_CONFIG_INSTRUCTION="Manual instructions to configure a file is available at https://www.loggly.com/docs/file-monitoring/. Rsyslog troubleshooting instructions are available at https://www.loggly.com/docs/troubleshooting-rsyslog/"
 
 ##########  Variable Declarations - End  ##########
 
@@ -55,9 +63,6 @@ installLogglyConfForS3()
 	#check if s3bucket is valid
 	checkIfValidS3Bucket
 
-	#configure loggly for Linux
-	installLogglyConf
-	
 	#create temporary directory
 	createTempDir
 
@@ -211,18 +216,20 @@ createTempDir()
 	if [ -d "$TEMP_DIR" ]; then
 		if [ "$(ls -A $TEMP_DIR)" ]; then
 			logMsgToConfigSysLog "WARN" "WARN: There are some files/folders already present in $TEMP_DIR. If you continue, the files currently inside the $TEMP_DIR will also be configured to send logs to loggly."
-			while true; do
-				read -p "Would you like to continue now anyway? (yes/no)" yn
-				case $yn in
-					[Yy]* )
-					break;;
-					[Nn]* ) 
-					logMsgToConfigSysLog "INFO" "INFO: Discontinuing with s3 file monitoring configuration."
-					exit 1
-					break;;
-					* ) echo "Please answer yes or no.";;
-				esac
-			done
+			if [ "$SUPPRESS_PROMPT" == "false" ]; then
+				while true; do
+					read -p "Would you like to continue now anyway? (yes/no)" yn
+					case $yn in
+						[Yy]* )
+						break;;
+						[Nn]* ) 
+						logMsgToConfigSysLog "INFO" "INFO: Discontinuing with s3 file monitoring configuration."
+						exit 1
+						break;;
+						* ) echo "Please answer yes or no.";;
+					esac
+				done
+			fi
 		fi		
 	else
 		if [ -d "/tmp/s3monitoring" ]; then
@@ -248,37 +255,15 @@ downloadS3Bucket()
 	fi
 }
 
-
 invokeS3FileMonitoring()
 {
 	dir=/tmp/s3monitoring/$LOGGLY_S3_ALIAS
-	#TODO: Not supporting multiple files with same name in different directories
-	#only supporting file with naming convention *.*
-	for f in $(find $dir -name '*')
-	do
-		fileNameWithExt=${f##*/}
-        uniqueFileName=$(echo "$fileNameWithExt" | tr . _)
-		var=$(file $f)
-		
-		#it may be possible that the "text" may contain some uppercase letters like "Text"
-		var=$(echo $var | tr "[:upper:]" "[:lower:]")
-		
-		if [[ $var == *text* ]]; then
-			LOGGLY_FILE_TO_MONITOR_ALIAS=$uniqueFileName-$LOGGLY_S3_ALIAS
-			LOGGLY_FILE_TO_MONITOR=$f
-			LOGGLY_FILE_TAG="s3file"
-			CONF_FILE_FORMAT_NAME="LogglyFormatS3"
-			constructFileVariables
-			checkFileReadPermission
-			checkLogFileSize $LOGGLY_FILE_TO_MONITOR
-			write21ConfFileContents
-			IS_ANY_FILE_CONFIGURED="true"
-		#ignoring directory
-		elif [[ $var != *directory* ]]; then
-			logMsgToConfigSysLog "WARN" "WARN: File $fileNameWithExt is not a text file. Ignoring."
-		fi
-	done
+	LOGGLY_FILE_TO_MONITOR=$dir
 	
+	configureDirectoryFileMonitoring
+
+	IS_ANY_FILE_CONFIGURED="true"
+
 	if [ "$IS_ANY_FILE_CONFIGURED" != "false" ]; then
 		restartRsyslog
 	fi
@@ -286,64 +271,71 @@ invokeS3FileMonitoring()
 
 installCronToSyncS3BucketPeriodically()
 {
-	while true; do
-		read -p "Would you like install a Cron job to sync the files currently in your bucket every 5 minutes? (yes/no)" yn
-		case $yn in
-			[Yy]* )
-			
-				#copying .s3cfg file to /root so that it can be used by crontab for sync
-				if ! sudo test -f "/root/.s3cfg" ; then
-					sudo cp $HOME/.s3cfg /root
-				fi
-			
-				CRON_FILE="/tmp/s3monitoring/cron_$LOGGLY_S3_ALIAS"
-				CRON_SYNC_PATH="/tmp/s3monitoring/$LOGGLY_S3_ALIAS"
-				
-				#checking if the provided s3 path if of directory or file
-				IS_DIR="true"
-				BUCKET_URL_LAST_VALUE=$(echo ${LOGGLY_S3_BUCKET_NAME##*/})
-				
-				if [ "$BUCKET_URL_LAST_VALUE" != "" ]; then
-					for fle in $(find $CRON_SYNC_PATH -name $BUCKET_URL_LAST_VALUE)
-					do
-						if [ -f $fle ]; then
-							IS_DIR="false"
-							break
-						fi
-					done
-				fi
-				
-				#adding file name to the sync folder as the bucket path is
-				#provided upto a file
-				if [ "$IS_DIR" == "false" ]; then
-					CRON_SYNC_PATH="$CRON_SYNC_PATH/$BUCKET_URL_LAST_VALUE"
-				fi
-				
-				logMsgToConfigSysLog "INFO" "INFO: Creating a Cron job to sync $LOGGLY_S3_BUCKET_NAME files to $CRON_SYNC_PATH in every five minutes."
-				
-				#setting up cron job
-				CRON_JOB_TO_SYNC_S3_BUCKET="*/5 * * * * s3cmd sync $LOGGLY_S3_BUCKET_NAME --preserve $CRON_SYNC_PATH"
-				
-				EXISTING_CRONS=$(sudo crontab -l 2>&1)
-				case $EXISTING_CRONS in
-					no*)
-						;;
-					*)
-						echo "$EXISTING_CRONS" >> $CRON_FILE
-						;;
-				esac
-				
-				echo "$CRON_JOB_TO_SYNC_S3_BUCKET" >> $CRON_FILE
-				sudo crontab $CRON_FILE
-				sudo rm -fr $CRON_FILE
-				break;;
-			[Nn]* ) 
-				logMsgToConfigSysLog "INFO" "INFO: Skipping Cron installation."
-				break;;
-			* ) echo "Please answer yes or no.";;
-		esac
-	done
+	if [ "$SUPPRESS_PROMPT" == "false" ]; then
+		while true; do
+			read -p "Would you like install a Cron job to sync the files currently in your bucket every 5 minutes? (yes/no)" yn
+			case $yn in
+				[Yy]* )
+					doS3CronInstallation
+					break;;
+				[Nn]* ) 
+					logMsgToConfigSysLog "INFO" "INFO: Skipping Cron installation."
+					break;;
+				* ) echo "Please answer yes or no.";;
+			esac
+		done
+	else
+		doS3CronInstallation
+	fi
+}
+
+doS3CronInstallation()
+{
+	#copying .s3cfg file to /root so that it can be used by crontab for sync
+	if ! sudo test -f "/root/.s3cfg" ; then
+		sudo cp $HOME/.s3cfg /root
+	fi
+
+	CRON_FILE="/tmp/s3monitoring/cron_$LOGGLY_S3_ALIAS"
+	CRON_SYNC_PATH="/tmp/s3monitoring/$LOGGLY_S3_ALIAS"
 	
+	#checking if the provided s3 path if of directory or file
+	IS_DIR="true"
+	BUCKET_URL_LAST_VALUE=$(echo ${LOGGLY_S3_BUCKET_NAME##*/})
+	
+	if [ "$BUCKET_URL_LAST_VALUE" != "" ]; then
+		for fle in $(find $CRON_SYNC_PATH -name $BUCKET_URL_LAST_VALUE)
+		do
+			if [ -f $fle ]; then
+				IS_DIR="false"
+				break
+			fi
+		done
+	fi
+	
+	#adding file name to the sync folder as the bucket path is
+	#provided upto a file
+	if [ "$IS_DIR" == "false" ]; then
+		CRON_SYNC_PATH="$CRON_SYNC_PATH/$BUCKET_URL_LAST_VALUE"
+	fi
+	
+	logMsgToConfigSysLog "INFO" "INFO: Creating a Cron job to sync $LOGGLY_S3_BUCKET_NAME files to $CRON_SYNC_PATH in every five minutes."
+	
+	#setting up cron job
+	CRON_JOB_TO_SYNC_S3_BUCKET="*/5 * * * * s3cmd sync $LOGGLY_S3_BUCKET_NAME --preserve $CRON_SYNC_PATH"
+	
+	EXISTING_CRONS=$(sudo crontab -l 2>&1)
+	case $EXISTING_CRONS in
+		no*)
+			;;
+		*)
+			echo "$EXISTING_CRONS" >> $CRON_FILE
+			;;
+	esac
+	
+	echo "$CRON_JOB_TO_SYNC_S3_BUCKET" >> $CRON_FILE
+	sudo crontab $CRON_FILE
+	sudo rm -fr $CRON_FILE
 }
 
 deleteTempDir()
@@ -429,7 +421,7 @@ deleteS3CronFromCrontab()
 usage()
 {
 cat << EOF
-usage: configure-s3-file-monitoring [-a loggly auth account or subdomain] [-t loggly token (optional)] [-u username] [-p password (optional)] [-s3url s3bucketname ] [-s3l s3alias]
+usage: configure-s3-file-monitoring [-a loggly auth account or subdomain] [-t loggly token (optional)] [-u username] [-p password (optional)] [-s3url s3bucketname ] [-s3l s3alias] [-s suppress prompts {optional)]
 usage: configure-s3-file-monitoring [-a loggly auth account or subdomain] [-r to rollback] [-s3l s3alias]
 usage: configure-s3-file-monitoring [-h for help]
 EOF
@@ -468,8 +460,13 @@ while [ "$1" != "" ]; do
 		
 		-s3l | --s3alias ) shift
 			LOGGLY_S3_ALIAS=$1
-			echo "File alias: $LOGGLY_S3_ALIAS"
+			FILE_ALIAS=$LOGGLY_S3_ALIAS
+			STATE_FILE_ALIAS=$LOGGLY_S3_ALIAS
+			echo "File alias: $FILE_ALIAS"
 		;;
+		-s | --suppress )
+			SUPPRESS_PROMPT="true"
+		  ;;
 		-h | --help)
 		usage
 		exit
