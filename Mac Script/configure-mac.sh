@@ -15,7 +15,7 @@ function ctrl_c()  {
 #name of the current script. This will get overwritten by the child script which calls this
 SCRIPT_NAME=configure-mac.sh
 #version of the current script. This will get overwritten by the child script which calls this
-SCRIPT_VERSION=1.1
+SCRIPT_VERSION=1.2
 
 #application tag. This will get overwritten by the child script which calls this
 APP_TAG=
@@ -89,6 +89,8 @@ PROP_FILE=
 #manual instructions to be show in case of error
 MANUAL_CONFIG_INSTRUCTION="Manual instructions to configure Loggly on Mac are available at https://www.loggly.com/docs/send-mac-logs-to-loggly/."
 
+MANUAL_XCODE_INSTALL_INSTRUCTION="Xcode command line tools are not installed on your system. Try running \"xcode-select --install\" to install xcode command line tools and run script again. You can download tools manually from https://developer.apple.com/"
+
 checkMacLogglyCompatibility()
 {	
 	#check if the user has root permission to run this script
@@ -115,7 +117,10 @@ checkMacLogglyCompatibility()
 	#check if minimum version of ruby is installed
 	checkIfMinRubyVersionInstalled
 	
-        MAC_ENV_VALIDATED="true"
+     	#check if xcode command line tools are installed
+    	checkIfXCodeCommandlineToolsInstalled
+
+    	MAC_ENV_VALIDATED="true"
 }
 
 # executing the script for loggly to install and configure fluentd.
@@ -191,9 +196,9 @@ checkIfUserHasRootPrivileges()
 #check if supported operating system
 checkIfSupportedOS()
 {
-    # Determine OS platform
-    UNAME=$(uname | tr "[:upper:]" "[:lower:]")
-    MAC_DIST=$UNAME
+    	# Determine OS platform
+    	UNAME=$(uname | tr "[:upper:]" "[:lower:]")
+    	MAC_DIST=$UNAME
 	if [ "$MAC_DIST" == "darwin" ]; then
 		logMsgToConfigSysLog "INFO" "INFO: Operating system is Mac"
 	else
@@ -304,6 +309,18 @@ checkIfMinRubyVersionInstalled()
     fi
 }
 
+checkIfXCodeCommandlineToolsInstalled()
+{
+    logMsgToConfigSysLog "INFO" "INFO: Checking if Xcode command line tools are installed."
+    
+    if [ $(xcode-select -p 2>/dev/null | wc -l ) == 0 ]; then
+        logMsgToConfigSysLog "ERROR" "ERROR: $MANUAL_XCODE_INSTALL_INSTRUCTION"
+        exit 1
+    else
+        logMsgToConfigSysLog "INFO" "INFO: Xcode command line tools are installed in your system."
+    fi
+}
+
 #this functions checks if the Fluentd gem is installed in the system
 checkIfFluentdInstalled()
 {
@@ -333,8 +350,8 @@ installFluentd()
 #this function installs Loggly fluentd plugin
 installLogglyFluentdPlugin()
 {
-    logMsgToConfigSysLog "INFO" "INFO: Installing Loggly plugin for Fluentd"
-    sudo gem install fluent-plugin-loggly
+    	logMsgToConfigSysLog "INFO" "INFO: Installing Loggly plugin for Fluentd"
+    	sudo gem install fluent-plugin-loggly
 	logMsgToConfigSysLog "INFO" "INFO: Loggly fluentd plugin installed successfully."
 }
 
@@ -415,7 +432,7 @@ configureFluentdAsService()
 	fi
 	
 	sudo touch $PROP_FILE
-    sudo chmod +x $PROP_FILE
+    	sudo chmod +x $PROP_FILE
 
 propStr="
 <?xml version="1.0" encoding="UTF-8"?>
@@ -455,7 +472,10 @@ startFluentdService()
 #check if the logs made it to Loggly
 checkIfLogsMadeToLoggly()
 {
-	logMsgToConfigSysLog "INFO" "INFO: Sending test message to Loggly."
+    	logMsgToConfigSysLog "INFO" "INFO: Sending test message to Loggly. Waiting for 30 secs."
+    
+    	#sleeping for 30 secs so that fluentd service can start doing its work properly
+    	sleep 30
 	uuid=$(cat /dev/urandom | env LC_CTYPE=C tr -dc 'a-zA-Z0-9' | fold -w 32 | head -n 1)	
 
 	queryParam="tag%3AMac%20$uuid"
