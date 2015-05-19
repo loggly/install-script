@@ -15,7 +15,7 @@ function ctrl_c()  {
 #name of the current script. This will get overwritten by the child script which calls this
 SCRIPT_NAME=configure-mac.sh
 #version of the current script. This will get overwritten by the child script which calls this
-SCRIPT_VERSION=1.2
+SCRIPT_VERSION=1.3
 
 #application tag. This will get overwritten by the child script which calls this
 APP_TAG=
@@ -46,6 +46,9 @@ LOGGLY_ACCOUNT_URL=
 
 #loggly.com URL
 LOGGLY_COM_URL=https://www.loggly.com
+
+#installation directory
+LOGGLY_HOME=$HOME/.loggly
 
 ######Inputs provided by user######
 #this variable will hold the loggly account name provided by user.
@@ -324,7 +327,7 @@ checkIfXCodeCommandlineToolsInstalled()
 #this functions checks if the Fluentd gem is installed in the system
 checkIfFluentdInstalled()
 {
-    if [ $(fluentd --setup ./fluent 2>/dev/null  | grep "./fluent/fluent.conf" | wc -l ) == 1 ]; then
+    if [ $(sudo fluentd --setup $LOGGLY_HOME/fluent 2>/dev/null  | grep ".loggly/fluent/fluent.conf" | wc -l ) == 1 ]; then
         logMsgToConfigSysLog "INFO" "INFO: Fluentd is already installed. Not installing."
     else
     	logMsgToConfigSysLog "INFO" "INFO: Fluentd is not installed. Installing Fluentd. This may take a while."
@@ -338,8 +341,12 @@ installFluentd()
 	#install fluentd gem http://docs.fluentd.org/articles/install-by-gem
 	sudo gem install fluentd --no-ri --no-rdoc
 	
+	if [[ ! -d "$LOGGLY_HOME" ]]; then
+                mkdir $LOGGLY_HOME
+        fi
+	
 	#to check fluentd installed successfully
-	if [ $(fluentd --setup ./fluent 2>/dev/null  | grep "./fluent/fluent.conf" | wc -l ) == 1 ]; then
+	if [ $(sudo fluentd --setup $LOGGLY_HOME/fluent 2>/dev/null  | grep ".loggly/fluent/fluent.conf" | wc -l ) == 1 ]; then
 		logMsgToConfigSysLog "INFO" "INFO: Fluentd installed Successfully"
 	else
 		logMsgToConfigSysLog "ERROR" "ERROR: Unable to install fluentd"
@@ -358,10 +365,6 @@ installLogglyFluentdPlugin()
 #function to write the contents of fluentd config file
 writeLogglyConfFile()
 {	
-
-	if [[ ! -d "$HOME/.loggly" ]]; then
-		mkdir $HOME/.loggly
-	fi
 
 	FLUENTD_CONF="$HOME/.loggly/fluentd-loggly.conf"
 
