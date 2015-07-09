@@ -9,7 +9,7 @@ source configure-linux.sh "being-invoked"
 #name of the current script
 SCRIPT_NAME=configure-tomcat.sh
 #version of the current script
-SCRIPT_VERSION=1.3
+SCRIPT_VERSION=1.4
 
 #minimum version of tomcat to enable log rotation
 MIN_TOMCAT_VERSION=6.0.33.0
@@ -109,7 +109,7 @@ installLogglyConfForTomcat()
 
 	#log success message
 	logMsgToConfigSysLog "SUCCESS" "SUCCESS: Tomcat successfully configured to send logs via Loggly."
-}
+    }
 
 #executing script to remove loggly configuration for tomcat
 removeLogglyConfForTomcat()
@@ -137,7 +137,7 @@ removeLogglyConfForTomcat()
 	logMsgToConfigSysLog "INFO" "INFO: Rollback completed."
 }
 
-#identify if tomcat6 or tomcat7 is installed on your system
+#identify if tomcat6/ tomcat7/ tomcat8 is installed on your system
 deduceAndCheckTomcatHomeAndVersion()
 {
 
@@ -313,8 +313,8 @@ getTomcatVersion()
 checkIfSupportedTomcatVersion()
 {
 	tomcatMajorVersion=${TOMCAT_VERSION%%.*}
-	if [[ ($tomcatMajorVersion -ne 6 ) &&  ($tomcatMajorVersion -ne 7) ]]; then
-		logMsgToConfigSysLog "ERROR" "ERROR: This script only supports Tomcat version 6 or 7."
+	if [[ ($tomcatMajorVersion -ne 6 ) &&  ($tomcatMajorVersion -ne 7) &&  ($tomcatMajorVersion -ne 8) ]]; then
+		logMsgToConfigSysLog "ERROR" "ERROR: This script only supports Tomcat version 6, 7 or 8."
 		exit 1
 	fi
 }
