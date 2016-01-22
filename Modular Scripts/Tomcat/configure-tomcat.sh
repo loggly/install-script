@@ -248,6 +248,7 @@ deduceAndCheckTomcatHomeAndVersion()
 				SERVICE=tomcat6
 			elif [ "$tomcatMajorVersion" = "8" ]; then
 				SERVICE=tomcat8
+			fi
 		else
 			logMsgToConfigSysLog "ERROR" "ERROR: Provided Catalina Home is not correct. Please recheck."
 		fi
