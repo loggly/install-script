@@ -9,7 +9,7 @@ source configure-linux.sh "being-invoked"
 #name of the current script
 SCRIPT_NAME=configure-file-monitoring.sh
 #version of the current script
-SCRIPT_VERSION=1.12
+SCRIPT_VERSION=1.13
 
 #file to monitor (contains complete path and file name) provided by user
 LOGGLY_FILE_TO_MONITOR=
@@ -411,20 +411,38 @@ write21ConfFileContents()
 		"
 	fi
 	
-	imfileStr+="
-	# File access file:
-	\$InputFileName $FILE_TO_MONITOR
-	\$InputFileTag $LOGGLY_FILE_TO_MONITOR_ALIAS:
-	\$InputFileStateFile stat-$STATE_FILE_ALIAS
-	\$InputFileSeverity info
-	\$InputFilePersistStateInterval 20000
-	\$InputRunFileMonitor
-	#Add a tag for file events
-	\$template $CONF_FILE_FORMAT_NAME,\"<%pri%>%protocol-version% %timestamp:::date-rfc3339% %HOSTNAME% %app-name% %procid% %msgid% [$LOGGLY_AUTH_TOKEN@41058 $TAG] %msg%\n\"
-	if \$programname == '$LOGGLY_FILE_TO_MONITOR_ALIAS' then @@logs-01.loggly.com:514;$CONF_FILE_FORMAT_NAME
-	if \$programname == '$LOGGLY_FILE_TO_MONITOR_ALIAS' then ~
-	"
-
+	rsyslog_version="$(rsyslogd -v)"
+	r_ver=${rsyslog_version:9:1}
+	if [ $r_ver -le 6 ] 
+	then
+		imfileStr+="
+		# File access file:
+		\$InputFileName $FILE_TO_MONITOR
+		\$InputFileTag $LOGGLY_FILE_TO_MONITOR_ALIAS:
+		\$InputFileStateFile stat-$STATE_FILE_ALIAS
+		\$InputFileSeverity info
+		\$InputFilePersistStateInterval 20000
+		\$InputRunFileMonitor
+		#Add a tag for file events
+		\$template $CONF_FILE_FORMAT_NAME,\"<%pri%>%protocol-version% %timestamp:::date-rfc3339% %HOSTNAME% %app-name% %procid% %msgid% [$LOGGLY_AUTH_TOKEN@41058 $TAG] %msg%\n\"
+		if \$programname == '$LOGGLY_FILE_TO_MONITOR_ALIAS' then @@logs-01.loggly.com:514;$CONF_FILE_FORMAT_NAME
+		if \$programname == '$LOGGLY_FILE_TO_MONITOR_ALIAS' then ~
+		"
+	else
+		imfileStr+="
+		# File access file:
+		\$InputFileName $FILE_TO_MONITOR
+		\$InputFileTag $LOGGLY_FILE_TO_MONITOR_ALIAS
+		\$InputFileStateFile stat-$STATE_FILE_ALIAS
+		\$InputFileSeverity info
+		\$InputFilePersistStateInterval 20000
+		\$InputRunFileMonitor
+		#Add a tag for file events
+		template (name=\"$CONF_FILE_FORMAT_NAME\" type=\"string\" string=\"<%pri%>%protocol-version% %timestamp:::date-rfc3339% %HOSTNAME% %app-name% %procid% %msgid% [$LOGGLY_AUTH_TOKEN@41058 $TAG] %msg%\n\")
+		if \$programname == '$LOGGLY_FILE_TO_MONITOR_ALIAS' then action(type=\"omfwd\" protocol=\"tcp\" target=\"logs-01.loggly.com\" port=\"514\" template=\"$CONF_FILE_FORMAT_NAME\")
+		if \$programname == '$LOGGLY_FILE_TO_MONITOR_ALIAS' then ~
+		"
+	fi
 	#write to 21-<file-alias>.conf file
 sudo cat << EOIPFW >> $FILE_SYSLOG_CONFFILE
 $imfileStr
