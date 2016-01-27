@@ -15,3 +15,4 @@ You can view the **READMEs** of the various installation scripts at the followin
 4. <a href="https://github.com/psquickitjayant/install-script/blob/master/Modular%20Scripts/Tomcat/README.md">Tomcat Configuration Script</a>
 5. <a href="https://github.com/psquickitjayant/install-script/blob/master/Modular%20Scripts/S3Logs%20Monitoring/README.md">S3 Bucket Configuration Script</a>
 6. <a href="https://github.com/psquickitjayant/install-script/blob/master/Modular%20Scripts/Nginx/README.md">Nginx Script</a>
+7. <a href="https://github.com/psquickitjayant/install-script/blob/master/Mac%20Script/README.md">Mac Script</a>
