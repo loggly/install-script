@@ -443,11 +443,10 @@ updateCertificate()
 		
 		logMsgToConfigSysLog "INFO" "INFO: Downloading required certificates"
 		sudo curl -O https://logdog.loggly.com/media/logs-01.loggly.com_sha12.crt
-		sudo cat logs-01.loggly.com_sha12.crt > loggly_full_sha12.crt
 
 		#taking backup and changing path in 22-loggly.conf
 		sudo cp $LOGGLY_RSYSLOG_CONFFILE $LOGGLY_RSYSLOG_CONFFILE_BACKUP
-		NEW_CRT_CONF="\$DefaultNetstreamDriverCAFile /etc/rsyslog.d/keys/ca.d/loggly_full_sha12.crt"
+		NEW_CRT_CONF="\$DefaultNetstreamDriverCAFile /etc/rsyslog.d/keys/ca.d/logs-01.loggly.com_sha12.crt"
 		sed -i  "s%$CURRENT_CRT_CONF%$NEW_CRT_CONF%g" $LOGGLY_RSYSLOG_CONFFILE
 		logMsgToConfigSysLog "INFO" "INFO: Upgraded TLS Certificate for Loggly configuration"
 	else
