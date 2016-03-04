@@ -471,6 +471,7 @@ updateHostsFile()
 {
 	sudo sed -i '$ a\ '"52.1.106.130 logs-01.loggly.com" /etc/hosts
 	logMsgToConfigSysLog "INFO" "INFO: Hosts file Updated"
+	sleep 15
 }
 
 
@@ -483,7 +484,9 @@ checkIfLogsMadeToLoggly()
 	queryParam="syslog.appName%3ALOGGLYVERIFY%20$uuid"
 	logger -t "LOGGLYVERIFY" "LOGGLYVERIFY-Test message for verification with UUID $uuid"
 
-	
+	#sleeps for 2 seconds before restoring hosts file
+	sleep 2
+
 	#restores hosts file to its earlier state
 	restoreHostFile
 	
