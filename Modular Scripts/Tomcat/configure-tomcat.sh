@@ -53,9 +53,6 @@ TAG=
 #this is not a mandatory input
 LOGGLY_CATALINA_HOME=
 
-#this variable will hold if the access-logs are invoked.
-CONFIGURE_ACCESS_LOGS="false"
-
 MANUAL_CONFIG_INSTRUCTION="Manual instructions to configure Tomcat is available at https://www.loggly.com/docs/tomcat-application-server/. Rsyslog troubleshooting instructions are available at https://www.loggly.com/docs/troubleshooting-rsyslog/"
 
 #this variable will hold if the check env function for linux is invoked
@@ -465,7 +462,6 @@ updateServerXML()
 
 	if ! grep -q 'renameOnRotate="true"' "$LOGGLY_CATALINA_HOME/conf/server.xml";
 	then
-		CONFIGURE_ACCESS_LOGS="true"
 		
 		#Creating backup of server.xml to server.xml.bk
 	        logMsgToConfigSysLog "INFO" "INFO: Creating backup of server.xml to server.xml.bk"
@@ -525,101 +521,94 @@ write21TomcatFileContents()
 	sudo chmod o+w $TOMCAT_SYSLOG_CONFFILE
 
 	imfileStr="\$ModLoad imfile
-	\$WorkDirectory $RSYSLOG_DIR
-	"
+\$WorkDirectory $RSYSLOG_DIR
+"
 	if [[ "$LINUX_DIST" == *"Ubuntu"* ]]; then
 		imfileStr+="\$PrivDropToGroup adm
-		"
+"
 	fi
 
 	imfileStr+="
-	#parameterized token here.......
-	#Add a tag for tomcat events
-	\$template LogglyFormatTomcat,\"<%pri%>%protocol-version% %timestamp:::date-rfc3339% %HOSTNAME% %app-name% %procid% %msgid% [$LOGGLY_AUTH_TOKEN@41058 $TAG] %msg%\n\"
+#parameterized token here.......
+#Add a tag for tomcat events
+\$template LogglyFormatTomcat,\"<%pri%>%protocol-version% %timestamp:::date-rfc3339% %HOSTNAME% %app-name% %procid% %msgid% [$LOGGLY_AUTH_TOKEN@41058 $TAG] %msg%\n\"
 
-	# catalina.out
-	\$InputFileName $LOGGLY_CATALINA_LOG_HOME/catalina.out
-	\$InputFileTag catalina-out
-	\$InputFileStateFile stat-catalina-out
-	\$InputFileSeverity info
-	\$InputFilePersistStateInterval 20000
-	\$InputRunFileMonitor
-	if \$programname == 'catalina-out' then @@logs-01.loggly.com:514;LogglyFormatTomcat
-	if \$programname == 'catalina-out' then ~
+# catalina.out
+\$InputFileName $LOGGLY_CATALINA_LOG_HOME/catalina.out
+\$InputFileTag catalina-out
+\$InputFileStateFile stat-catalina-out
+\$InputFileSeverity info
+\$InputFilePersistStateInterval 20000
+\$InputRunFileMonitor
+if \$programname == 'catalina-out' then @@logs-01.loggly.com:514;LogglyFormatTomcat
+if \$programname == 'catalina-out' then ~
 
-	# initd.log
-	\$InputFileName $LOGGLY_CATALINA_LOG_HOME/initd.log
-	\$InputFileTag initd
-	\$InputFileStateFile stat-initd
-	\$InputFileSeverity info
-	\$InputFilePersistStateInterval 20000
-	\$InputRunFileMonitor
-	if \$programname == 'initd' then @@logs-01.loggly.com:514;LogglyFormatTomcat
-	if \$programname == 'initd' then ~
-	"
+# initd.log
+\$InputFileName $LOGGLY_CATALINA_LOG_HOME/initd.log
+\$InputFileTag initd
+\$InputFileStateFile stat-initd
+\$InputFileSeverity info
+\$InputFilePersistStateInterval 20000
+\$InputRunFileMonitor
+if \$programname == 'initd' then @@logs-01.loggly.com:514;LogglyFormatTomcat
+if \$programname == 'initd' then ~
+"
 
 	#if log rotation is enabled i.e. tomcat version is greater than or equal to
 	#6.0.33.0, then add the following lines to tomcat syslog conf file
 	if [ $(compareVersions $TOMCAT_VERSION $MIN_TOMCAT_VERSION 4) -ge 0 ]; then
 	imfileStr+="
-	# catalina.log
-	\$InputFileName $LOGGLY_CATALINA_LOG_HOME/catalina.log
-	\$InputFileTag catalina-log
-	\$InputFileStateFile stat-catalina-log
-	\$InputFileSeverity info
-	\$InputFilePersistStateInterval 20000
-	\$InputRunFileMonitor
-	if \$programname == 'catalina-log' then @@logs-01.loggly.com:514;LogglyFormatTomcat
-	if \$programname == 'catalina-log' then ~
+# catalina.log
+\$InputFileName $LOGGLY_CATALINA_LOG_HOME/catalina.log
+\$InputFileTag catalina-log
+\$InputFileStateFile stat-catalina-log
+\$InputFileSeverity info
+\$InputFilePersistStateInterval 20000
+\$InputRunFileMonitor
+if \$programname == 'catalina-log' then @@logs-01.loggly.com:514;LogglyFormatTomcat
+if \$programname == 'catalina-log' then ~
 
-	# host-manager.log
-	\$InputFileName $LOGGLY_CATALINA_LOG_HOME/host-manager.log
-	\$InputFileTag host-manager
-	\$InputFileStateFile stat-host-manager
-	\$InputFileSeverity info
-	\$InputFilePersistStateInterval 20000
-	\$InputRunFileMonitor
-	if \$programname == 'host-manager' then @@logs-01.loggly.com:514;LogglyFormatTomcat
-	if \$programname == 'host-manager' then ~
+# host-manager.log
+\$InputFileName $LOGGLY_CATALINA_LOG_HOME/host-manager.log
+\$InputFileTag host-manager
+\$InputFileStateFile stat-host-manager
+\$InputFileSeverity info
+\$InputFilePersistStateInterval 20000
+\$InputRunFileMonitor
+if \$programname == 'host-manager' then @@logs-01.loggly.com:514;LogglyFormatTomcat
+if \$programname == 'host-manager' then ~
 
-	# localhost.log
-	\$InputFileName $LOGGLY_CATALINA_LOG_HOME/localhost.log
-	\$InputFileTag localhost-log
-	\$InputFileStateFile stat-localhost-log
-	\$InputFileSeverity info
-	\$InputFilePersistStateInterval 20000
-	\$InputRunFileMonitor
-	if \$programname == 'localhost-log' then @@logs-01.loggly.com:514;LogglyFormatTomcat
-	if \$programname == 'localhost-log' then ~
+# localhost.log
+\$InputFileName $LOGGLY_CATALINA_LOG_HOME/localhost.log
+\$InputFileTag localhost-log
+\$InputFileStateFile stat-localhost-log
+\$InputFileSeverity info
+\$InputFilePersistStateInterval 20000
+\$InputRunFileMonitor
+if \$programname == 'localhost-log' then @@logs-01.loggly.com:514;LogglyFormatTomcat
+if \$programname == 'localhost-log' then ~
 
-	# manager.log
-	\$InputFileName $LOGGLY_CATALINA_LOG_HOME/manager.log
-	\$InputFileTag manager
-	\$InputFileStateFile stat-manager
-	\$InputFileSeverity info
-	\$InputFilePersistStateInterval 20000
-	\$InputRunFileMonitor
-	if \$programname == 'manager' then @@logs-01.loggly.com:514;LogglyFormatTomcat
-	if \$programname == 'manager' then ~
-	"
+# manager.log
+\$InputFileName $LOGGLY_CATALINA_LOG_HOME/manager.log
+\$InputFileTag manager
+\$InputFileStateFile stat-manager
+\$InputFileSeverity info
+\$InputFilePersistStateInterval 20000
+\$InputRunFileMonitor
+if \$programname == 'manager' then @@logs-01.loggly.com:514;LogglyFormatTomcat
+if \$programname == 'manager' then ~
+
+# localhost_access_log.txt 
+\$InputFileName $LOGGLY_CATALINA_LOG_HOME/localhost_access_log.txt
+\$InputFileTag tomcat-access
+\$InputFileStateFile stat-tomcat-access
+\$InputFileSeverity info
+\$InputFilePersistStateInterval 20000
+\$InputRunFileMonitor
+if \$programname == 'tomcat-access' then @@logs-01.loggly.com:514;LogglyFormatTomcat
+if \$programname == 'tomcat-access' then ~
+"
 	fi
-
-	if [ $CONFIGURE_ACCESS_LOGS == "true" ];
-	then
-	imfileStr+="
-
-	# localhost_access_log.txt 
-	\$InputFileName $LOGGLY_CATALINA_LOG_HOME/localhost_access_log.txt
-	\$InputFileTag tomcat-access
-	\$InputFileStateFile stat-tomcat-access
-	\$InputFileSeverity info
-	\$InputFilePersistStateInterval 20000
-	\$InputRunFileMonitor
-	if \$programname == 'tomcat-access' then @@logs-01.loggly.com:514;LogglyFormatTomcat
-	if \$programname == 'tomcat-access' then ~
-	"
-	fi
-	
 
 	#change the tomcat-21 file to variable from above and also take the directory of the tomcat log file.
 sudo cat << EOIPFW >> $TOMCAT_SYSLOG_CONFFILE
