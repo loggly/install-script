@@ -15,7 +15,7 @@ function ctrl_c()  {
 #name of the current script. This will get overwritten by the child script which calls this
 SCRIPT_NAME=configure-linux.sh
 #version of the current script. This will get overwritten by the child script which calls this
-SCRIPT_VERSION=1.16
+SCRIPT_VERSION=1.15
 
 #application tag. This will get overwritten by the child script which calls this
 APP_TAG=
@@ -373,6 +373,8 @@ checkIfValidAuthToken()
 checkIfRsyslogConfiguredAsService()
 {
 	if [ -f /etc/init.d/$RSYSLOG_SERVICE ]; then
+		logMsgToConfigSysLog "INFO" "INFO: $RSYSLOG_SERVICE is present as service."
+	elif [ -f /usr/lib/systemd/system/$RSYSLOG_SERVICE.service ]; then
 		logMsgToConfigSysLog "INFO" "INFO: $RSYSLOG_SERVICE is present as service."
 	else
 		logMsgToConfigSysLog "ERROR" "ERROR: $RSYSLOG_SERVICE is not present as service."
