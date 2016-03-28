@@ -23,6 +23,8 @@
 # python SQS3script.py --user <user name> --flag <true> and --region <region> --sqsname <sqs queue name>  --acnumber <account number>
 
 
+# This script assumes that the aws credentials are stored at ~/.aws/credentials
+
 
 import boto
 import boto3
@@ -97,10 +99,7 @@ if s3bucket !=None and setups3 !=None and region !=None and acnumber !=None and 
 
 if s3bucket !=None and acnumber !=None and sqsurl !=None and region!=None:
     queue_name = sqsurl.rsplit('/', 1)[1]
-    print 'Queue name ' + queue_name
-
     
-
     my_queue = conn.get_queue(queue_name)
 
     # get queue's policy
@@ -115,15 +114,15 @@ if s3bucket !=None and acnumber !=None and sqsurl !=None and region!=None:
         start = '\"aws:SourceArn\":'
         end = '}}}'
         result = re.search('%s(.*)%s' % (start, end), queue_attr).group(1)
-        print(result)
+        
+        
+        leftbracketremoved = result.replace('[','')
+        rightbracketremoved = leftbracketremoved.replace(']','')
 
-        s3addon = result + ", arn:aws:s3:*:*:" + s3bucket
-        s3new  = s3addon.replace("\"", "")
-        #s3addon.replace('\\', '')
-
+        addon  = '[' + rightbracketremoved + ',' + '\"arn:aws:s3:*:*:' + s3bucket +'\"' +']'
         
 
-        conn.set_queue_attribute(my_queue, 'Policy', json.dumps({
+        text = """ {
           "Version": "2008-10-17",
           "Id": "PolicyExample",
           "Statement": [
@@ -134,12 +133,10 @@ if s3bucket !=None and acnumber !=None and sqsurl !=None and region!=None:
                 "AWS": "*"
               },
               "Action": "SQS:SendMessage",
-              "Resource": "arn:aws:sqs:" + region + ":" + acnumber + ":" + queue_name,
+              "Resource": "arn:aws:sqs:%s:%s:%s",
               "Condition": {
                 "ArnLike": {
-                  "aws:SourceArn": [ 
-                        s3new
-                    ]    
+                  "aws:SourceArn": %s   
                 }
               }
             },
@@ -147,13 +144,19 @@ if s3bucket !=None and acnumber !=None and sqsurl !=None and region!=None:
               "Sid": "GiveAccessToLoggly",
               "Effect": "Allow",
               "Principal": {
-                "AWS": "arn:aws:iam::" + acnumber + ":root"
+                "AWS": "arn:aws:iam::%s:root"
               },
               "Action": "SQS:*",
-              "Resource": "arn:aws:sqs:" + region + ":" + acnumber + ":" + queue_name
+              "Resource": "arn:aws:sqs:%s:%s:%s"
             }
           ]
-        }))
+        }
+        """ % (region, acnumber, queue_name, addon, acnumber, region, acnumber, queue_name)
+
+        
+        parsed = json.loads(text)
+       
+        conn.set_queue_attribute(my_queue, 'Policy', json.dumps(parsed))
 
     else:
         conn.set_queue_attribute(my_queue, 'Policy', json.dumps({
