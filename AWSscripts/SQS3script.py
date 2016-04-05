@@ -1,29 +1,9 @@
 # Instructions
+# python SQS3script.py --s3bucket <bucket name>  --region <region> --acnumber <account number>  ( --sqsurl <sqs-url>  or --sqsname <sqs queue name> ) --user <user name>
 
-# 1. Add permissions to existing sqs queue 
-
-
-# python SQS3script.py --s3bucket <bucket name> --acnumber <account number> --sqsurl <sqs-url>  --region <region>
-
-
-# or Create a new queue and add permission to it
-
-
-# python SQS3script.py --s3bucket <bucket name> --acnumber <account number> --sqsname <sqs queue name> --region <region>
-
-
-# 2. Add permissions to s3 bucket
-
-
-# python SQS3script.py --s3bucket <bucket name> --setups3 true --region <region> --acnumber <account numbner> --sqsname <sqs queue name>
-
-# 3. Create user and access key 
-
-
-# python SQS3script.py --user <user name> --flag <true> and --region <region> --sqsname <sqs queue name>  --acnumber <account number>
-
-
+# Provide the SQS queue url in case queue already exists otherwise provide a name for the SQS queue to be created
 # This script assumes that the aws credentials are stored at ~/.aws/credentials
+# region examples: us-east-1, us-west-2 etc.
 
 
 import boto
@@ -33,6 +13,7 @@ import boto.sqs.connection
 import json
 import os
 import re
+import sys
 
 from boto.sqs.connection import SQSConnection
 from boto.sqs.message import Message
@@ -60,6 +41,7 @@ parser.add_option("--setups3", dest="setups3",
 
 (opts, args) = parser.parse_args()
 
+
 s3bucket = opts.s3bucket
 acnumber = opts.acnumber
 sqsurl = opts.sqsurl
@@ -68,6 +50,28 @@ sqsname = opts.sqsname
 user = opts.user
 flag = opts.flag
 setups3 = opts.setups3
+
+
+if not s3bucket:
+    parser.error("S3 bucket name not provided")
+
+if not acnumber:
+    parser.error("Account number not provided")
+
+if not region:
+    parser.error("SQS queue/Bucket region not provided")
+
+
+
+if (sqsname == None or sqsname == '') and (sqsurl == None or sqsurl == ''):
+  print "Please provide the SQS name or the SQS url" 
+  sys.exit()
+
+
+if (sqsname != None and sqsname != '') and (sqsurl != None and sqsurl != ''):
+  print "Please provide either the SQS name or the SQS url. SQS name to create a new queue; SQS url to use an existing queue" 
+  sys.exit()
+
 
 with open(os.environ['HOME'] + '/.aws/credentials') as f:
     for line in f:
@@ -80,24 +84,7 @@ with open(os.environ['HOME'] + '/.aws/credentials') as f:
 conn = boto.sqs.connect_to_region(region, aws_access_key_id=access_key,  aws_secret_access_key=secret_key)
 
 
-
-if s3bucket !=None and setups3 !=None and region !=None and acnumber !=None and sqsname !=None:
-
-    client = boto3.client('s3', region)
-
-    response = client.put_bucket_notification_configuration(
-        Bucket=s3bucket,
-        NotificationConfiguration={ 
-            "QueueConfigurations": [{
-             "Id": "Notification",
-             "Events": ["s3:ObjectCreated:*"],
-             "QueueArn": "arn:aws:sqs:" + region + ":" + acnumber + ":" + sqsname
-        }],
-        }
-    )
-
-
-if s3bucket !=None and acnumber !=None and sqsurl !=None and region!=None:
+if sqsurl != None and sqsurl != '':
     queue_name = sqsurl.rsplit('/', 1)[1]
     
     my_queue = conn.get_queue(queue_name)
@@ -189,10 +176,25 @@ if s3bucket !=None and acnumber !=None and sqsurl !=None and region!=None:
           ]
         }))
 
+    # s3 bucket notification configuration 
+    client = boto3.client('s3', region)
+
+  
+    response = client.put_bucket_notification_configuration(
+        Bucket=s3bucket,
+        NotificationConfiguration={ 
+            "QueueConfigurations": [{
+             "Id": "Notification",
+             "Events": ["s3:ObjectCreated:*"],
+             "QueueArn": "arn:aws:sqs:" + region + ":" + acnumber + ":" + queue_name
+        }],
+        }
+    )
 
 
 
-if s3bucket !=None and acnumber !=None and sqsname !=None and region!=None:
+
+if sqsname != None and sqsname != '':
 
     sqs = boto.connect_sqs(access_key, secret_key)
 
@@ -233,8 +235,23 @@ if s3bucket !=None and acnumber !=None and sqsname !=None and region!=None:
           ]
         }))
 
+    # s3 bucket notification configuration 
+    client = boto3.client('s3', region)
 
-if user !=None and flag !=None and region !=None and sqsname !=None and acnumber !=None:
+    response = client.put_bucket_notification_configuration(
+        Bucket=s3bucket,
+        NotificationConfiguration={ 
+            "QueueConfigurations": [{
+             "Id": "Notification",
+             "Events": ["s3:ObjectCreated:*"],
+             "QueueArn": "arn:aws:sqs:" + region + ":" + acnumber + ":" + sqsname
+        }],
+        }
+    )
+
+
+
+if user != None and user != '':
 
     iam = boto.connect_iam(access_key, secret_key)
  
