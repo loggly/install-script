@@ -1,6 +1,7 @@
 # Instructions
 # python SQS3script.py --s3bucket <bucket name>  --region <region> --acnumber <account number>  ( --sqsurl <sqs-url>  or --sqsname <sqs queue name> ) --user <user name>
-
+# s3bucket, region, acnumber are mandatory
+# sqsurl, sqsname and user are optional but you need to provide either the sqsname or the sqsurl
 # Provide the SQS queue url in case queue already exists otherwise provide a name for the SQS queue to be created
 # This script assumes that the aws credentials are stored at ~/.aws/credentials
 # region examples: us-east-1, us-west-2 etc.
