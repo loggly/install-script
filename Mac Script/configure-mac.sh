@@ -15,7 +15,7 @@ function ctrl_c()  {
 #name of the current script. This will get overwritten by the child script which calls this
 SCRIPT_NAME=configure-mac.sh
 #version of the current script. This will get overwritten by the child script which calls this
-SCRIPT_VERSION=1.3
+SCRIPT_VERSION=1.4
 
 #application tag. This will get overwritten by the child script which calls this
 APP_TAG=
@@ -552,9 +552,9 @@ logMsgToConfigSysLog()
 	#for Mac system, we need to use -D switch to decode
 	varUname=$(uname)
 	if [[ $varUname == 'Linux' ]]; then
-		enabler=$(echo -n MWVjNGU4ZTEtZmJiMi00N2U3LTkyOWItNzVhMWJmZjVmZmUw | base64 -d)
+		enabler=$(echo -n MWVjNGU4ZTEtZmJiMi00N2U3LTkyOWItNzVhMWJmZjVmZmUw | base64 --decode)
 	elif [[ $varUname == 'Darwin' ]]; then
-		enabler=$(echo MWVjNGU4ZTEtZmJiMi00N2U3LTkyOWItNzVhMWJmZjVmZmUw | base64 -D)
+		enabler=$(echo MWVjNGU4ZTEtZmJiMi00N2U3LTkyOWItNzVhMWJmZjVmZmUw | base64 --decode)
 	fi
 	
 	if [ $? -ne 0 ]; then
