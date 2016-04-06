@@ -77,6 +77,8 @@ queue_name = conn.get_queue(sqsname)
 
 
 if queue_name!= None :
+
+    print "Queue " + queue_name + " already exists, attaching the bucket to this queue's policy"
     
     queue_attr_raw = conn.get_queue_attributes(queue_name, attribute='All')
 
