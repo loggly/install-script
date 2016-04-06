@@ -1,7 +1,7 @@
 # Instructions
 
 # python SQS3script.py --s3bucket <bucket name>  --acnumber <account number>  --sqsname <sqs queue name> --user <user name> --subdomain <subdomain>
-# s3bucket and acnumber parameters are mandatory, sqsname and user are optional
+# s3bucket, acnumber and subdomain parameters are mandatory, sqsname and user are optional
 
 # This script assumes that the aws credentials are created at ~/.aws/credentials by running aws configure on command line
 # region examples: us-east-1, us-west-2 etc.
@@ -57,6 +57,8 @@ if not s3bucket:
 if not acnumber:
     parser.error("Account number not provided")
 
+if not subdomain:
+    parser.error("Subdomain not provided")
 
 with open(os.environ['HOME'] + '/.aws/credentials') as f:
     for line in f:
