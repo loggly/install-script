@@ -339,7 +339,7 @@ checkIfFluentdInstalled()
 installFluentd()
 {
 	#install fluentd gem http://docs.fluentd.org/articles/install-by-gem
-	sudo gem install fluentd --no-ri --no-rdoc
+	sudo gem install fluentd --no-ri --no-rdoc -n/usr/local/bin
 	
 	if [[ ! -d "$LOGGLY_HOME" ]]; then
                 mkdir $LOGGLY_HOME
