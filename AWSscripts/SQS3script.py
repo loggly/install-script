@@ -8,9 +8,9 @@
 
 
 import boto
-import boto3
 import boto.sqs
 import boto.sqs.connection
+import boto3
 import json
 import os
 import re
@@ -18,6 +18,7 @@ import sys
 
 from boto.sqs.connection import SQSConnection
 from boto.sqs.message import Message
+from boto.exception import BotoServerError
 
 from optparse import OptionParser
 
@@ -57,8 +58,6 @@ if not s3bucket:
 if not acnumber:
     parser.error("Account number not provided")
 
-if not subdomain:
-    parser.error("Subdomain not provided")
 
 with open(os.environ['HOME'] + '/.aws/credentials') as f:
     for line in f:
@@ -78,7 +77,7 @@ queue_name = conn.get_queue(sqsname)
 
 if queue_name!= None :
 
-    print "Queue " + queue_name + " already exists, attaching the bucket to this queue's policy"
+    print "Queue already exists, attaching the bucket to this queue's policy"
     
     queue_attr_raw = conn.get_queue_attributes(queue_name, attribute='All')
 
@@ -182,15 +181,14 @@ if queue_name!= None :
 
 else: 
 
-    sqs = boto.connect_sqs(access_key, secret_key)
+    if sqsname == None:
+        queue_name = 'loggly-' + subdomain + '-s3queue'
+    else:
+        queue_name =  sqsname
 
-    queue_name = 'loggly-' + subdomain + '-s3queue'
-
-    q = sqs.create_queue(queue_name)
+    q = conn.create_queue(queue_name)
 
     queue_name = conn.get_queue(sqsname)
-
-    # attach a policy to this queue
 
     conn.set_queue_attribute(queue_name, 'Policy', json.dumps({
           "Version": "2008-10-17",
@@ -321,7 +319,6 @@ else:
 
     print loggly_secret_key
 
-
     policy_json = """{
     "Version": "2012-10-17",
     "Statement": [
@@ -346,8 +343,6 @@ else:
     ]
     }""" % (region, acnumber, sqsname, s3bucket,)
 
-
     response = iam.put_user_policy(user,
                                    'TestPolicy',
                                    policy_json)
-          
