@@ -118,7 +118,7 @@ checkLinuxLogglyCompatibility()
 
 	#checking if syslog-ng is configured as a service
 	checkifSyslogNgConfiguredAsService
-	
+
 	#check if rsyslog is configured as service. If no, then exit
 	checkIfRsyslogConfiguredAsService
 
@@ -158,7 +158,7 @@ installLogglyConf()
 	if [ "$IS_INVOKED" = "" ]; then
 		logMsgToConfigSysLog "SUCCESS" "SUCCESS: Linux system successfully configured to send logs via Loggly."
 	fi
-	
+
 }
 
 #remove loggly configuration from Linux system
@@ -189,7 +189,7 @@ removeLogglyConf()
 #checks if user has root privileges
 checkIfUserHasRootPrivileges()
 {
-	#This script needs to be run as a sudo user
+	#This script needs to be run as root
 	if [[ $EUID -ne 0 ]]; then
 	   logMsgToConfigSysLog "ERROR" "ERROR: This script must be run as root."
 	   exit 1
@@ -200,9 +200,9 @@ checkIfUserHasRootPrivileges()
 checkIfSupportedOS()
 {
 	getOs
-	
+
 	LINUX_DIST_IN_LOWER_CASE=$(echo $LINUX_DIST | tr "[:upper:]" "[:lower:]")
-	
+
 	case "$LINUX_DIST_IN_LOWER_CASE" in
 		*"ubuntu"* )
 		echo "INFO: Operating system is Ubuntu."
@@ -233,7 +233,7 @@ checkIfSupportedOS()
 					[Yy]* )
 					break;;
 					[Nn]* )
-					exit 1	
+					exit 1
 					;;
 					* ) echo "Please answer yes or no.";;
 				esac
@@ -303,7 +303,7 @@ checkIfLogglyServersAccessible()
 		logMsgToConfigSysLog "ERROR" "ERROR: This is not a recognized subdomain. Please ask the account owner for the subdomain they signed up with."
 		exit 1
 	fi
-	
+
 	echo "INFO: Checking if Gen2 account."
 	if [ $(curl -s --head  --request GET $LOGGLY_ACCOUNT_URL/apiv2/customer | grep "404 NOT FOUND" | wc -l) == 1 ]; then
 		logMsgToConfigSysLog "ERROR" "ERROR: This scripts need a Gen2 account. Please contact Loggly support."
@@ -343,7 +343,7 @@ getAuthToken()
 		tokenstr=${tokenstr#*\"}
 
 		LOGGLY_AUTH_TOKEN=$tokenstr
-		
+
 		logMsgToConfigSysLog "INFO" "INFO: Retrieved authentication token: $LOGGLY_AUTH_TOKEN"
 	fi
 }
@@ -369,13 +369,13 @@ checkIfRsyslogConfiguredAsService()
 		logMsgToConfigSysLog "ERROR" "ERROR: $RSYSLOG_SERVICE is not present as service."
 		exit 1
 	fi
-	
+
 	#checking if syslog-ng is running as a service
 	checkifSyslogNgConfiguredAsService
-	
+
 	if [ $(ps -A | grep "$RSYSLOG_SERVICE" | wc -l) -eq 0 ]; then
 		logMsgToConfigSysLog "INFO" "INFO: $RSYSLOG_SERVICE is not running. Attempting to start service."
-		sudo service $RSYSLOG_SERVICE start
+		service $RSYSLOG_SERVICE start
 	fi
 }
 
@@ -399,7 +399,7 @@ checkIfMultipleRsyslogConfigured()
 #check if minimum version of rsyslog required to configure loggly is met
 checkIfMinVersionOfRsyslog()
 {
-	RSYSLOG_VERSION=$(sudo $RSYSLOGD -version | grep "$RSYSLOGD")
+	RSYSLOG_VERSION=$($RSYSLOGD -version | grep "$RSYSLOGD")
 	RSYSLOG_VERSION=${RSYSLOG_VERSION#* }
 	RSYSLOG_VERSION=${RSYSLOG_VERSION%,*}
 	RSYSLOG_VERSION=$RSYSLOG_VERSION | tr -d " "
@@ -415,7 +415,7 @@ checkIfSelinuxServiceEnforced()
 	isSelinuxInstalled=$(getenforce -ds 2>/dev/null)
 	if [ $? -ne 0 ]; then
 		logMsgToConfigSysLog "INFO" "INFO: selinux status is not enforced."
-	elif [ $(sudo getenforce | grep "Enforcing" | wc -l) -gt 0 ]; then
+	elif [ $(getenforce | grep "Enforcing" | wc -l) -gt 0 ]; then
 		logMsgToConfigSysLog "ERROR" "ERROR: selinux status is 'Enforcing'. Please disable it and start the rsyslog daemon manually."
 		exit 1
 	fi
@@ -461,24 +461,24 @@ inputStr="
 "
 	if [ -f "$LOGGLY_RSYSLOG_CONFFILE" ]; then
 		logMsgToConfigSysLog "INFO" "INFO: Loggly rsyslog file $LOGGLY_RSYSLOG_CONFFILE already exist."
-		
+
 		STR_SIZE=${#inputStr}
 		SIZE_FILE=$(stat -c%s "$LOGGLY_RSYSLOG_CONFFILE")
-		
+
 		#actual file size and variable size with same contents always differ in size with one byte
 		STR_SIZE=$(( STR_SIZE + 1 ))
-		
+
 		if [ "$STR_SIZE" -ne "$SIZE_FILE" ]; then
-			
+
 			logMsgToConfigSysLog "WARN" "WARN: Loggly rsyslog file /etc/rsyslog.d/22-loggly.conf content has changed."
 			if [ "$SUPPRESS_PROMPT" == "false" ]; then
-					while true; 
+					while true;
 					do
 						read -p "Do you wish to override $LOGGLY_RSYSLOG_CONFFILE and re-verify configuration? (yes/no)" yn
 						case $yn in
 						[Yy]* )
 							logMsgToConfigSysLog "INFO" "INFO: Going to back up the conf file: $LOGGLY_RSYSLOG_CONFFILE to $LOGGLY_RSYSLOG_CONFFILE_BACKUP";
-							sudo mv -f $LOGGLY_RSYSLOG_CONFFILE $LOGGLY_RSYSLOG_CONFFILE_BACKUP;
+							mv -f $LOGGLY_RSYSLOG_CONFFILE $LOGGLY_RSYSLOG_CONFFILE_BACKUP;
 							WRITE_SCRIPT_CONTENTS="true"
 							break;;
 						[Nn]* )
@@ -490,7 +490,7 @@ inputStr="
 					done
 			else
 				logMsgToConfigSysLog "INFO" "INFO: Going to back up the conf file: $LOGGLY_RSYSLOG_CONFFILE to $LOGGLY_RSYSLOG_CONFFILE_BACKUP";
-				sudo mv -f $LOGGLY_RSYSLOG_CONFFILE $LOGGLY_RSYSLOG_CONFFILE_BACKUP;
+				mv -f $LOGGLY_RSYSLOG_CONFFILE $LOGGLY_RSYSLOG_CONFFILE_BACKUP;
 				WRITE_SCRIPT_CONTENTS="true"
 			fi
 		else
@@ -499,13 +499,13 @@ inputStr="
 	else
 		WRITE_SCRIPT_CONTENTS="true"
 	fi
-	
+
 	if [ "$WRITE_SCRIPT_CONTENTS" == "true" ]; then
 
-sudo cat << EOIPFW >> $LOGGLY_RSYSLOG_CONFFILE
+cat << EOIPFW >> $LOGGLY_RSYSLOG_CONFFILE
 $inputStr
 EOIPFW
-	
+
 	fi
 
 }
@@ -517,13 +517,13 @@ createRsyslogDir()
 		logMsgToConfigSysLog "INFO" "INFO: $RSYSLOG_DIR already exist, so not creating directory."
 		if [[ "$LINUX_DIST" == *"Ubuntu"* ]]; then
 			logMsgToConfigSysLog "INFO" "INFO: Changing the permission on the rsyslog in /var/spool"
-			sudo chown -R syslog:adm $RSYSLOG_DIR
+			chown -R syslog:adm $RSYSLOG_DIR
 		fi
 	else
 		logMsgToConfigSysLog "INFO" "INFO: Creating directory $SYSLOGDIR"
-		sudo mkdir -v $RSYSLOG_DIR
+		mkdir -v $RSYSLOG_DIR
 		if [[ "$LINUX_DIST" == *"Ubuntu"* ]]; then
-			sudo chown -R syslog:adm $RSYSLOG_DIR
+			chown -R syslog:adm $RSYSLOG_DIR
 		fi
 	fi
 }
@@ -577,7 +577,7 @@ checkIfLogsMadeToLoggly()
 remove22LogglyConfFile()
 {
 	if [ -f "$LOGGLY_RSYSLOG_CONFFILE" ]; then
-		sudo rm -rf "$LOGGLY_RSYSLOG_CONFFILE"
+		rm -rf "$LOGGLY_RSYSLOG_CONFFILE"
 	fi
 }
 
@@ -603,7 +603,7 @@ compareVersions ()
 restartRsyslog()
 {
 	logMsgToConfigSysLog "INFO" "INFO: Restarting the $RSYSLOG_SERVICE service."
-	sudo service $RSYSLOG_SERVICE restart
+	service $RSYSLOG_SERVICE restart
 	if [ $? -ne 0 ]; then
 		logMsgToConfigSysLog "WARNING" "WARNING: $RSYSLOG_SERVICE did not restart gracefully. Please restart $RSYSLOG_SERVICE manually."
 	fi
@@ -666,9 +666,9 @@ sendPayloadToConfigSysLog()
 searchAndFetch()
 {
 	url=$2
-	
+
 	result=$(wget -qO- /dev/null --user "$LOGGLY_USERNAME" --password "$LOGGLY_PASSWORD" "$url")
-	
+
 	if [ -z "$result" ]; then
 		logMsgToConfigSysLog "ERROR" "ERROR: Please check your network/firewall settings & ensure Loggly subdomain, username and password is specified correctly."
 		exit 1
@@ -687,7 +687,7 @@ searchAndFetch()
 	eval $1="'$count'"
 	if [ "$count" -gt 0 ]; then
 		timestamp=$(echo "$result" | grep timestamp)
-	fi	
+	fi
 }
 
 #get password in the form of asterisk
@@ -774,4 +774,4 @@ fi
 
 ##########  Get Inputs from User - End  ##########       -------------------------------------------------------
 #          End of Syslog Logging Directives for Loggly
-#        
+#
