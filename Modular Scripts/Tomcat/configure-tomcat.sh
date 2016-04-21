@@ -9,7 +9,7 @@ source configure-linux.sh "being-invoked"
 #name of the current script
 SCRIPT_NAME=configure-tomcat.sh
 #version of the current script
-SCRIPT_VERSION=1.5
+SCRIPT_VERSION=1.6
 
 #minimum version of tomcat to enable log rotation
 MIN_TOMCAT_VERSION=6.0.33.0
@@ -257,14 +257,18 @@ assumeTomcatHome()
 {
 	#if user has not provided the catalina home
 	if [ "$LOGGLY_CATALINA_HOME" = "" ]; then
-		case "$LINUX_DIST" in
-			*"Ubuntu"* )
+		LINUX_DIST_IN_LOWER_CASE=$(echo $LINUX_DIST | tr "[:upper:]" "[:lower:]")
+		case "$LINUX_DIST_IN_LOWER_CASE" in
+			*"ubuntu"* )
 			LOGGLY_CATALINA_HOME="/var/lib/$1"
 			;;
-			*"RedHat"* )
+			*"redhat"* )
 			LOGGLY_CATALINA_HOME="/usr/share/$1"
 			;;
-			*"CentOS"* )
+			*"centos"* )
+			LOGGLY_CATALINA_HOME="/usr/share/$1"
+			;;
+			*"amazon"* )
 			LOGGLY_CATALINA_HOME="/usr/share/$1"
 			;;
 		esac
