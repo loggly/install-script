@@ -15,7 +15,7 @@ function ctrl_c()  {
 #name of the current script. This will get overwritten by the child script which calls this
 SCRIPT_NAME=configure-linux.sh
 #version of the current script. This will get overwritten by the child script which calls this
-SCRIPT_VERSION=1.15
+SCRIPT_VERSION=1.16
 
 #application tag. This will get overwritten by the child script which calls this
 APP_TAG=
@@ -119,6 +119,9 @@ checkLinuxLogglyCompatibility()
 	#checking if syslog-ng is configured as a service
 	checkifSyslogNgConfiguredAsService
 
+	#check if systemd is present in machine.
+	checkIfSystemdConfigured
+
 	#check if rsyslog is configured as service. If no, then exit
 	checkIfRsyslogConfiguredAsService
 
@@ -178,6 +181,9 @@ removeLogglyConf()
 
 	#set the basic variables needed by this script
 	setLinuxVariables
+
+	#remove systemd-rsyslog configuration
+	revertSystemdChanges
 
 	#remove 22-loggly.conf file
 	remove22LogglyConfFile
@@ -368,6 +374,8 @@ checkIfRsyslogConfiguredAsService()
 {
 	if [ -f /etc/init.d/$RSYSLOG_SERVICE ]; then
 		logMsgToConfigSysLog "INFO" "INFO: $RSYSLOG_SERVICE is present as service."
+	elif [ -f /usr/lib/systemd/system/$RSYSLOG_SERVICE.service ]; then
+		logMsgToConfigSysLog "INFO" "INFO: $RSYSLOG_SERVICE is present as service."
 	else
 		logMsgToConfigSysLog "ERROR" "ERROR: $RSYSLOG_SERVICE is not present as service."
 		exit 1
@@ -387,6 +395,19 @@ checkifSyslogNgConfiguredAsService()
 	if [ $(ps -A | grep "$SYSLOG_NG_SERVICE" | wc -l) -gt 0  ]; then
 		logMsgToConfigSysLog "ERROR" "ERROR: This script does not currently support syslog-ng. Please follow the instructions on this page https://www.loggly.com/docs/syslog-ng-manual-configuration"
 		exit 1
+	fi
+}
+
+#check if systemd is present in machine.
+checkIfSystemdConfigured()
+{
+	FILE="/etc/systemd/journald.conf";
+	if [ -f "$FILE" ]; then
+		logMsgToConfigSysLog "INFO" "INFO: Systemd is present. Configuring logs from Systemd to rsyslog."
+		cp /etc/systemd/journald.conf /etc/systemd/journald.conf.loggly.bk
+		sed -i 's/.*ForwardToSyslog.*/ForwardToSyslog=Yes/g' /etc/systemd/journald.conf
+		logMsgToConfigSysLog "INFO" "INFO: Restarting Systemd-journald"
+		systemctl restart systemd-journald 
 	fi
 }
 
@@ -592,6 +613,17 @@ remove22LogglyConfFile()
 {
 	if [ -f "$LOGGLY_RSYSLOG_CONFFILE" ]; then
 		rm -rf "$LOGGLY_RSYSLOG_CONFFILE"
+	fi
+}
+
+revertSystemdChanges()
+{
+	FILE="/etc/systemd/journald.conf.loggly.bk";
+	if [ -f "$FILE" ]; then
+		cp /etc/systemd/journald.conf.loggly.bk /etc/systemd/journald.conf
+		rm /etc/systemd/journald.conf.loggly.bk
+		logMsgToConfigSysLog "INFO" "INFO: Reverted Systemd-rsyslog configuration"
+		systemctl restart systemd-journald
 	fi
 }
 
