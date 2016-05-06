@@ -190,7 +190,7 @@ if queue_name!= None :
 else: 
 
     if sqsname == None:
-        queue_name = 'loggly-s3queue'
+        queue_name = 'loggly-s3-queue'
     else:
         queue_name =  sqsname
 
