@@ -1,7 +1,7 @@
 # Instructions
 
-# python SQS3script.py --s3bucket <bucket name>  --acnumber <account number>  --sqsname <sqs queue name> --user <user name> --subdomain <subdomain>
-# s3bucket, acnumber and subdomain parameters are mandatory, sqsname and user are optional
+# python SQS3script.py --s3bucket <bucket name>  --acnumber <account number>  --sqsname <sqs queue name> --user <user name>
+# s3bucket, acnumber parameters are mandatory, sqsname and user are optional
 
 # This script assumes that the aws credentials are created at ~/.aws/credentials by running aws configure on command line
 # region examples: us-east-1, us-west-2 etc.
@@ -32,8 +32,6 @@ parser.add_option("--user", dest="user",
                   help="user")
 parser.add_option("--sqsname", dest="sqsname",
                   help="sqsname")
-parser.add_option("--subdomain", dest="subdomain",
-                  help="subdomain")
 
 (opts, args) = parser.parse_args()
 
@@ -42,7 +40,6 @@ s3bucket = opts.s3bucket
 acnumber = opts.acnumber
 sqsname = opts.sqsname
 user = opts.user
-subdomain = opts.subdomain
 
 conn = boto.connect_s3()
 bucket = conn.get_bucket(s3bucket)
@@ -50,7 +47,6 @@ region = bucket.get_location()
 
 if region == '':
   region = 'us-east-1'
-
 
 if not s3bucket:
     parser.error("S3 bucket name not provided")
@@ -68,23 +64,20 @@ with open(os.environ['HOME'] + '/.aws/credentials') as f:
 
 
 conn = boto.sqs.connect_to_region(region, aws_access_key_id=access_key,  aws_secret_access_key=secret_key)
-
-
 client = boto3.client('s3', region)
-
 queue_name = conn.get_queue(sqsname)
-
 
 if queue_name!= None :
 
-    print "Queue already exists, attaching the bucket to this queue's policy"
-    
     queue_attr_raw = conn.get_queue_attributes(queue_name, attribute='All')
-
     queue_attr = str(queue_attr_raw) 
 
-    if 'arn:aws:s3' in queue_attr:
+    if s3bucket in queue_attr:
+      print 'Bucket already exists in queue\'s policy, moving on'
+
+    elif 'arn:aws:s3' in queue_attr:
         # append a bucket to the existing policy
+        print "Bucket already exists, attaching the bucket to this queue's policy"
        
         start = '\"aws:SourceArn\":'
         end = '}}}'
@@ -133,6 +126,21 @@ if queue_name!= None :
        
         conn.set_queue_attribute(queue_name, 'Policy', json.dumps(parsed))
 
+        # s3 bucket notification configuration 
+        client = boto3.client('s3', region)
+
+
+        response = client.put_bucket_notification_configuration(
+            Bucket=s3bucket,
+            NotificationConfiguration={ 
+                "QueueConfigurations": [{
+                 "Id": "Notification",
+                 "Events": ["s3:ObjectCreated:*"],
+                 "QueueArn": "arn:aws:sqs:" + region + ":" + acnumber + ":" + queue_name
+            }],
+            }
+        )
+
     else:
         conn.set_queue_attribute(queue_name, 'Policy', json.dumps({
           "Version": "2008-10-17",
@@ -164,25 +172,25 @@ if queue_name!= None :
           ]
         }))
 
-    # s3 bucket notification configuration 
-    client = boto3.client('s3', region)
+        # s3 bucket notification configuration 
+        client = boto3.client('s3', region)
 
 
-    response = client.put_bucket_notification_configuration(
-        Bucket=s3bucket,
-        NotificationConfiguration={ 
-            "QueueConfigurations": [{
-             "Id": "Notification",
-             "Events": ["s3:ObjectCreated:*"],
-             "QueueArn": "arn:aws:sqs:" + region + ":" + acnumber + ":" + queue_name
-        }],
-        }
-    )
+        response = client.put_bucket_notification_configuration(
+            Bucket=s3bucket,
+            NotificationConfiguration={ 
+                "QueueConfigurations": [{
+                 "Id": "Notification",
+                 "Events": ["s3:ObjectCreated:*"],
+                 "QueueArn": "arn:aws:sqs:" + region + ":" + acnumber + ":" + queue_name
+            }],
+            }
+        )
 
 else: 
 
     if sqsname == None:
-        queue_name = 'loggly-' + subdomain + '-s3queue'
+        queue_name = 'loggly-s3queue'
     else:
         queue_name =  sqsname
 
@@ -244,7 +252,7 @@ if user != None and user != '':
     try:
         response  = iam.get_user(user)
         if 'get_user_response' in response:
-            print 'user already exists, use a different user name'
+            print 'User already exists, use a different user name'
             sys.exit()
         
     except BotoServerError, e:
