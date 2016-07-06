@@ -440,7 +440,8 @@ if user != None and user != '':
                     "Effect": "Allow",
                     "Action":[
                     "s3:ListBucket",
-                    "s3:GetObject"
+                    "s3:GetObject",
+                    "s3:GetBucketLocation"
                  ],
                     "Resource": ["arn:aws:s3:::%s"]
                 }
@@ -501,7 +502,8 @@ else:
                     "Effect": "Allow",
                     "Action":[
                     "s3:ListBucket",
-                    "s3:GetObject"
+                    "s3:GetObject",
+                    "s3:GetBucketLocation"
                  ],
                     "Resource": ["arn:aws:s3:::%s"]
                 }
