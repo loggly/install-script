@@ -391,11 +391,11 @@ else:
 print "Queue Name"
 print sqsname
 
+iam = boto.connect_iam(access_key, secret_key)
+
 
 if user != None and user != '':
-
-    iam = boto.connect_iam(access_key, secret_key)
- 
+    
     try:
         response  = iam.get_user(user)
         if 'get_user_response' in response:
@@ -458,46 +458,56 @@ if user != None and user != '':
 else:   
     # create an IAM user
     user = 'loggly-s3-user'
-    response = iam.create_user(user)
 
-    # create an access key
-    iam.create_access_key(user)
-    response = iam.create_access_key(user)
-    loggly_access_key = response.access_key_id
-    loggly_secret_key = response.secret_access_key
+    try:
+        response  = iam.get_user(user)
+        if 'get_user_response' in response:
+            print 'The default user \'loggly-s3-user\' which the script creates already exists, please pass a different user name with --user parameter'
+            sys.exit()
+        
+    except BotoServerError, e:
+        if "The user with name" in e.message and "cannot be found" in e.message :
 
-    print "Access key for Loggly"
+            response = iam.create_user(user)
 
-    print loggly_access_key
+            # create an access key
+            iam.create_access_key(user)
+            response = iam.create_access_key(user)
+            loggly_access_key = response.access_key_id
+            loggly_secret_key = response.secret_access_key
 
-    print "Secret key for Loggly"
+            print "Access key for Loggly"
 
-    print loggly_secret_key
+            print loggly_access_key
 
-    policy_json = """{
-    "Version": "2012-10-17",
-    "Statement": [
-        {
-            "Sid": "Sidtest",
-            "Effect": "Allow",
-            "Action": [
-                "sqs:*"
-            ],
-            "Resource": [
-                "arn:aws:sqs:%s:%s:%s"
+            print "Secret key for Loggly"
+
+            print loggly_secret_key
+
+            policy_json = """{
+            "Version": "2012-10-17",
+            "Statement": [
+                {
+                    "Sid": "Sidtest",
+                    "Effect": "Allow",
+                    "Action": [
+                        "sqs:*"
+                    ],
+                    "Resource": [
+                        "arn:aws:sqs:%s:%s:%s"
+                    ]
+                },
+                {
+                    "Effect": "Allow",
+                    "Action":[
+                    "s3:ListBucket",
+                    "s3:GetObject"
+                 ],
+                    "Resource": ["arn:aws:s3:::%s"]
+                }
             ]
-        },
-        {
-            "Effect": "Allow",
-            "Action":[
-            "s3:ListBucket",
-            "s3:GetObject"
-         ],
-            "Resource": ["arn:aws:s3:::%s"]
-        }
-    ]
-    }""" % (region, acnumber, sqsname, s3bucket,)
+            }""" % (region, acnumber, sqsname, s3bucket,)
 
-    response = iam.put_user_policy(user,
-                                   'TestPolicy',
-                                   policy_json)
+            response = iam.put_user_policy(user,
+                                           'TestPolicy',
+                                           policy_json)
