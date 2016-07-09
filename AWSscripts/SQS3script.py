@@ -18,7 +18,7 @@ import sys
 
 from boto.sqs.connection import SQSConnection
 from boto.sqs.message import Message
-from boto.exception import BotoServerError
+from boto.exception import BotoServerError, S3ResponseError
 
 from optparse import OptionParser
 
@@ -42,7 +42,37 @@ sqsname = opts.sqsname
 user = opts.user
 
 conn = boto.connect_s3()
-bucket = conn.get_bucket(s3bucket)
+
+access_key=''
+secret_key=''
+bucket=''
+
+with open(os.environ['HOME'] + '/.aws/credentials') as f:
+    for line in f:
+        if "aws_access_key_id" in line:
+             access_key = line.split("=",1)[1].strip()
+        if "aws_secret_access_key" in line:
+             secret_key = line.split("=",1)[1].strip()
+
+if not access_key:
+    print "Please check your ~/.aws/credentials file and make sure that access key and secret access key are set. Run aws configure to set them up"
+
+if not secret_key:
+    print "Please check your ~/.aws/credentials file and make sure that access key and secret access key are set. Run aws configure to set them up"
+
+try:
+    bucket = conn.get_bucket(s3bucket)
+except S3ResponseError, e:
+    if "Not Found" in e:
+        print e
+        print 'S3 bucket ' + s3bucket + ' does not exist, please create it and run the script again'
+        sys.exit()
+    else:
+        print e
+        sys.exit()
+    
+
+
 region = bucket.get_location()
 
 if region == '':
@@ -55,20 +85,14 @@ if not acnumber:
     parser.error("Account number not provided")
 
 
-with open(os.environ['HOME'] + '/.aws/credentials') as f:
-    for line in f:
-        if "aws_access_key_id" in line:
-             access_key = line.split("=",1)[1].strip()
-        if "aws_secret_access_key" in line:
-             secret_key = line.split("=",1)[1].strip()
-
-
 conn = boto.sqs.connect_to_region(region, aws_access_key_id=access_key,  aws_secret_access_key=secret_key)
 client = boto3.client('s3', region)
 queue_name = conn.get_queue(sqsname)
 
-if queue_name!= None :
 
+if "None" not in str(queue_name):
+    #queue exists
+  
     queue_attr_raw = conn.get_queue_attributes(queue_name, attribute='All')
     queue_attr = str(queue_attr_raw) 
 
@@ -76,8 +100,8 @@ if queue_name!= None :
       print 'Bucket already exists in queue\'s policy, moving on'
 
     elif 'arn:aws:s3' in queue_attr:
-        # append a bucket to the existing policy
-        print "Bucket already exists, attaching the bucket to this queue's policy"
+        # append the bucket to the existing policy
+        print "A bucket already exists in this queue's policy, appending this bucket to it"
        
         start = '\"aws:SourceArn\":'
         end = '}}}'
@@ -201,7 +225,7 @@ if queue_name!= None :
                 "AWS": "*"
               },
               "Action": "SQS:SendMessage",
-              "Resource": "arn:aws:sqs:" + region + ":" + acnumber + ":" + queue_name,
+              "Resource": "arn:aws:sqs:" + region + ":" + acnumber + ":" + sqsname,
               "Condition": {
                 "ArnLike": {
                   "aws:SourceArn": "arn:aws:s3:*:*:" + s3bucket
@@ -215,7 +239,7 @@ if queue_name!= None :
                 "AWS": "arn:aws:iam::" + acnumber + ":root"
               },
               "Action": "SQS:*",
-              "Resource": "arn:aws:sqs:" + region + ":" + acnumber + ":" + queue_name
+              "Resource": "arn:aws:sqs:" + region + ":" + acnumber + ":" + sqsname
             }
           ]
         }))
@@ -230,7 +254,7 @@ if queue_name!= None :
                 "QueueConfigurations": [{
                  "Id": "Notification",
                  "Events": ["s3:ObjectCreated:*"],
-                 "QueueArn": "arn:aws:sqs:" + region + ":" + acnumber + ":" + queue_name
+                 "QueueArn": "arn:aws:sqs:" + region + ":" + acnumber + ":" + sqsname
             }],
             }
         )
@@ -284,108 +308,230 @@ if queue_name!= None :
         response = bucket.set_policy(policy_json)
 
 else: 
-
+    # queue does not exist and no sqs queue name is passed
     if sqsname == None:
-        queue_name = 'loggly-s3-queue'
         sqsname = 'loggly-s3-queue'
-    else:
-        queue_name =  sqsname
-
-    q = conn.create_queue(queue_name)
-
+    
     queue_name = conn.get_queue(sqsname)
 
-    conn.set_queue_attribute(queue_name, 'Policy', json.dumps({
-          "Version": "2008-10-17",
-          "Id": "PolicyExample",
+    # Default queue already exists
+    if queue_name!= None:
+        queue_attr_raw = conn.get_queue_attributes(queue_name, attribute='All')
+        queue_attr = str(queue_attr_raw) 
+
+        if s3bucket in queue_attr:
+          print 'Bucket already exists in queue\'s policy, moving on'
+
+        else:
+            # append the bucket to the existing policy
+            print "A bucket already exists in this queue's policy, appending this bucket to it"
+           
+            start = '\"aws:SourceArn\":'
+            end = '}}}'
+            result = re.search('%s(.*)%s' % (start, end), queue_attr).group(1)
+            
+            
+            leftbracketremoved = result.replace('[','')
+            rightbracketremoved = leftbracketremoved.replace(']','')
+
+            addon  = '[' + rightbracketremoved + ',' + '\"arn:aws:s3:*:*:' + s3bucket +'\"' +']'
+            
+
+            text = """ {
+              "Version": "2008-10-17",
+              "Id": "PolicyExample",
+              "Statement": [
+                {
+                  "Sid": "example-statement-ID",
+                  "Effect": "Allow",
+                  "Principal": {
+                    "AWS": "*"
+                  },
+                  "Action": "SQS:SendMessage",
+                  "Resource": "arn:aws:sqs:%s:%s:%s",
+                  "Condition": {
+                    "ArnLike": {
+                      "aws:SourceArn": %s   
+                    }
+                  }
+                },
+                {
+                  "Sid": "GiveAccessToLoggly",
+                  "Effect": "Allow",
+                  "Principal": {
+                    "AWS": "arn:aws:iam::%s:root"
+                  },
+                  "Action": "SQS:*",
+                  "Resource": "arn:aws:sqs:%s:%s:%s"
+                }
+              ]
+            }
+            """ % (region, acnumber, sqsname, addon, acnumber, region, acnumber, sqsname)
+
+            
+            parsed = json.loads(text)
+           
+            conn.set_queue_attribute(queue_name, 'Policy', json.dumps(parsed))
+
+            # s3 bucket notification configuration 
+            client = boto3.client('s3', region)
+
+
+            response = client.put_bucket_notification_configuration(
+                Bucket=s3bucket,
+                NotificationConfiguration={ 
+                    "QueueConfigurations": [{
+                     "Id": "Notification",
+                     "Events": ["s3:ObjectCreated:*"],
+                     "QueueArn": "arn:aws:sqs:" + region + ":" + acnumber + ":" + sqsname
+                }],
+                }
+            )
+
+            policy_json = """{
+              "Id": "Policy1467278443739",
+              "Version": "2012-10-17",
+              "Statement": [
+                {
+                  "Sid": "Stmt1467278441801",
+                  "Action": [
+                    "s3:GetObject"
+                  ],
+                  "Effect": "Allow",
+                  "Resource": "arn:aws:s3:::%s/*",
+                  "Principal": {
+                    "AWS": [
+                      "*"
+                    ]
+                  }
+                },
+                {
+                  "Sid": "Stmt14672784418012",
+                  "Action": [
+                    "s3:ListBucket"
+                  ],
+                  "Effect": "Allow",
+                  "Resource": "arn:aws:s3:::%s",
+                  "Principal": {
+                    "AWS": [
+                      "*"
+                    ]
+                  }
+                },
+                {
+                  "Sid": "Stmt14672784418013",
+                  "Action": [
+                    "s3:GetBucketLocation"
+                  ],
+                  "Effect": "Allow",
+                  "Resource": "arn:aws:s3:::%s",
+                  "Principal": {
+                    "AWS": [
+                      "*"
+                    ]
+                  }
+                }
+              ]
+            }""" % (s3bucket, s3bucket, s3bucket,)
+
+            response = bucket.set_policy(policy_json) 
+
+    else:
+        # create the default queue or the queue passed as a parameter          
+        q = conn.create_queue(sqsname)
+        queue_name = conn.get_queue(sqsname)
+  
+        conn.set_queue_attribute(queue_name, 'Policy', json.dumps({
+              "Version": "2008-10-17",
+              "Id": "PolicyExample",
+              "Statement": [
+                {
+                  "Sid": "example-statement-ID",
+                  "Effect": "Allow",
+                  "Principal": {
+                    "AWS": "*"
+                  },
+                  "Action": "SQS:SendMessage",
+                  "Resource": "arn:aws:sqs:" + region + ":" + acnumber + ":" + sqsname,
+                  "Condition": {
+                    "ArnLike": {
+                      "aws:SourceArn": "arn:aws:s3:*:*:" + s3bucket
+                    }
+                  }
+                },
+                {
+                  "Sid": "GiveAccessToLoggly",
+                  "Effect": "Allow",
+                  "Principal": {
+                    "AWS": "arn:aws:iam::" + acnumber + ":root"
+                  },
+                  "Action": "SQS:*",
+                  "Resource": "arn:aws:sqs:" + region + ":" + acnumber + ":" + sqsname
+                }
+              ]
+            }))
+
+        # s3 bucket notification configuration 
+        client = boto3.client('s3', region)
+
+        response = client.put_bucket_notification_configuration(
+            Bucket=s3bucket,
+            NotificationConfiguration={ 
+                "QueueConfigurations": [{
+                 "Id": "Notification",
+                 "Events": ["s3:ObjectCreated:*"],
+                 "QueueArn": "arn:aws:sqs:" + region + ":" + acnumber + ":" + sqsname
+            }],
+            }
+        )
+
+        policy_json = """{
+          "Id": "Policy1467278443739",
+          "Version": "2012-10-17",
           "Statement": [
             {
-              "Sid": "example-statement-ID",
+              "Sid": "Stmt1467278441801",
+              "Action": [
+                "s3:GetObject"
+              ],
               "Effect": "Allow",
+              "Resource": "arn:aws:s3:::%s/*",
               "Principal": {
-                "AWS": "*"
-              },
-              "Action": "SQS:SendMessage",
-              "Resource": "arn:aws:sqs:" + region + ":" + acnumber + ":" + sqsname,
-              "Condition": {
-                "ArnLike": {
-                  "aws:SourceArn": "arn:aws:s3:*:*:" + s3bucket
-                }
+                "AWS": [
+                  "*"
+                ]
               }
             },
             {
-              "Sid": "GiveAccessToLoggly",
+              "Sid": "Stmt14672784418012",
+              "Action": [
+                "s3:ListBucket"
+              ],
               "Effect": "Allow",
+              "Resource": "arn:aws:s3:::%s",
               "Principal": {
-                "AWS": "arn:aws:iam::" + acnumber + ":root"
-              },
-              "Action": "SQS:*",
-              "Resource": "arn:aws:sqs:" + region + ":" + acnumber + ":" + sqsname
+                "AWS": [
+                  "*"
+                ]
+              }
+            },
+            {
+              "Sid": "Stmt14672784418013",
+              "Action": [
+                "s3:GetBucketLocation"
+              ],
+              "Effect": "Allow",
+              "Resource": "arn:aws:s3:::%s",
+              "Principal": {
+                "AWS": [
+                  "*"
+                ]
+              }
             }
           ]
-        }))
+        }""" % (s3bucket, s3bucket, s3bucket,)
 
-    # s3 bucket notification configuration 
-    client = boto3.client('s3', region)
-
-    response = client.put_bucket_notification_configuration(
-        Bucket=s3bucket,
-        NotificationConfiguration={ 
-            "QueueConfigurations": [{
-             "Id": "Notification",
-             "Events": ["s3:ObjectCreated:*"],
-             "QueueArn": "arn:aws:sqs:" + region + ":" + acnumber + ":" + sqsname
-        }],
-        }
-    )
-
-    policy_json = """{
-      "Id": "Policy1467278443739",
-      "Version": "2012-10-17",
-      "Statement": [
-        {
-          "Sid": "Stmt1467278441801",
-          "Action": [
-            "s3:GetObject"
-          ],
-          "Effect": "Allow",
-          "Resource": "arn:aws:s3:::%s/*",
-          "Principal": {
-            "AWS": [
-              "*"
-            ]
-          }
-        },
-        {
-          "Sid": "Stmt14672784418012",
-          "Action": [
-            "s3:ListBucket"
-          ],
-          "Effect": "Allow",
-          "Resource": "arn:aws:s3:::%s",
-          "Principal": {
-            "AWS": [
-              "*"
-            ]
-          }
-        },
-        {
-          "Sid": "Stmt14672784418013",
-          "Action": [
-            "s3:GetBucketLocation"
-          ],
-          "Effect": "Allow",
-          "Resource": "arn:aws:s3:::%s",
-          "Principal": {
-            "AWS": [
-              "*"
-            ]
-          }
-        }
-      ]
-    }""" % (s3bucket, s3bucket, s3bucket,)
-
-    response = bucket.set_policy(policy_json)
+        response = bucket.set_policy(policy_json)
 
 
 print "Queue Name"
