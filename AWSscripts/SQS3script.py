@@ -15,6 +15,8 @@ import json
 import os
 import re
 import sys
+import urllib
+import StringIO
 
 from boto.sqs.connection import SQSConnection
 from boto.sqs.message import Message
@@ -97,7 +99,7 @@ if "None" not in str(queue_name):
     queue_attr = str(queue_attr_raw) 
 
     if s3bucket in queue_attr:
-      print 'Bucket already exists in queue\'s policy, moving on'
+      print 'Bucket already exists in queue\'s policy'
 
     elif 'arn:aws:s3' in queue_attr:
         # append the bucket to the existing policy
@@ -320,7 +322,7 @@ else:
         queue_attr = str(queue_attr_raw) 
 
         if s3bucket in queue_attr:
-          print 'Bucket already exists in queue\'s policy, moving on'
+          print 'Bucket already exists in queue\'s policy'
 
         else:
             # append the bucket to the existing policy
@@ -545,8 +547,68 @@ if user != None and user != '':
     try:
         response  = iam.get_user(user)
         if 'get_user_response' in response:
-            print 'User already exists, use a different user name'
-            sys.exit()
+            print 'IAM user %s already exists, appending the sqs queue and s3 bucket to this IAM user\'s policy' % user
+            
+            existing_policy = str(iam.get_user_policy(user, 'LogglyUserPolicy'))
+            existing_policy_decoded = urllib.unquote(existing_policy)
+
+            s3Buckets = []
+            sqsQueues = [] 
+
+            response = iam.get_all_access_keys(user, max_items=1)
+            
+            s = StringIO.StringIO(existing_policy_decoded)
+            for line in s:
+              if 'arn:aws:sqs' in line:
+                sqsQueues.append(line.strip().replace(",", ""))
+              if 'arn:aws:s3' in line:
+                s3Buckets.append(line.strip().replace(",", ""))
+            
+            # append current s3bucket and sqs queue
+            sqsQueues.append('\"arn:aws:sqs:%s:%s:%s\"' % (region, acnumber, sqsname,))
+            s3Buckets.append('\"arn:aws:s3:::%s\"' % (s3bucket))    
+
+            sqsQueueAddOn=""
+            for entry in sqsQueues:
+              sqsQueueAddOn = sqsQueueAddOn + entry + ",\n"
+
+            
+            s3BucketAddOn=""
+            for entry in s3Buckets:
+              s3BucketAddOn =  s3BucketAddOn + entry + ",\n"
+
+            policy_json = """{
+            "Version": "2012-10-17",
+            "Statement": [
+                {
+                    "Sid": "Sidtest",
+                    "Effect": "Allow",
+                    "Action": [
+                        "sqs:*"
+                    ],
+                    "Resource": [
+                        %s
+                    ]
+                },
+                {
+                    "Effect": "Allow",
+                    "Action":[
+                    "s3:ListBucket",
+                    "s3:GetObject",
+                    "s3:GetBucketLocation"
+                 ],
+                    "Resource": [
+                        %s
+                    ]
+                }
+            ]
+            }""" % (sqsQueueAddOn[:-2], s3BucketAddOn[:-2],)
+
+
+            response = iam.put_user_policy(user, 'LogglyUserPolicy', policy_json)
+
+            print ""
+            print 'Appended! Please provide the access key and secret key for the IAM user %s in the form fields' % user
         
     except BotoServerError, e:
         if "The user with name" in e.message and "cannot be found" in e.message :
@@ -568,6 +630,9 @@ if user != None and user != '':
 
             print loggly_secret_key
 
+            print ""
+            print "Please save the above credentials"
+
 
             policy_json = """{
             "Version": "2012-10-17",
@@ -589,14 +654,16 @@ if user != None and user != '':
                     "s3:GetObject",
                     "s3:GetBucketLocation"
                  ],
-                    "Resource": ["arn:aws:s3:::%s"]
+                    "Resource": [
+                      "arn:aws:s3:::%s"
+                    ]
                 }
             ]
             }""" % (region, acnumber, sqsname, s3bucket,)
 
 
             response = iam.put_user_policy(user,
-                                           'TestPolicy',
+                                           'LogglyUserPolicy',
                                            policy_json)
         else: 
             
@@ -609,9 +676,72 @@ else:
     try:
         response  = iam.get_user(user)
         if 'get_user_response' in response:
-            print 'The default user \'loggly-s3-user\' which the script creates already exists, please pass a different user name with --user parameter'
-            sys.exit()
-        
+            print 'The default IAM user \'loggly-s3-user\' which the script creates already exists, appending the sqs queue and s3 bucket to this IAM user\'s policy'
+            
+            existing_policy = str(iam.get_user_policy(user, 'LogglyUserPolicy'))
+            existing_policy_decoded = urllib.unquote(existing_policy)
+
+            s3Buckets = []
+            sqsQueues = [] 
+
+            response = iam.get_all_access_keys(user, max_items=1)
+            
+            s = StringIO.StringIO(existing_policy_decoded)
+            for line in s:
+              if 'arn:aws:sqs' in line:
+                sqsQueues.append(line.strip().replace(",", ""))
+              if 'arn:aws:s3' in line:
+                s3Buckets.append(line.strip().replace(",", ""))
+            
+            # append current s3bucket and sqs queue
+            sqsQueues.append('\"arn:aws:sqs:%s:%s:%s\"' % (region, acnumber, sqsname,))
+            s3Buckets.append('\"arn:aws:s3:::%s\"' % (s3bucket))    
+
+            sqsQueueAddOn=""
+            for entry in sqsQueues:
+              sqsQueueAddOn = sqsQueueAddOn + entry + ",\n"
+
+            
+            s3BucketAddOn=""
+            for entry in s3Buckets:
+              s3BucketAddOn =  s3BucketAddOn + entry + ",\n"
+
+            policy_json = """{
+            "Version": "2012-10-17",
+            "Statement": [
+                {
+                    "Sid": "Sidtest",
+                    "Effect": "Allow",
+                    "Action": [
+                        "sqs:*"
+                    ],
+                    "Resource": [
+                        %s
+                    ]
+                },
+                {
+                    "Effect": "Allow",
+                    "Action":[
+                    "s3:ListBucket",
+                    "s3:GetObject",
+                    "s3:GetBucketLocation"
+                 ],
+                    "Resource": [
+                        %s
+                    ]
+                }
+            ]
+            }""" % (sqsQueueAddOn[:-2], s3BucketAddOn[:-2],)
+    
+
+            try: 
+              response = iam.put_user_policy(user, 'LogglyUserPolicy', policy_json)
+            except Exception, e:
+              print e
+      
+            print ""
+            print "Appended! Please provide the access key and secret key for the IAM user \'loggly-s3-user\' in the form fields"
+
     except BotoServerError, e:
         if "The user with name" in e.message and "cannot be found" in e.message :
 
@@ -631,6 +761,9 @@ else:
 
             print loggly_secret_key
 
+            print ""
+            print "Please save the above credentials"
+
             policy_json = """{
             "Version": "2012-10-17",
             "Statement": [
@@ -651,11 +784,13 @@ else:
                     "s3:GetObject",
                     "s3:GetBucketLocation"
                  ],
-                    "Resource": ["arn:aws:s3:::%s"]
+                    "Resource": [
+                      "arn:aws:s3:::%s"
+                    ]
                 }
             ]
             }""" % (region, acnumber, sqsname, s3bucket,)
 
             response = iam.put_user_policy(user,
-                                           'TestPolicy',
+                                           'LogglyUserPolicy',
                                            policy_json)
