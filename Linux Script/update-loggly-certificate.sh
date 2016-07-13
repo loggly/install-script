@@ -13,9 +13,9 @@ function ctrl_c()  {
 ##########  Variable Declarations - Start  ##########
 
 #name of the current script. This will get overwritten by the child script which calls this
-SCRIPT_NAME=configure-linux.sh
+SCRIPT_NAME=update-loggly-certificate.sh
 #version of the current script. This will get overwritten by the child script which calls this
-SCRIPT_VERSION=1.16
+SCRIPT_VERSION=1.0
 
 #application tag. This will get overwritten by the child script which calls this
 APP_TAG=
@@ -45,6 +45,9 @@ HOST_NAME=
 #this variable will hold the name of the linux distribution
 LINUX_DIST=
 
+#this variable will hold if the script is for test
+TEST_MODE="true"
+
 #host name for logs-01.loggly.com
 LOGS_01_HOST=logs-01.loggly.com
 LOGS_01_URL=https://$LOGS_01_HOST
@@ -73,12 +76,12 @@ LOGGLY_PASSWORD=
 SUPPRESS_PROMPT="false"
 
 #variables used in 22-loggly.conf file
-LOGGLY_SYSLOG_PORT=514
+LOGGLY_SYSLOG_PORT=6514
 LOGGLY_DISTRIBUTION_ID="41058"
 
-#Instruction link on how to configure loggly on linux manually. This will get overwritten by the child script which calls this
+#Instruction link on how to configure rsyslog TLS on linux manually. This will get overwritten by the child script which calls this
 #on how to configure the child application
-MANUAL_CONFIG_INSTRUCTION="Manual instructions to configure rsyslog on Linux are available at https://www.loggly.com/docs/rsyslog-manual-configuration/. Rsyslog troubleshooting instructions are available at https://www.loggly.com/docs/troubleshooting-rsyslog/"
+MANUAL_CONFIG_INSTRUCTION="Manual instructions to configure rsyslog TLS on Linux are available at https://www.loggly.com/docs/rsyslog-tls-configuration/."
 
 #this variable is set if the script is invoked via some other calling script
 IS_INVOKED=
@@ -90,6 +93,7 @@ LINUX_ENV_VALIDATED="false"
 LINUX_DO_VERIFICATION="true"
 
 ##########  Variable Declarations - End  ##########
+
 
 #check if the Linux environment is compatible with Loggly.
 #Also set few variables after the check.
@@ -103,10 +107,10 @@ checkLinuxLogglyCompatibility()
 
 	#set the basic variables needed by this script
 	setLinuxVariables
-
+	
 	#check if the Loggly servers are accessible. If no, ask user to check network connectivity & exit
 	checkIfLogglyServersAccessible
-
+	
 	#check if user credentials are valid. If no, then exit
 	checkIfValidUserNamePassword
 
@@ -115,13 +119,10 @@ checkLinuxLogglyCompatibility()
 
 	#check if authentication token is valid. If no, then exit.
 	checkIfValidAuthToken
-
+	
 	#checking if syslog-ng is configured as a service
 	checkifSyslogNgConfiguredAsService
-
-	#check if systemd is present in machine.
-	checkIfSystemdConfigured
-
+	
 	#check if rsyslog is configured as service. If no, then exit
 	checkIfRsyslogConfiguredAsService
 
@@ -133,9 +134,6 @@ checkLinuxLogglyCompatibility()
 
 	#check if selinux service is enforced. if yes, ask the user to manually disable and exit the script
 	checkIfSelinuxServiceEnforced
-	
-	#update rsyslog.conf and adds $MaxMessageSize in it
-	modifyMaxMessageSize
 
 	LINUX_ENV_VALIDATED="true"
 }
@@ -144,34 +142,36 @@ checkLinuxLogglyCompatibility()
 installLogglyConf()
 {
 	#log message indicating starting of Loggly configuration
-	logMsgToConfigSysLog "INFO" "INFO: Initiating Configure Loggly for Linux."
+	logMsgToConfigSysLog "INFO" "INFO: Initiating TLS Certificate upgrade in Loggly Configuration."
 
 	if [ "$LINUX_ENV_VALIDATED" = "false" ]; then
 		checkLinuxLogglyCompatibility
 	fi
 
-	#if all the above check passes, write the 22-loggly.conf file
-	checkAuthTokenAndWriteContents
+	#write new sha2 certificate
+	updateCertificate
 
-	#create rsyslog dir if it doesn't exist, Modify the permission on rsyslog directory if exist on Ubuntu
-	createRsyslogDir
+	#restart rsyslog service
+	restartRsyslog
+	
+	if [ "$TEST_MODE" = "true" ]; then
 
-	if [ "$LINUX_DO_VERIFICATION" = "true" ]; then
+		#call changeHostFile to test collector
+		updateHostsFile
+
 		#check if the logs are going to loggly fro linux system now
 		checkIfLogsMadeToLoggly
-	fi
 
-	if [ "$IS_INVOKED" = "" ]; then
-		logMsgToConfigSysLog "SUCCESS" "SUCCESS: Linux system successfully configured to send logs via Loggly."
-	fi
-
+	else
+		logMsgToConfigSysLog "SUCCESS" "SUCCESS: Successfully upgraded TLS Certificate for Loggly configuration"
+	fi	
 }
 
-#remove loggly configuration from Linux system
-removeLogglyConf()
+#revert loggly TLS Certificate upgrade from Linux system
+revertTLSchanges()
 {
 	#log message indicating starting of Loggly configuration
-	logMsgToConfigSysLog "INFO" "INFO: Initiating uninstall Loggly for Linux."
+	logMsgToConfigSysLog "INFO" "INFO: Initiating restore of rsyslog-tls"
 
 	#check if the user has root permission to run this script
 	checkIfUserHasRootPrivileges
@@ -182,23 +182,20 @@ removeLogglyConf()
 	#set the basic variables needed by this script
 	setLinuxVariables
 
-	#remove systemd-rsyslog configuration
-	revertSystemdChanges
-
 	#remove 22-loggly.conf file
-	remove22LogglyConfFile
+	remove22LogglyTLSChange
 
 	#restart rsyslog service
 	restartRsyslog
 
 	#log success message
-	logMsgToConfigSysLog "SUCCESS" "SUCCESS: Uninstalled Loggly configuration from Linux system."
+	logMsgToConfigSysLog "SUCCESS" "SUCCESS: TLS Changes have been reverted."
 }
 
 #checks if user has root privileges
 checkIfUserHasRootPrivileges()
 {
-	#This script needs to be run as root
+	#This script needs to be run as a sudo user
 	if [[ $EUID -ne 0 ]]; then
 	   logMsgToConfigSysLog "ERROR" "ERROR: This script must be run as root."
 	   exit 1
@@ -209,9 +206,9 @@ checkIfUserHasRootPrivileges()
 checkIfSupportedOS()
 {
 	getOs
-
+	
 	LINUX_DIST_IN_LOWER_CASE=$(echo $LINUX_DIST | tr "[:upper:]" "[:lower:]")
-
+	
 	case "$LINUX_DIST_IN_LOWER_CASE" in
 		*"ubuntu"* )
 		echo "INFO: Operating system is Ubuntu."
@@ -242,7 +239,7 @@ checkIfSupportedOS()
 					[Yy]* )
 					break;;
 					[Nn]* )
-					exit 1
+					exit 1	
 					;;
 					* ) echo "Please answer yes or no.";;
 				esac
@@ -312,7 +309,7 @@ checkIfLogglyServersAccessible()
 		logMsgToConfigSysLog "ERROR" "ERROR: This is not a recognized subdomain. Please ask the account owner for the subdomain they signed up with."
 		exit 1
 	fi
-
+	
 	echo "INFO: Checking if Gen2 account."
 	if [ $(curl -s --head  --request GET $LOGGLY_ACCOUNT_URL/apiv2/customer | grep "404 NOT FOUND" | wc -l) == 1 ]; then
 		logMsgToConfigSysLog "ERROR" "ERROR: This scripts need a Gen2 account. Please contact Loggly support."
@@ -352,7 +349,7 @@ getAuthToken()
 		tokenstr=${tokenstr#*\"}
 
 		LOGGLY_AUTH_TOKEN=$tokenstr
-
+		
 		logMsgToConfigSysLog "INFO" "INFO: Retrieved authentication token: $LOGGLY_AUTH_TOKEN"
 	fi
 }
@@ -374,19 +371,17 @@ checkIfRsyslogConfiguredAsService()
 {
 	if [ -f /etc/init.d/$RSYSLOG_SERVICE ]; then
 		logMsgToConfigSysLog "INFO" "INFO: $RSYSLOG_SERVICE is present as service."
-	elif [ -f /usr/lib/systemd/system/$RSYSLOG_SERVICE.service ]; then
-		logMsgToConfigSysLog "INFO" "INFO: $RSYSLOG_SERVICE is present as service."
 	else
 		logMsgToConfigSysLog "ERROR" "ERROR: $RSYSLOG_SERVICE is not present as service."
 		exit 1
 	fi
-
+	
 	#checking if syslog-ng is running as a service
 	checkifSyslogNgConfiguredAsService
-
+	
 	if [ $(ps -A | grep "$RSYSLOG_SERVICE" | wc -l) -eq 0 ]; then
 		logMsgToConfigSysLog "INFO" "INFO: $RSYSLOG_SERVICE is not running. Attempting to start service."
-		service $RSYSLOG_SERVICE start
+		sudo service $RSYSLOG_SERVICE start
 	fi
 }
 
@@ -395,19 +390,6 @@ checkifSyslogNgConfiguredAsService()
 	if [ $(ps -A | grep "$SYSLOG_NG_SERVICE" | wc -l) -gt 0  ]; then
 		logMsgToConfigSysLog "ERROR" "ERROR: This script does not currently support syslog-ng. Please follow the instructions on this page https://www.loggly.com/docs/syslog-ng-manual-configuration"
 		exit 1
-	fi
-}
-
-#check if systemd is present in machine.
-checkIfSystemdConfigured()
-{
-	FILE="/etc/systemd/journald.conf";
-	if [ -f "$FILE" ]; then
-		logMsgToConfigSysLog "INFO" "INFO: Systemd is present. Configuring logs from Systemd to rsyslog."
-		cp /etc/systemd/journald.conf /etc/systemd/journald.conf.loggly.bk
-		sed -i 's/.*ForwardToSyslog.*/ForwardToSyslog=Yes/g' /etc/systemd/journald.conf
-		logMsgToConfigSysLog "INFO" "INFO: Restarting Systemd-journald"
-		systemctl restart systemd-journald 
 	fi
 }
 
@@ -423,7 +405,7 @@ checkIfMultipleRsyslogConfigured()
 #check if minimum version of rsyslog required to configure loggly is met
 checkIfMinVersionOfRsyslog()
 {
-	RSYSLOG_VERSION=$($RSYSLOGD -version | grep "$RSYSLOGD")
+	RSYSLOG_VERSION=$(sudo $RSYSLOGD -version | grep "$RSYSLOGD")
 	RSYSLOG_VERSION=${RSYSLOG_VERSION#* }
 	RSYSLOG_VERSION=${RSYSLOG_VERSION%,*}
 	RSYSLOG_VERSION=$RSYSLOG_VERSION | tr -d " "
@@ -439,129 +421,59 @@ checkIfSelinuxServiceEnforced()
 	isSelinuxInstalled=$(getenforce -ds 2>/dev/null)
 	if [ $? -ne 0 ]; then
 		logMsgToConfigSysLog "INFO" "INFO: selinux status is not enforced."
-	elif [ $(getenforce | grep "Enforcing" | wc -l) -gt 0 ]; then
+	elif [ $(sudo getenforce | grep "Enforcing" | wc -l) -gt 0 ]; then
 		logMsgToConfigSysLog "ERROR" "ERROR: selinux status is 'Enforcing'. Please disable it and start the rsyslog daemon manually."
 		exit 1
 	fi
 }
 
-#update rsyslog.conf and adds $MaxMessageSize in it
-modifyMaxMessageSize()
+#create /etc/rsyslog.d/keys/ca.d directory and installs the certificates
+updateCertificate()
 {
-	if  grep -q '$MaxMessageSize' "/etc/rsyslog.conf"; then
-		sed -i 's/.*$MaxMessageSize.*/$MaxMessageSize 64k/g' /etc/rsyslog.conf
-	else
-	sed -i '1 a $MaxMessageSize 64k' /etc/rsyslog.conf
-	fi
-	logMsgToConfigSysLog "INFO" "INFO: Modified \$MaxMessageSize to 64k in rsyslog.conf"
-}
+	CURRENT_CRT_CONF="$(grep '.crt' $LOGGLY_RSYSLOG_CONFFILE)"
+	CURRENT_CRT_COUNT="$(grep '.crt' $LOGGLY_RSYSLOG_CONFFILE | wc -l)"
+	if [ $CURRENT_CRT_COUNT -gt 0 ]; then
 
-#check if authentication token is valid and then write contents to 22-loggly.conf file to /etc/rsyslog.d directory
-checkAuthTokenAndWriteContents()
-{
-	if [ "$LOGGLY_AUTH_TOKEN" != "" ]; then
-		writeContents $LOGGLY_ACCOUNT $LOGGLY_AUTH_TOKEN $LOGGLY_DISTRIBUTION_ID $LOGS_01_HOST $LOGGLY_SYSLOG_PORT
-		restartRsyslog
-	else
-		logMsgToConfigSysLog "ERROR" "ERROR: Loggly auth token is required to configure rsyslog. Please pass -a <auth token> while running script."
-		exit 1
-	fi
-}
-
-
-#write the contents to 22-loggly.conf file
-writeContents()
-{
-
-WRITE_SCRIPT_CONTENTS="false"
-inputStr="
-#          -------------------------------------------------------
-#          Syslog Logging Directives for Loggly ($1.loggly.com)
-#          -------------------------------------------------------
-
-# Define the template used for sending logs to Loggly. Do not change this format.
-\$template LogglyFormat,\"<%pri%>%protocol-version% %timestamp:::date-rfc3339% %HOSTNAME% %app-name% %procid% %msgid% [$2@$3] %msg%\n\"
-
-\$WorkDirectory /var/spool/rsyslog # where to place spool files
-\$ActionQueueFileName fwdRule1 # unique name prefix for spool files
-\$ActionQueueMaxDiskSpace 1g   # 1gb space limit (use as much as possible)
-\$ActionQueueSaveOnShutdown on # save messages to disk on shutdown
-\$ActionQueueType LinkedList   # run asynchronously
-\$ActionResumeRetryCount -1    # infinite retries if host is down
-
-# Send messages to Loggly over TCP using the template.
-*.*             @@$4:$5;LogglyFormat
-
-#     -------------------------------------------------------
-"
-	if [ -f "$LOGGLY_RSYSLOG_CONFFILE" ]; then
-		logMsgToConfigSysLog "INFO" "INFO: Loggly rsyslog file $LOGGLY_RSYSLOG_CONFFILE already exist."
-
-		STR_SIZE=${#inputStr}
-		SIZE_FILE=$(stat -c%s "$LOGGLY_RSYSLOG_CONFFILE")
-
-		#actual file size and variable size with same contents always differ in size with one byte
-		STR_SIZE=$(( STR_SIZE + 1 ))
-
-		if [ "$STR_SIZE" -ne "$SIZE_FILE" ]; then
-
-			logMsgToConfigSysLog "WARN" "WARN: Loggly rsyslog file /etc/rsyslog.d/22-loggly.conf content has changed."
-			if [ "$SUPPRESS_PROMPT" == "false" ]; then
-					while true;
-					do
-						read -p "Do you wish to override $LOGGLY_RSYSLOG_CONFFILE and re-verify configuration? (yes/no)" yn
-						case $yn in
-						[Yy]* )
-							logMsgToConfigSysLog "INFO" "INFO: Going to back up the conf file: $LOGGLY_RSYSLOG_CONFFILE to $LOGGLY_RSYSLOG_CONFFILE_BACKUP";
-							mv -f $LOGGLY_RSYSLOG_CONFFILE $LOGGLY_RSYSLOG_CONFFILE_BACKUP;
-							WRITE_SCRIPT_CONTENTS="true"
-							break;;
-						[Nn]* )
-							LINUX_DO_VERIFICATION="false"
-							logMsgToConfigSysLog "INFO" "INFO: Skipping Linux verification."
-							break;;
-						* ) echo "Please answer yes or no.";;
-						esac
-					done
-			else
-				logMsgToConfigSysLog "INFO" "INFO: Going to back up the conf file: $LOGGLY_RSYSLOG_CONFFILE to $LOGGLY_RSYSLOG_CONFFILE_BACKUP";
-				mv -f $LOGGLY_RSYSLOG_CONFFILE $LOGGLY_RSYSLOG_CONFFILE_BACKUP;
-				WRITE_SCRIPT_CONTENTS="true"
+		DIRECTORY_K="/etc/rsyslog.d/keys";
+		DIRECTORY_CA="/etc/rsyslog.d/keys/ca.d";
+	
+		if [ ! -d "$DIRECTORY_K" ]; then
+			logMsgToConfigSysLog "INFO" "INFO: Making directories /etc/rsyslog.d/keys/ca.d"
+			sudo mkdir /etc/rsyslog.d/keys
+			sudo mkdir /etc/rsyslog.d/keys/ca.d
+		elif [ -d "$DIRECTORY_K" ]; then
+			if [ ! -d "$DIRECTORY_CA" ]; then
+				sudo mkdir /etc/rsyslog.d/keys/ca.d
 			fi
 		else
-			 LINUX_DO_VERIFICATION="false"
+			logMsgToConfigSysLog "INFO" "INFO: Directories /etc/rsyslog.d/keys/ca.d already exists"
 		fi
+	
+		cd /etc/rsyslog.d/keys/ca.d/
+		
+		logMsgToConfigSysLog "INFO" "INFO: Downloading required certificates"
+		sudo curl -O https://logdog.loggly.com/media/logs-01.loggly.com_sha12.crt
+		sudo cat logs-01.loggly.com_sha12.crt > loggly_full_sha12.crt
+
+		#taking backup and changing path in 22-loggly.conf
+		sudo cp $LOGGLY_RSYSLOG_CONFFILE $LOGGLY_RSYSLOG_CONFFILE_BACKUP
+		NEW_CRT_CONF="\$DefaultNetstreamDriverCAFile /etc/rsyslog.d/keys/ca.d/loggly_full_sha12.crt"
+		sed -i  "s%$CURRENT_CRT_CONF%$NEW_CRT_CONF%g" $LOGGLY_RSYSLOG_CONFFILE
+		logMsgToConfigSysLog "INFO" "INFO: Upgraded TLS Certificate for Loggly configuration"
 	else
-		WRITE_SCRIPT_CONTENTS="true"
+		logMsgToConfigSysLog "INFO" "INFO: Rsyslog TLS is not configured."
+		logMsgToConfigSysLog "ERROR" "INFO: Please configure Rsyslog TLS first and then retry updating the certificate."
 	fi
-
-	if [ "$WRITE_SCRIPT_CONTENTS" == "true" ]; then
-
-cat << EOIPFW >> $LOGGLY_RSYSLOG_CONFFILE
-$inputStr
-EOIPFW
-
-	fi
-
 }
 
-#create /var/spool/rsyslog directory if not already present. Modify the permission of this directory for Ubuntu
-createRsyslogDir()
+#Updates the /etc/hosts file with test collectorIP and creates backup of file
+updateHostsFile()
 {
-	if [ -d "$RSYSLOG_DIR" ]; then
-		logMsgToConfigSysLog "INFO" "INFO: $RSYSLOG_DIR already exist, so not creating directory."
-		if [[ "$LINUX_DIST" == *"Ubuntu"* ]]; then
-			logMsgToConfigSysLog "INFO" "INFO: Changing the permission on the rsyslog in /var/spool"
-			chown -R syslog:adm $RSYSLOG_DIR
-		fi
-	else
-		logMsgToConfigSysLog "INFO" "INFO: Creating directory $SYSLOGDIR"
-		mkdir -v $RSYSLOG_DIR
-		if [[ "$LINUX_DIST" == *"Ubuntu"* ]]; then
-			chown -R syslog:adm $RSYSLOG_DIR
-		fi
-	fi
+	sudo sed -i '$ a\ '"52.1.106.130 logs-01.loggly.com" /etc/hosts
+	logMsgToConfigSysLog "INFO" "INFO: Hosts file Updated"
+	sleep 15
 }
+
 
 #check if the logs made it to Loggly
 checkIfLogsMadeToLoggly()
@@ -572,6 +484,12 @@ checkIfLogsMadeToLoggly()
 	queryParam="syslog.appName%3ALOGGLYVERIFY%20$uuid"
 	logger -t "LOGGLYVERIFY" "LOGGLYVERIFY-Test message for verification with UUID $uuid"
 
+	#sleeps for 2 seconds before restoring hosts file
+	sleep 2
+
+	#restores hosts file to its earlier state
+	restoreHostFile
+	
 	counter=1
 	maxCounter=10
 	finalCount=0
@@ -585,45 +503,46 @@ checkIfLogsMadeToLoggly()
 	let counter=$counter+1
 
 	while [ "$finalCount" -eq 0 ]; do
-		echo "INFO: Did not find the test log message in Loggly's search yet. Waiting for 30 secs."
-		sleep 30
+		echo "INFO: Did not find the test log message in Loggly's search yet. Waiting for 50 secs."
+		sleep 50
 		echo "INFO: Done waiting. Verifying again."
 		logMsgToConfigSysLog "INFO" "INFO: Verification # $counter of total $maxCounter."
 		searchAndFetch finalCount "$queryUrl"
 		let counter=$counter+1
 		if [ "$counter" -gt "$maxCounter" ]; then
+
 			logMsgToConfigSysLog "ERROR" "ERROR: Logs did not make to Loggly in time. Please check network and firewall settings and retry."
 			exit 1
 		fi
 	done
 
 	if [ "$finalCount" -eq 1 ]; then
-		if [ "$IS_INVOKED" = "" ]; then
-			logMsgToConfigSysLog "SUCCESS" "SUCCESS: Verification logs successfully transferred to Loggly! You are now sending Linux system logs to Loggly."
-	 		exit 0
-		else
-			logMsgToConfigSysLog "INFO" "SUCCESS: Verification logs successfully transferred to Loggly! You are now sending Linux system logs to Loggly."
- 		fi
+		logMsgToConfigSysLog "SUCCESS" "SUCCESS: Verification logs successfully transferred to Loggly! You have now upgraded TLS Certificate for Loggly configuration"
 	fi
 
+}
+
+#restores host file to its original state
+restoreHostFile()
+{
+	if grep -q '52.1.106.130 logs-01.loggly.com' "/etc/hosts";then
+        	sed -i -e '/52.1.106.130 logs-01.loggly.com/d' /etc/hosts
+	fi
+	logMsgToConfigSysLog "INFO" "INFO: Hosts file Restored"
 }
 
 #delete 22-loggly.conf file
-remove22LogglyConfFile()
+remove22LogglyTLSChange()
 {
-	if [ -f "$LOGGLY_RSYSLOG_CONFFILE" ]; then
-		rm -rf "$LOGGLY_RSYSLOG_CONFFILE"
-	fi
-}
-
-revertSystemdChanges()
-{
-	FILE="/etc/systemd/journald.conf.loggly.bk";
-	if [ -f "$FILE" ]; then
-		cp /etc/systemd/journald.conf.loggly.bk /etc/systemd/journald.conf
-		rm /etc/systemd/journald.conf.loggly.bk
-		logMsgToConfigSysLog "INFO" "INFO: Reverted Systemd-rsyslog configuration"
-		systemctl restart systemd-journald
+	CURRENT_CRT_COUNT="$(grep '.crt' $LOGGLY_RSYSLOG_CONFFILE | wc -l)"
+	if [ $CURRENT_CRT_COUNT -gt 0 ]; then
+		if [ -f $LOGGLY_RSYSLOG_CONFFILE ]; then
+			sudo rm -rf $LOGGLY_RSYSLOG_CONFFILE
+			sudo cp $LOGGLY_RSYSLOG_CONFFILE_BACKUP $LOGGLY_RSYSLOG_CONFFILE
+		fi
+	else
+		logMsgToConfigSysLog "INFO" "INFO: Rsyslog TLS is not configured."
+		exit 1
 	fi
 }
 
@@ -649,7 +568,7 @@ compareVersions ()
 restartRsyslog()
 {
 	logMsgToConfigSysLog "INFO" "INFO: Restarting the $RSYSLOG_SERVICE service."
-	service $RSYSLOG_SERVICE restart
+	sudo service $RSYSLOG_SERVICE restart
 	if [ $? -ne 0 ]; then
 		logMsgToConfigSysLog "WARNING" "WARNING: $RSYSLOG_SERVICE did not restart gracefully. Please restart $RSYSLOG_SERVICE manually."
 	fi
@@ -712,9 +631,9 @@ sendPayloadToConfigSysLog()
 searchAndFetch()
 {
 	url=$2
-
+	
 	result=$(wget -qO- /dev/null --user "$LOGGLY_USERNAME" --password "$LOGGLY_PASSWORD" "$url")
-
+	
 	if [ -z "$result" ]; then
 		logMsgToConfigSysLog "ERROR" "ERROR: Please check your network/firewall settings & ensure Loggly subdomain, username and password is specified correctly."
 		exit 1
@@ -733,7 +652,7 @@ searchAndFetch()
 	eval $1="'$count'"
 	if [ "$count" -gt 0 ]; then
 		timestamp=$(echo "$result" | grep timestamp)
-	fi
+	fi	
 }
 
 #get password in the form of asterisk
@@ -757,67 +676,65 @@ getPassword()
 usage()
 {
 cat << EOF
-usage: configure-linux [-a loggly auth account or subdomain] [-t loggly token (optional)] [-u username] [-p password (optional)] [-s suppress prompts {optional)]
-usage: configure-linux [-a loggly auth account or subdomain] [-r to remove]
-usage: configure-linux [-h for help]
+usage: update-loggly-certificate [-a loggly auth account or subdomain] [-u loggly username] [-t loggly token (optional)] [-p password (optional)] [ -notest to disable test mode (optional)] [-s suppress prompts {optional)]
+usage: update-loggly-certificate [-a loggly auth account or subdomain] [-r to remove]
+usage: update-loggly-certificate [-h for help]
 EOF
 }
 
 ##########  Get Inputs from User - Start  ##########
-if [ "$1" != "being-invoked" ]; then
-	if [ $# -eq 0 ]; then
-		usage
-		exit
-	else
-		while [ "$1" != "" ]; do
-			case $1 in
-			-t | --token ) shift
-				LOGGLY_AUTH_TOKEN=$1
-				echo "AUTH TOKEN $LOGGLY_AUTH_TOKEN"
-				;;
-			-a | --account ) shift
-				LOGGLY_ACCOUNT=$1
-				echo "Loggly account or subdomain: $LOGGLY_ACCOUNT"
-				;;
-			-u | --username ) shift
-				LOGGLY_USERNAME=$1
-				echo "Username is set"
-				;;
-			-p | --password ) shift
-				LOGGLY_PASSWORD=$1
-				;;
-			-r | --remove )
-				LOGGLY_REMOVE="true"
-				;;
-			-s | --suppress )
-				SUPPRESS_PROMPT="true"
-				;;
-			-h | --help)
-				usage
-				exit
-				;;
-			*) usage
+if [ $# -eq 0 ]; then
+	usage
+	exit
+else
+	while [ "$1" != "" ]; do
+		case $1 in
+		-t | --token ) shift
+			LOGGLY_AUTH_TOKEN=$1
+			echo "AUTH TOKEN $LOGGLY_AUTH_TOKEN"
+			;;
+		-a | --account ) shift
+			LOGGLY_ACCOUNT=$1
+			echo "Loggly account or subdomain: $LOGGLY_ACCOUNT"
+			;;
+		-notest | --notest ) shift
+			TEST_MODE="false"
+			logMsgToConfigSysLog "INFO" "INFO: Test mode disabled"
+			;;
+		-u | --username ) shift
+			LOGGLY_USERNAME=$1
+			echo "Username is set"
+			;;
+		-p | --password ) shift
+			LOGGLY_PASSWORD=$1
+			;;
+		-r | --remove )
+			TLS_RESET="true"
+			;;
+		-s | --suppress )
+			SUPPRESS_PROMPT="true"
+			;;
+		-h | --help)
+			usage
 			exit
 			;;
-			esac
-			shift
-		done
-	fi
-
-	if [ "$LOGGLY_REMOVE" != "" -a "$LOGGLY_ACCOUNT" != "" ]; then
-		removeLogglyConf
-	elif [ "$LOGGLY_ACCOUNT" != "" -a "$LOGGLY_USERNAME" != "" ]; then
-		if [ "$LOGGLY_PASSWORD" = "" ]; then
-			getPassword
-		fi
-		installLogglyConf
-	else
-		usage
-	fi
-else
-	IS_INVOKED="true"
+		*) usage
+		exit
+		;;
+		esac
+		shift
+	done
 fi
 
+if [ "$TLS_RESET" != "" -a "$LOGGLY_ACCOUNT" != "" ]; then 
+	revertTLSchanges
+elif [ "$LOGGLY_ACCOUNT" != "" -a "$LOGGLY_USERNAME" != "" ]; then
+	if [ "$LOGGLY_PASSWORD" = "" ]; then
+		getPassword
+	fi
+	installLogglyConf
+else
+	usage
+fi
 ##########  Get Inputs from User - End  ##########       -------------------------------------------------------
 #          End of Syslog Logging Directives for Loggly
-#

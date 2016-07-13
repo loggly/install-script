@@ -9,7 +9,7 @@ source configure-linux.sh "being-invoked"
 #name of the current script
 SCRIPT_NAME=configure-tomcat.sh
 #version of the current script
-SCRIPT_VERSION=1.3
+SCRIPT_VERSION=1.6
 
 #minimum version of tomcat to enable log rotation
 MIN_TOMCAT_VERSION=6.0.33.0
@@ -98,6 +98,9 @@ installLogglyConfForTomcat()
 	#update logging.properties file for log rotation
 	updateLoggingPropertiesFile
 	
+	#update server.xml to add renameOnRotate
+        updateServerXML
+
 	#multiple tags
 	addTagsInConfiguration
 	
@@ -109,7 +112,7 @@ installLogglyConfForTomcat()
 
 	#log success message
 	logMsgToConfigSysLog "SUCCESS" "SUCCESS: Tomcat successfully configured to send logs via Loggly."
-}
+    }
 
 #executing script to remove loggly configuration for tomcat
 removeLogglyConfForTomcat()
@@ -130,6 +133,9 @@ removeLogglyConfForTomcat()
 
 	#remove 21tomcat.conf file
 	remove21TomcatConfFile
+
+	#restore original server.xml from backup
+	restoreServerXML
 	
 	#restore original loggly properties file from backup
 	restoreLogglyPropertiesFile
@@ -137,7 +143,7 @@ removeLogglyConfForTomcat()
 	logMsgToConfigSysLog "INFO" "INFO: Rollback completed."
 }
 
-#identify if tomcat6 or tomcat7 is installed on your system
+#identify if tomcat6/ tomcat7/ tomcat8 is installed on your system
 deduceAndCheckTomcatHomeAndVersion()
 {
 
@@ -164,6 +170,25 @@ deduceAndCheckTomcatHomeAndVersion()
 
 			#lets check if tomcat6 is installed on the system
 			SERVICE=tomcat6
+
+			#try to deduce tomcat home considering tomcat6
+			assumeTomcatHome $SERVICE
+
+			#initialize validTomcatHome variable with value true. This value will be toggled
+			#in the function checkIfValidTomcatHome fails
+			validTomcatHome="true"
+
+			#checks if the deduced tomcat7 home is correct or not
+			checkIfValidTomcatHome validTomcatHome
+		fi
+		
+		#if tomcat6 home is not valid one, move on to check for tomcat8
+		if [ "$validTomcatHome" = "false" ]; then
+
+			LOGGLY_CATALINA_HOME=
+
+			#lets check if tomcat6 is installed on the system
+			SERVICE=tomcat8
 
 			#try to deduce tomcat home considering tomcat6
 			assumeTomcatHome $SERVICE
@@ -218,6 +243,8 @@ deduceAndCheckTomcatHomeAndVersion()
 				SERVICE=tomcat7
 			elif [ "$tomcatMajorVersion" = "6" ]; then
 				SERVICE=tomcat6
+			elif [ "$tomcatMajorVersion" = "8" ]; then
+				SERVICE=tomcat8
 			fi
 		else
 			logMsgToConfigSysLog "ERROR" "ERROR: Provided Catalina Home is not correct. Please recheck."
@@ -230,14 +257,18 @@ assumeTomcatHome()
 {
 	#if user has not provided the catalina home
 	if [ "$LOGGLY_CATALINA_HOME" = "" ]; then
-		case "$LINUX_DIST" in
-			*"Ubuntu"* )
+		LINUX_DIST_IN_LOWER_CASE=$(echo $LINUX_DIST | tr "[:upper:]" "[:lower:]")
+		case "$LINUX_DIST_IN_LOWER_CASE" in
+			*"ubuntu"* )
 			LOGGLY_CATALINA_HOME="/var/lib/$1"
 			;;
-			*"RedHat"* )
+			*"redhat"* )
 			LOGGLY_CATALINA_HOME="/usr/share/$1"
 			;;
-			*"CentOS"* )
+			*"centos"* )
+			LOGGLY_CATALINA_HOME="/usr/share/$1"
+			;;
+			*"amazon"* )
 			LOGGLY_CATALINA_HOME="/usr/share/$1"
 			;;
 		esac
@@ -313,8 +344,8 @@ getTomcatVersion()
 checkIfSupportedTomcatVersion()
 {
 	tomcatMajorVersion=${TOMCAT_VERSION%%.*}
-	if [[ ($tomcatMajorVersion -ne 6 ) &&  ($tomcatMajorVersion -ne 7) ]]; then
-		logMsgToConfigSysLog "ERROR" "ERROR: This script only supports Tomcat version 6 or 7."
+	if [[ ($tomcatMajorVersion -ne 6 ) &&  ($tomcatMajorVersion -ne 7) &&  ($tomcatMajorVersion -ne 8) ]]; then
+		logMsgToConfigSysLog "ERROR" "ERROR: This script only supports Tomcat version 6, 7 or 8."
 		exit 1
 	fi
 }
@@ -428,6 +459,25 @@ EOIPFW
 }
 
 
+#add renameOnRotate to true in the Valve element to stop access logs 
+#log rotation
+updateServerXML()
+{
+
+	if ! grep -q 'renameOnRotate="true"' "$LOGGLY_CATALINA_HOME/conf/server.xml";
+	then
+		
+		#Creating backup of server.xml to server.xml.bk
+	        logMsgToConfigSysLog "INFO" "INFO: Creating backup of server.xml to server.xml.bk"
+		sudo cp $LOGGLY_CATALINA_HOME/conf/server.xml $LOGGLY_CATALINA_HOME/conf/server.xml.bk
+		if  grep -q '"localhost_access_log."' "$LOGGLY_CATALINA_HOME/conf/server.xml";
+		then
+			sed -i 's/"localhost_access_log."/"localhost_access_log"/g' $LOGGLY_CATALINA_HOME/conf/server.xml
+		fi
+		sed -i 's/"localhost_access_log"/"localhost_access_log"\ renameOnRotate="true"/g' $LOGGLY_CATALINA_HOME/conf/server.xml
+		logMsgToConfigSysLog "INFO" "INFO: Disabled log rotation for localhost_access_log file in server.xml"
+	fi
+}
 addTagsInConfiguration()
 {
 	#split tags by comman(,)
@@ -475,83 +525,93 @@ write21TomcatFileContents()
 	sudo chmod o+w $TOMCAT_SYSLOG_CONFFILE
 
 	imfileStr="\$ModLoad imfile
-	\$WorkDirectory $RSYSLOG_DIR
-	"
+\$WorkDirectory $RSYSLOG_DIR
+"
 	if [[ "$LINUX_DIST" == *"Ubuntu"* ]]; then
 		imfileStr+="\$PrivDropToGroup adm
-		"
+"
 	fi
 
 	imfileStr+="
-	#parameterized token here.......
-	#Add a tag for tomcat events
-	\$template LogglyFormatTomcat,\"<%pri%>%protocol-version% %timestamp:::date-rfc3339% %HOSTNAME% %app-name% %procid% %msgid% [$LOGGLY_AUTH_TOKEN@41058 $TAG] %msg%\n\"
+#parameterized token here.......
+#Add a tag for tomcat events
+\$template LogglyFormatTomcat,\"<%pri%>%protocol-version% %timestamp:::date-rfc3339% %HOSTNAME% %app-name% %procid% %msgid% [$LOGGLY_AUTH_TOKEN@41058 $TAG] %msg%\n\"
 
-	# catalina.out
-	\$InputFileName $LOGGLY_CATALINA_LOG_HOME/catalina.out
-	\$InputFileTag catalina-out
-	\$InputFileStateFile stat-catalina-out
-	\$InputFileSeverity info
-	\$InputFilePersistStateInterval 20000
-	\$InputRunFileMonitor
-	if \$programname == 'catalina-out' then @@logs-01.loggly.com:514;LogglyFormatTomcat
-	if \$programname == 'catalina-out' then ~
+# catalina.out
+\$InputFileName $LOGGLY_CATALINA_LOG_HOME/catalina.out
+\$InputFileTag catalina-out
+\$InputFileStateFile stat-catalina-out
+\$InputFileSeverity info
+\$InputFilePersistStateInterval 20000
+\$InputRunFileMonitor
+if \$programname == 'catalina-out' then @@logs-01.loggly.com:514;LogglyFormatTomcat
+if \$programname == 'catalina-out' then ~
 
-	# initd.log
-	\$InputFileName $LOGGLY_CATALINA_LOG_HOME/initd.log
-	\$InputFileTag initd
-	\$InputFileStateFile stat-initd
-	\$InputFileSeverity info
-	\$InputFilePersistStateInterval 20000
-	\$InputRunFileMonitor
-	if \$programname == 'initd' then @@logs-01.loggly.com:514;LogglyFormatTomcat
-	if \$programname == 'initd' then ~
-	"
+# initd.log
+\$InputFileName $LOGGLY_CATALINA_LOG_HOME/initd.log
+\$InputFileTag initd
+\$InputFileStateFile stat-initd
+\$InputFileSeverity info
+\$InputFilePersistStateInterval 20000
+\$InputRunFileMonitor
+if \$programname == 'initd' then @@logs-01.loggly.com:514;LogglyFormatTomcat
+if \$programname == 'initd' then ~
+"
 
 	#if log rotation is enabled i.e. tomcat version is greater than or equal to
 	#6.0.33.0, then add the following lines to tomcat syslog conf file
 	if [ $(compareVersions $TOMCAT_VERSION $MIN_TOMCAT_VERSION 4) -ge 0 ]; then
 	imfileStr+="
-	# catalina.log
-	\$InputFileName $LOGGLY_CATALINA_LOG_HOME/catalina.log
-	\$InputFileTag catalina-log
-	\$InputFileStateFile stat-catalina-log
-	\$InputFileSeverity info
-	\$InputFilePersistStateInterval 20000
-	\$InputRunFileMonitor
-	if \$programname == 'catalina-log' then @@logs-01.loggly.com:514;LogglyFormatTomcat
-	if \$programname == 'catalina-log' then ~
+# catalina.log
+\$InputFileName $LOGGLY_CATALINA_LOG_HOME/catalina.log
+\$InputFileTag catalina-log
+\$InputFileStateFile stat-catalina-log
+\$InputFileSeverity info
+\$InputFilePersistStateInterval 20000
+\$InputRunFileMonitor
+if \$programname == 'catalina-log' then @@logs-01.loggly.com:514;LogglyFormatTomcat
+if \$programname == 'catalina-log' then ~
 
-	# host-manager.log
-	\$InputFileName $LOGGLY_CATALINA_LOG_HOME/host-manager.log
-	\$InputFileTag host-manager
-	\$InputFileStateFile stat-host-manager
-	\$InputFileSeverity info
-	\$InputFilePersistStateInterval 20000
-	\$InputRunFileMonitor
-	if \$programname == 'host-manager' then @@logs-01.loggly.com:514;LogglyFormatTomcat
-	if \$programname == 'host-manager' then ~
+# host-manager.log
+\$InputFileName $LOGGLY_CATALINA_LOG_HOME/host-manager.log
+\$InputFileTag host-manager
+\$InputFileStateFile stat-host-manager
+\$InputFileSeverity info
+\$InputFilePersistStateInterval 20000
+\$InputRunFileMonitor
+if \$programname == 'host-manager' then @@logs-01.loggly.com:514;LogglyFormatTomcat
+if \$programname == 'host-manager' then ~
 
-	# localhost.log
-	\$InputFileName $LOGGLY_CATALINA_LOG_HOME/localhost.log
-	\$InputFileTag localhost-log
-	\$InputFileStateFile stat-localhost-log
-	\$InputFileSeverity info
-	\$InputFilePersistStateInterval 20000
-	\$InputRunFileMonitor
-	if \$programname == 'localhost-log' then @@logs-01.loggly.com:514;LogglyFormatTomcat
-	if \$programname == 'localhost-log' then ~
+# localhost.log
+\$InputFileName $LOGGLY_CATALINA_LOG_HOME/localhost.log
+\$InputFileTag localhost-log
+\$InputFileStateFile stat-localhost-log
+\$InputFileSeverity info
+\$InputFilePersistStateInterval 20000
+\$InputRunFileMonitor
+if \$programname == 'localhost-log' then @@logs-01.loggly.com:514;LogglyFormatTomcat
+if \$programname == 'localhost-log' then ~
 
-	# manager.log
-	\$InputFileName $LOGGLY_CATALINA_LOG_HOME/manager.log
-	\$InputFileTag manager
-	\$InputFileStateFile stat-manager
-	\$InputFileSeverity info
-	\$InputFilePersistStateInterval 20000
-	\$InputRunFileMonitor
-	if \$programname == 'manager' then @@logs-01.loggly.com:514;LogglyFormatTomcat
-	if \$programname == 'manager' then ~
-	"
+# manager.log
+\$InputFileName $LOGGLY_CATALINA_LOG_HOME/manager.log
+\$InputFileTag manager
+\$InputFileStateFile stat-manager
+\$InputFileSeverity info
+\$InputFilePersistStateInterval 20000
+\$InputRunFileMonitor
+if \$programname == 'manager' then @@logs-01.loggly.com:514;LogglyFormatTomcat
+if \$programname == 'manager' then ~
+
+# localhost_access_log.txt 
+\$InputFileName $LOGGLY_CATALINA_LOG_HOME/localhost_access_log.txt
+\$InputFileTag tomcat-access
+\$InputFileStateFile stat-tomcat-access
+\$InputFileSeverity info
+\$InputFilePersistStateInterval 20000
+\$InputRunFileMonitor
+if \$programname == 'tomcat-access' then @@logs-01.loggly.com:514;LogglyFormatTomcat
+if \$programname == 'tomcat-access' then ~
+"
 	fi
 
 	#change the tomcat-21 file to variable from above and also take the directory of the tomcat log file.
@@ -621,6 +681,17 @@ restoreLogglyPropertiesFile()
 	
 	logMsgToConfigSysLog "INFO" "INFO: Tomcat needs to be restarted to rollback the configuration."
 	restartTomcat
+}
+
+restoreServerXML()
+{
+	if [ -f "$LOGGLY_CATALINA_HOME/conf/server.xml.bk" ];
+	then
+		logMsgToConfigSysLog "INFO" "INFO: Restoring server.xml file from backup"
+		sudo rm -rf $LOGGLY_CATALINA_HOME/conf/server.xml
+		sudo cp $LOGGLY_CATALINA_HOME/conf/server.xml.bk $LOGGLY_CATALINA_HOME/conf/server.xml
+		sudo rm -rf $LOGGLY_CATALINA_HOME/conf/server.xml.bk	
+	fi
 }
 
 #remove 21tomcat.conf file
