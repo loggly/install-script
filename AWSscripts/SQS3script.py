@@ -167,54 +167,7 @@ if "None" not in str(queue_name):
             }
         )
 
-        policy_json = """{
-          "Id": "Policy1467278443739",
-          "Version": "2012-10-17",
-          "Statement": [
-            {
-              "Sid": "Stmt1467278441801",
-              "Action": [
-                "s3:GetObject"
-              ],
-              "Effect": "Allow",
-              "Resource": "arn:aws:s3:::%s/*",
-              "Principal": {
-                "AWS": [
-                  "*"
-                ]
-              }
-            },
-            {
-              "Sid": "Stmt14672784418012",
-              "Action": [
-                "s3:ListBucket"
-              ],
-              "Effect": "Allow",
-              "Resource": "arn:aws:s3:::%s",
-              "Principal": {
-                "AWS": [
-                  "*"
-                ]
-              }
-            },
-            {
-              "Sid": "Stmt14672784418013",
-              "Action": [
-                "s3:GetBucketLocation"
-              ],
-              "Effect": "Allow",
-              "Resource": "arn:aws:s3:::%s",
-              "Principal": {
-                "AWS": [
-                  "*"
-                ]
-              }
-            }
-          ]
-        }""" % (s3bucket, s3bucket, s3bucket,)
-
-        response = bucket.set_policy(policy_json)
-
+      
     else:
         conn.set_queue_attribute(queue_name, 'Policy', json.dumps({
           "Version": "2008-10-17",
@@ -260,54 +213,6 @@ if "None" not in str(queue_name):
             }],
             }
         )
-
-        policy_json = """{
-          "Id": "Policy1467278443739",
-          "Version": "2012-10-17",
-          "Statement": [
-            {
-              "Sid": "Stmt1467278441801",
-              "Action": [
-                "s3:GetObject"
-              ],
-              "Effect": "Allow",
-              "Resource": "arn:aws:s3:::%s/*",
-              "Principal": {
-                "AWS": [
-                  "*"
-                ]
-              }
-            },
-            {
-              "Sid": "Stmt14672784418012",
-              "Action": [
-                "s3:ListBucket"
-              ],
-              "Effect": "Allow",
-              "Resource": "arn:aws:s3:::%s",
-              "Principal": {
-                "AWS": [
-                  "*"
-                ]
-              }
-            },
-            {
-              "Sid": "Stmt14672784418013",
-              "Action": [
-                "s3:GetBucketLocation"
-              ],
-              "Effect": "Allow",
-              "Resource": "arn:aws:s3:::%s",
-              "Principal": {
-                "AWS": [
-                  "*"
-                ]
-              }
-            }
-          ]
-        }""" % (s3bucket, s3bucket, s3bucket,)
-
-        response = bucket.set_policy(policy_json)
 
 else: 
     # queue does not exist and no sqs queue name is passed
@@ -390,54 +295,6 @@ else:
                 }
             )
 
-            policy_json = """{
-              "Id": "Policy1467278443739",
-              "Version": "2012-10-17",
-              "Statement": [
-                {
-                  "Sid": "Stmt1467278441801",
-                  "Action": [
-                    "s3:GetObject"
-                  ],
-                  "Effect": "Allow",
-                  "Resource": "arn:aws:s3:::%s/*",
-                  "Principal": {
-                    "AWS": [
-                      "*"
-                    ]
-                  }
-                },
-                {
-                  "Sid": "Stmt14672784418012",
-                  "Action": [
-                    "s3:ListBucket"
-                  ],
-                  "Effect": "Allow",
-                  "Resource": "arn:aws:s3:::%s",
-                  "Principal": {
-                    "AWS": [
-                      "*"
-                    ]
-                  }
-                },
-                {
-                  "Sid": "Stmt14672784418013",
-                  "Action": [
-                    "s3:GetBucketLocation"
-                  ],
-                  "Effect": "Allow",
-                  "Resource": "arn:aws:s3:::%s",
-                  "Principal": {
-                    "AWS": [
-                      "*"
-                    ]
-                  }
-                }
-              ]
-            }""" % (s3bucket, s3bucket, s3bucket,)
-
-            response = bucket.set_policy(policy_json) 
-
     else:
         # create the default queue or the queue passed as a parameter          
         q = conn.create_queue(sqsname)
@@ -487,54 +344,6 @@ else:
             }
         )
 
-        policy_json = """{
-          "Id": "Policy1467278443739",
-          "Version": "2012-10-17",
-          "Statement": [
-            {
-              "Sid": "Stmt1467278441801",
-              "Action": [
-                "s3:GetObject"
-              ],
-              "Effect": "Allow",
-              "Resource": "arn:aws:s3:::%s/*",
-              "Principal": {
-                "AWS": [
-                  "*"
-                ]
-              }
-            },
-            {
-              "Sid": "Stmt14672784418012",
-              "Action": [
-                "s3:ListBucket"
-              ],
-              "Effect": "Allow",
-              "Resource": "arn:aws:s3:::%s",
-              "Principal": {
-                "AWS": [
-                  "*"
-                ]
-              }
-            },
-            {
-              "Sid": "Stmt14672784418013",
-              "Action": [
-                "s3:GetBucketLocation"
-              ],
-              "Effect": "Allow",
-              "Resource": "arn:aws:s3:::%s",
-              "Principal": {
-                "AWS": [
-                  "*"
-                ]
-              }
-            }
-          ]
-        }""" % (s3bucket, s3bucket, s3bucket,)
-
-        response = bucket.set_policy(policy_json)
-
 
 print "Queue Name"
 print sqsname
@@ -566,6 +375,7 @@ if user != None and user != '':
             
             # append current s3bucket and sqs queue
             sqsQueues.append('\"arn:aws:sqs:%s:%s:%s\"' % (region, acnumber, sqsname,))
+            s3Buckets.append('\"arn:aws:s3:::%s/*\"' % (s3bucket))
             s3Buckets.append('\"arn:aws:s3:::%s\"' % (s3bucket))    
 
             sqsQueueAddOn=""
@@ -655,11 +465,12 @@ if user != None and user != '':
                     "s3:GetBucketLocation"
                  ],
                     "Resource": [
+                      "arn:aws:s3:::%s/*",
                       "arn:aws:s3:::%s"
                     ]
                 }
             ]
-            }""" % (region, acnumber, sqsname, s3bucket,)
+            }""" % (region, acnumber, sqsname, s3bucket, s3bucket,)
 
 
             response = iam.put_user_policy(user,
@@ -695,6 +506,7 @@ else:
             
             # append current s3bucket and sqs queue
             sqsQueues.append('\"arn:aws:sqs:%s:%s:%s\"' % (region, acnumber, sqsname,))
+            s3Buckets.append('\"arn:aws:s3:::%s/*\"' % (s3bucket))
             s3Buckets.append('\"arn:aws:s3:::%s\"' % (s3bucket))    
 
             sqsQueueAddOn=""
@@ -785,11 +597,12 @@ else:
                     "s3:GetBucketLocation"
                  ],
                     "Resource": [
+                      "arn:aws:s3:::%s/*",
                       "arn:aws:s3:::%s"
                     ]
                 }
             ]
-            }""" % (region, acnumber, sqsname, s3bucket,)
+            }""" % (region, acnumber, sqsname, s3bucket, s3bucket,)
 
             response = iam.put_user_policy(user,
                                            'LogglyUserPolicy',
