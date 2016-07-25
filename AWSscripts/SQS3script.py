@@ -18,8 +18,6 @@ import sys
 import urllib
 import StringIO
 
-from boto.sqs.connection import SQSConnection
-from boto.sqs.message import Message
 from boto.exception import BotoServerError, S3ResponseError
 
 from optparse import OptionParser
@@ -42,6 +40,10 @@ s3bucket = opts.s3bucket
 acnumber = opts.acnumber
 sqsname = opts.sqsname
 user = opts.user
+
+if acnumber.isdigit()==False:
+    print "Please check your account number, it should only contain digits, no other characters."
+    sys.exit()
 
 conn = boto.connect_s3()
 
