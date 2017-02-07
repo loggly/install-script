@@ -61,9 +61,6 @@ installLogglyConfForFile()
 	#checks if the file name contain spaces, if yes, the exit
 	checkIfFileLocationContainSpaces
 	
-	#check if the alias is already taken
-	checkIfFileAliasExist
-	
 	if [ "$IS_DIRECTORY" == "true" ]; then
 		
 		configureDirectoryFileMonitoring
@@ -75,6 +72,9 @@ installLogglyConfForFile()
 		
 		#construct variables using filename and filealias
 		constructFileVariables
+		
+		#check if the alias is already taken
+		checkIfFileAliasExist
 		
 		#check for the log file size
 		checkLogFileSize $LOGGLY_FILE_TO_MONITOR
