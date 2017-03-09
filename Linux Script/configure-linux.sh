@@ -78,7 +78,7 @@ LOGGLY_DISTRIBUTION_ID="41058"
 
 #Instruction link on how to configure loggly on linux manually. This will get overwritten by the child script which calls this
 #on how to configure the child application
-MANUAL_CONFIG_INSTRUCTION="Manual instructions to configure rsyslog on Linux are available at https://www.loggly.com/docs/rsyslog-manual-configuration/. Rsyslog troubleshooting instructions are available at https://www.loggly.com/docs/troubleshooting-rsyslog/"
+MANUAL_CONFIG_INSTRUCTION="Manual instructions to configure rsyslog on Linux are available at https://www.loggly.com/docs/rsyslog-tls-configuration/. Rsyslog troubleshooting instructions are available at https://www.loggly.com/docs/troubleshooting-rsyslog/"
 
 #this variable is set if the script is invoked via some other calling script
 IS_INVOKED=
@@ -483,6 +483,10 @@ downloadTlsCerts()
 	curl -O https://logdog.loggly.com/media/logs-01.loggly.com_sha12.crt
 	sudo cp -Prf logs-01.loggly.com_sha12.crt /etc/rsyslog.d/keys/ca.d/logs-01.loggly.com_sha12.crt
 	sudo rm logs-01.loggly.com_sha12.crt
+	if [ ! -f /etc/rsyslog.d/keys/ca.d//logs-01.loggly.com_sha12.crt ]; then
+	logMsgToConfigSysLog "ERROR" "ERROR: Certificate could not be downloaded."
+	exit 1
+	fi
 }
 
 confString()
@@ -550,8 +554,19 @@ action(type=\"omfwd\" protocol=\"tcp\" target=\"$LOGS_01_HOST\" port=\"$LOGGLY_S
 	"
 if [ "$RSYSLOG_VERSION_TMP" -le "7" ]; then
 				/bin/bash -c "sudo $PKG_MGR install rsyslog-gnutls -y"
+				if [ $(dpkg-query -W -f='${Status}' rsyslog-gnutls 2>/dev/null | grep -c "ok installed") -eq 0 ];
+				then
+				logMsgToConfigSysLog "ERROR" "ERROR: The rsyslog-gnutls package was not downloaded. Please download it and then run the script again."
+				exit 1
+				fi
                 inputStrTls=$inputStr_TLS_RSYS_7
 elif [ "$RSYSLOG_VERSION_TMP" -ge "8" ]; then
+				/bin/bash -c "sudo $PKG_MGR install rsyslog-gnutls -y"
+				if [ $(dpkg-query -W -f='${Status}' rsyslog-gnutls 2>/dev/null | grep -c "ok installed") -eq 0 ];
+				then
+				logMsgToConfigSysLog "ERROR" "ERROR: The rsyslog-gnutls package was not downloaded. Please download it and then run the script again."
+				exit 1
+				fi
                 inputStrTls=$inputStr_TLS_RSYS_8
 fi
 inputStr=$inputStr_NO_TLS
