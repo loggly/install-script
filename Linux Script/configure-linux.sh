@@ -150,11 +150,11 @@ installLogglyConf()
 		checkLinuxLogglyCompatibility
 	fi
 
-	#if all the above check passes, write the 22-loggly.conf file
-	checkAuthTokenAndWriteContents
-
 	#create rsyslog dir if it doesn't exist, Modify the permission on rsyslog directory if exist on Ubuntu
 	createRsyslogDir
+
+	#if all the above check passes, write the 22-loggly.conf file
+	checkAuthTokenAndWriteContents
 
 	if [ "$LINUX_DO_VERIFICATION" = "true" ]; then
 		#check if the logs are going to loggly fro linux system now
