@@ -2,7 +2,7 @@
 
 #downloads configure-linux.sh
 echo "INFO: Downloading dependencies - configure-linux.sh"
-curl -s -o configure-linux.sh https://www.loggly.com/install/configure-linux.sh
+curl -s -o configure-linux.sh https://raw.githubusercontent.com/Shwetajain148/install-script/Add-TLS-Support/Linux%20Script/configure-linux.sh 
 source configure-linux.sh "being-invoked"
 
 ##########  Variable Declarations - Start  ##########
@@ -47,6 +47,9 @@ FILE_TO_MONITOR=
 IS_DIRECTORY=
 
 IS_WILDCARD=
+
+FILE_TLS_SENDING="true"
+
 ##########  Variable Declarations - End  ##########
 
 # executing the script for loggly to install and configure syslog
@@ -72,16 +75,16 @@ installLogglyConfForFile()
 		
 		#construct variables using filename and filealias
 		constructFileVariables
-		
+
 		#check if the alias is already taken
 		checkIfFileAliasExist
-		
+
 		#check for the log file size
 		checkLogFileSize $LOGGLY_FILE_TO_MONITOR
 		
 		#checks if the file has proper read permission
 		checkFileReadPermission
-		
+
 		#configure loggly for Linux
 		installLogglyConf
 		
@@ -400,49 +403,91 @@ write21ConfFileContents()
 	logMsgToConfigSysLog "INFO" "INFO: Creating file $FILE_SYSLOG_CONFFILE"
 	sudo touch $FILE_SYSLOG_CONFFILE
 	sudo chmod o+w $FILE_SYSLOG_CONFFILE
-
-	imfileStr="
-	\$ModLoad imfile
-	\$InputFilePollInterval 10
-	\$WorkDirectory $RSYSLOG_DIR
-	"
-	if [[ "$LINUX_DIST" == *"Ubuntu"* ]]; then
-		imfileStr+="\$PrivDropToGroup adm
-		"
-	fi
 	
 	rsyslog_version="$(rsyslogd -v)"
 	r_ver=${rsyslog_version:9:1}
-	if [ $r_ver -le 6 ] 
+	if [ $r_ver -le 7 ] 
 	then
-		imfileStr+="
-		# File access file:
-		\$InputFileName $FILE_TO_MONITOR
-		\$InputFileTag $LOGGLY_FILE_TO_MONITOR_ALIAS:
-		\$InputFileStateFile stat-$STATE_FILE_ALIAS
-		\$InputFileSeverity info
-		\$InputFilePersistStateInterval 20000
-		\$InputRunFileMonitor
-		#Add a tag for file events
-		\$template $CONF_FILE_FORMAT_NAME,\"<%pri%>%protocol-version% %timestamp:::date-rfc3339% %HOSTNAME% %app-name% %procid% %msgid% [$LOGGLY_AUTH_TOKEN@41058 $TAG] %msg%\n\"
-		if \$programname == '$LOGGLY_FILE_TO_MONITOR_ALIAS' then @@logs-01.loggly.com:514;$CONF_FILE_FORMAT_NAME
-		if \$programname == '$LOGGLY_FILE_TO_MONITOR_ALIAS' then ~
+		imfileStr="
+			\$ModLoad imfile
+			\$InputFilePollInterval 10
+			\$WorkDirectory $RSYSLOG_DIR
+			\$ActionSendStreamDriver gtls
+			\$ActionSendStreamDriverMode 1
+			\$ActionSendStreamDriverAuthMode x509/name
+			\$ActionSendStreamDriverPermittedPeer *.loggly.com
+
+			#RsyslogGnuTLS
+			\$DefaultNetstreamDriverCAFile /etc/rsyslog.d/keys/ca.d/logs-01.loggly.com_sha12.crt
+
+			# File access file:
+			\$InputFileName $FILE_TO_MONITOR
+			\$InputFileTag $LOGGLY_FILE_TO_MONITOR_ALIAS
+			\$InputFileStateFile stat-$STATE_FILE_ALIAS
+			\$InputFileSeverity info
+			\$InputFilePersistStateInterval 20000
+			\$InputRunFileMonitor
+			#Add a tag for file events
+			template (name=\"$CONF_FILE_FORMAT_NAME\" type=\"string\" string=\"<%pri%>%protocol-version% %timestamp:::date-rfc3339% %HOSTNAME% %app-name% %procid% %msgid% [$LOGGLY_AUTH_TOKEN@41058 $TAG] %msg%\n\")
+			if \$programname == '$LOGGLY_FILE_TO_MONITOR_ALIAS' then action(type=\"omfwd\" protocol=\"tcp\" target=\"logs-01.loggly.com\" port=\"6514\" template=\"$CONF_FILE_FORMAT_NAME\")
+			if \$programname == '$LOGGLY_FILE_TO_MONITOR_ALIAS' then stop
+		"
+		imfileStrNonTls="
+			\$ModLoad imfile
+			\$InputFilePollInterval 10
+			\$WorkDirectory $RSYSLOG_DIR
+			# File access file:
+			\$InputFileName $FILE_TO_MONITOR
+			\$InputFileTag $LOGGLY_FILE_TO_MONITOR_ALIAS
+			\$InputFileStateFile stat-$STATE_FILE_ALIAS
+			\$InputFileSeverity info
+			\$InputFilePersistStateInterval 20000
+			\$InputRunFileMonitor
+			#Add a tag for file events
+			template (name=\"$CONF_FILE_FORMAT_NAME\" type=\"string\" string=\"<%pri%>%protocol-version% %timestamp:::date-rfc3339% %HOSTNAME% %app-name% %procid% %msgid% [$LOGGLY_AUTH_TOKEN@41058 $TAG] %msg%\n\")
+			if \$programname == '$LOGGLY_FILE_TO_MONITOR_ALIAS' then action(type=\"omfwd\" protocol=\"tcp\" target=\"logs-01.loggly.com\" port=\"514\" template=\"$CONF_FILE_FORMAT_NAME\")
+			if \$programname == '$LOGGLY_FILE_TO_MONITOR_ALIAS' then ~
 		"
 	else
-		imfileStr+="
-		# File access file:
-		\$InputFileName $FILE_TO_MONITOR
-		\$InputFileTag $LOGGLY_FILE_TO_MONITOR_ALIAS
-		\$InputFileStateFile stat-$STATE_FILE_ALIAS
-		\$InputFileSeverity info
-		\$InputFilePersistStateInterval 20000
-		\$InputRunFileMonitor
-		#Add a tag for file events
-		template (name=\"$CONF_FILE_FORMAT_NAME\" type=\"string\" string=\"<%pri%>%protocol-version% %timestamp:::date-rfc3339% %HOSTNAME% %app-name% %procid% %msgid% [$LOGGLY_AUTH_TOKEN@41058 $TAG] %msg%\n\")
-		if \$programname == '$LOGGLY_FILE_TO_MONITOR_ALIAS' then action(type=\"omfwd\" protocol=\"tcp\" target=\"logs-01.loggly.com\" port=\"514\" template=\"$CONF_FILE_FORMAT_NAME\")
-		if \$programname == '$LOGGLY_FILE_TO_MONITOR_ALIAS' then ~
+		imfileStr="
+			module(load=\"imfile\")
+
+			#RsyslogGnuTLS
+			\$DefaultNetstreamDriverCAFile /etc/rsyslog.d/keys/ca.d/logs-01.loggly.com_sha12.crt
+
+			# Input for FILE1
+			input(type=\"imfile\" tag=\"$LOGGLY_FILE_TO_MONITOR_ALIAS\" ruleset=\"filelog\" file=\"$FILE_TO_MONITOR\") #wildcard is allowed at file level only
+
+			# Add a tag for file events
+			template(name=\"$CONF_FILE_FORMAT_NAME\" type=\"string\" string=\"<%pri%>%protocol-version% %timestamp:::date-rfc3339% %HOSTNAME% %app-name% %procid% %msgid% [$LOGGLY_AUTH_TOKEN@41058 $TAG] %msg%\n\")
+
+			ruleset(name=\"filelog\"){
+			action(type=\"omfwd\" protocol=\"tcp\" target=\"logs-01.loggly.com\" port=\"6514\" template=\"$CONF_FILE_FORMAT_NAME\" StreamDriver=\"gtls\" StreamDriverMode=\"1\" StreamDriverAuthMode=\"x509/name\" StreamDriverPermittedPeers=\"*.loggly.com\")
+			}
+		"
+		imfileStrNonTls="
+			\$ModLoad imfile
+			\$InputFilePollInterval 10
+			\$WorkDirectory $RSYSLOG_DIR
+			module(load="imfile")
+
+			# Input for FILE1
+			input(type=\"imfile\" tag=\"$LOGGLY_FILE_TO_MONITOR_ALIAS\" ruleset=\"filelog\" file=\"$FILE_TO_MONITOR\") #wildcard is allowed at file level only
+
+			# Add a tag for file events
+			template(name=\"$CONF_FILE_FORMAT_NAME\" type=\"string\" string=\"<%pri%>%protocol-version% %timestamp:::date-rfc3339% %HOSTNAME% %app-name% %procid% %msgid% [$LOGGLY_AUTH_TOKEN@41058 $TAG] %msg%\n\")
+
+			ruleset(name=\"filelog\"){
+			action(type=\"omfwd\" protocol=\"tcp\" target=\"logs-01.loggly.com\" port=\"514\" template=\"$CONF_FILE_FORMAT_NAME\") stop
+			}
 		"
 	fi
+
+	if [ $FILE_TLS_SENDING == "false" ]; 
+	then
+		imfileStr=$imfileStrNonTls
+	fi
+	
 	#write to 21-<file-alias>.conf file
 sudo cat << EOIPFW >> $FILE_SYSLOG_CONFFILE
 $imfileStr
@@ -624,6 +669,11 @@ if [ "$1" != "being-invoked" ]; then
 			  STATE_FILE_ALIAS=$LOGGLY_FILE_TO_MONITOR_ALIAS
 			  CONF_FILE_FORMAT_NAME=$CONF_FILE_FORMAT_NAME$1
 			  echo "File alias: $LOGGLY_FILE_TO_MONITOR_ALIAS"
+			  ;;
+		  --insecure )
+			  LOGGLY_TLS_SENDING="false"
+			  FILE_TLS_SENDING="false"
+			  LOGGLY_SYSLOG_PORT=514
 			  ;;
 		 -tag| --filetag ) shift
 			  LOGGLY_FILE_TAG=$1
