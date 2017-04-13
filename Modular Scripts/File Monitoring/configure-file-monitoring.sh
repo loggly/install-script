@@ -446,7 +446,7 @@ write21ConfFileContents()
 			#Add a tag for file events
 			template (name=\"$CONF_FILE_FORMAT_NAME\" type=\"string\" string=\"<%pri%>%protocol-version% %timestamp:::date-rfc3339% %HOSTNAME% %app-name% %procid% %msgid% [$LOGGLY_AUTH_TOKEN@41058 $TAG] %msg%\n\")
 			if \$programname == '$LOGGLY_FILE_TO_MONITOR_ALIAS' then action(type=\"omfwd\" protocol=\"tcp\" target=\"logs-01.loggly.com\" port=\"514\" template=\"$CONF_FILE_FORMAT_NAME\")
-			if \$programname == '$LOGGLY_FILE_TO_MONITOR_ALIAS' then ~
+			if \$programname == '$LOGGLY_FILE_TO_MONITOR_ALIAS' then stop
 		"
 	else
 		imfileStr="
