@@ -2,7 +2,7 @@
 
 #downloads configure-linux.sh
 echo "INFO: Downloading dependencies - configure-linux.sh"
-curl -s -o configure-linux.sh https://github.com/Shwetajain148/install-script/blob/tls-support-filemonitoring/Linux%20Script/configure-linux.sh
+curl -s -o configure-linux.sh https://raw.githubusercontent.com/Shwetajain148/install-script/tls-support-filemonitoring/Linux%20Script/configure-linux.sh
 source configure-linux.sh "being-invoked"
 
 ##########  Variable Declarations - Start  ##########
