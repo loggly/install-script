@@ -553,25 +553,19 @@ action(type=\"omfwd\" protocol=\"tcp\" target=\"$LOGS_01_HOST\" port=\"$LOGGLY_S
 #     -------------------------------------------------------
 	"
 if [ "$RSYSLOG_VERSION_TMP" -le "7" ]; then
-				/bin/bash -c "sudo $PKG_MGR install rsyslog-gnutls -y"
-				if [ $(dpkg-query -W -f='${Status}' rsyslog-gnutls 2>/dev/null | grep -c "ok installed") -eq 0 ];
-				then
-				logMsgToConfigSysLog "ERROR" "ERROR: The rsyslog-gnutls package was not downloaded. Please download it and then run the script again."
-				exit 1
-				fi
                 inputStrTls=$inputStr_TLS_RSYS_7
 elif [ "$RSYSLOG_VERSION_TMP" -ge "8" ]; then
-				/bin/bash -c "sudo $PKG_MGR install rsyslog-gnutls -y"
-				if [ $(dpkg-query -W -f='${Status}' rsyslog-gnutls 2>/dev/null | grep -c "ok installed") -eq 0 ];
-				then
-				logMsgToConfigSysLog "ERROR" "ERROR: The rsyslog-gnutls package was not downloaded. Please download it and then run the script again."
-				exit 1
-				fi
                 inputStrTls=$inputStr_TLS_RSYS_8
 fi
 inputStr=$inputStr_NO_TLS
 if [ $LOGGLY_TLS_SENDING == "true" ]; then
 	downloadTlsCerts
+	/bin/bash -c "sudo $PKG_MGR install rsyslog-gnutls -y"
+				if [ $(dpkg-query -W -f='${Status}' rsyslog-gnutls 2>/dev/null | grep -c "ok installed") -eq 0 ];
+				then
+				logMsgToConfigSysLog "ERROR" "ERROR: The rsyslog-gnutls package was not downloaded. Please download it and then run the script again."
+				exit 1
+				fi
 	inputStr=$inputStrTls
 fi
 }
