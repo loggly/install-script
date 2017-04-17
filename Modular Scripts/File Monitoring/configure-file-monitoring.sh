@@ -466,10 +466,8 @@ write21ConfFileContents()
 			}
 		"
 		imfileStrNonTls="
-			\$ModLoad imfile
-			\$InputFilePollInterval 10
-			\$WorkDirectory $RSYSLOG_DIR
-			module(load="imfile")
+		
+			module(load=\"imfile\")
 
 			# Input for FILE1
 			input(type=\"imfile\" tag=\"$LOGGLY_FILE_TO_MONITOR_ALIAS\" ruleset=\"filelog\" file=\"$FILE_TO_MONITOR\") #wildcard is allowed at file level only
