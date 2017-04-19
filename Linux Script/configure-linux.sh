@@ -15,7 +15,7 @@ function ctrl_c()  {
 #name of the current script. This will get overwritten by the child script which calls this
 SCRIPT_NAME=configure-linux.sh
 #version of the current script. This will get overwritten by the child script which calls this
-SCRIPT_VERSION=1.16
+SCRIPT_VERSION=1.17
 
 #application tag. This will get overwritten by the child script which calls this
 APP_TAG=
@@ -73,12 +73,12 @@ LOGGLY_PASSWORD=
 SUPPRESS_PROMPT="false"
 
 #variables used in 22-loggly.conf file
-LOGGLY_SYSLOG_PORT=514
+LOGGLY_SYSLOG_PORT=6514
 LOGGLY_DISTRIBUTION_ID="41058"
 
 #Instruction link on how to configure loggly on linux manually. This will get overwritten by the child script which calls this
 #on how to configure the child application
-MANUAL_CONFIG_INSTRUCTION="Manual instructions to configure rsyslog on Linux are available at https://www.loggly.com/docs/rsyslog-manual-configuration/. Rsyslog troubleshooting instructions are available at https://www.loggly.com/docs/troubleshooting-rsyslog/"
+MANUAL_CONFIG_INSTRUCTION="Manual instructions to configure rsyslog on Linux are available at https://www.loggly.com/docs/rsyslog-tls-configuration/. Rsyslog troubleshooting instructions are available at https://www.loggly.com/docs/troubleshooting-rsyslog/"
 
 #this variable is set if the script is invoked via some other calling script
 IS_INVOKED=
@@ -88,6 +88,9 @@ LINUX_ENV_VALIDATED="false"
 
 #this variable will inform if verification needs to be performed
 LINUX_DO_VERIFICATION="true"
+
+#this variable will enable sending logs over TLS
+LOGGLY_TLS_SENDING="true"
 
 ##########  Variable Declarations - End  ##########
 
@@ -215,18 +218,23 @@ checkIfSupportedOS()
 	case "$LINUX_DIST_IN_LOWER_CASE" in
 		*"ubuntu"* )
 		echo "INFO: Operating system is Ubuntu."
+		PKG_MGR="apt-get"
 		;;
 		*"redhat"* )
 		echo "INFO: Operating system is Red Hat."
+		PKG_MGR="yum"
 		;;
 		*"centos"* )
 		echo "INFO: Operating system is CentOS."
+		PKG_MGR="yum"
 		;;
 		*"debian"* )
 		echo "INFO: Operating system is Debian."
+		PKG_MGR="apt-get"
 		;;
 		*"amazon"* )
 		echo "INFO: Operating system is Amazon AMI."
+		PKG_MGR="yum"
 		;;
 		*"darwin"* )
 		#if the OS is mac then exit
@@ -468,32 +476,107 @@ checkAuthTokenAndWriteContents()
 	fi
 }
 
-
-#write the contents to 22-loggly.conf file
-writeContents()
+downloadTlsCerts()
 {
+	echo "DOWNLOADING CERTIFICATE"
+	mkdir -pv /etc/rsyslog.d/keys/ca.d
+	curl -O https://logdog.loggly.com/media/logs-01.loggly.com_sha12.crt
+	sudo cp -Prf logs-01.loggly.com_sha12.crt /etc/rsyslog.d/keys/ca.d/logs-01.loggly.com_sha12.crt
+	sudo rm logs-01.loggly.com_sha12.crt
+	if [ ! -f /etc/rsyslog.d/keys/ca.d//logs-01.loggly.com_sha12.crt ]; then
+	logMsgToConfigSysLog "ERROR" "ERROR: Certificate could not be downloaded."
+	exit 1
+	fi
+}
 
-WRITE_SCRIPT_CONTENTS="false"
-inputStr="
+confString()
+{
+	RSYSLOG_VERSION_TMP=$(echo $RSYSLOG_VERSION | cut -d "." -f1 )
+	inputStr_TLS_RSYS_7="
 #          -------------------------------------------------------
-#          Syslog Logging Directives for Loggly ($1.loggly.com)
+#          Syslog Logging Directives for Loggly ($LOGGLY_ACCOUNT.loggly.com)
 #          -------------------------------------------------------
-
+##########################################################
+### RsyslogTemplate for Loggly ###
+##########################################################
+\$template LogglyFormat,\"<%pri%>%protocol-version% %timestamp:::date-rfc3339% %HOSTNAME% %app-name% %procid% %msgid% [$LOGGLY_AUTH_TOKEN@$LOGGLY_DISTRIBUTION_ID tag=\\\"RsyslogTLS\\\"] %msg%\n\"
+# Setup disk assisted queues
+\$WorkDirectory /var/spool/rsyslog # where to place spool files
+\$ActionQueueFileName fwdRule1     # unique name prefix for spool files
+\$ActionQueueMaxDiskSpace 1g       # 1gb space limit (use as much as possible)
+\$ActionQueueSaveOnShutdown on     # save messages to disk on shutdown
+\$ActionQueueType LinkedList       # run asynchronously
+\$ActionResumeRetryCount -1        # infinite retries if host is down
+#RsyslogGnuTLS
+\$DefaultNetstreamDriverCAFile /etc/rsyslog.d/keys/ca.d/logs-01.loggly.com_sha12.crt
+\$ActionSendStreamDriver gtls
+\$ActionSendStreamDriverMode 1
+\$ActionSendStreamDriverAuthMode x509/name
+\$ActionSendStreamDriverPermittedPeer *.loggly.com
+*.* @@$LOGS_01_HOST:$LOGGLY_SYSLOG_PORT;LogglyFormat
+#################END CONFIG FILE#########################
+	"
+	inputStr_TLS_RSYS_8="
+#          -------------------------------------------------------
+#          Syslog Logging Directives for Loggly ($LOGGLY_ACCOUNT.loggly.com)
+#          -------------------------------------------------------
+# Setup disk assisted queues
+\$WorkDirectory /var/spool/rsyslog # where to place spool files
+\$ActionQueueFileName fwdRule1     # unique name prefix for spool files
+\$ActionQueueMaxDiskSpace 1g       # 1gb space limit (use as much as possible)
+\$ActionQueueSaveOnShutdown on     # save messages to disk on shutdown
+\$ActionQueueType LinkedList       # run asynchronously
+\$ActionResumeRetryCount -1        # infinite retries if host is down
+#RsyslogGnuTLS
+\$DefaultNetstreamDriverCAFile /etc/rsyslog.d/keys/ca.d/logs-01.loggly.com_sha12.crt
+template(name=\"LogglyFormat\" type=\"string\"
+string=\"<%pri%>%protocol-version% %timestamp:::date-rfc3339% %HOSTNAME% %app-name% %procid% %msgid% [$LOGGLY_AUTH_TOKEN@$LOGGLY_DISTRIBUTION_ID tag=\\\"RsyslogTLS\\\"] %msg%\n\"
+)
+# Send messages to Loggly over TCP using the template.
+action(type=\"omfwd\" protocol=\"tcp\" target=\"$LOGS_01_HOST\" port=\"$LOGGLY_SYSLOG_PORT\" template=\"LogglyFormat\" StreamDriver=\"gtls\" StreamDriverMode=\"1\" StreamDriverAuthMode=\"x509/name\" StreamDriverPermittedPeers=\"*.loggly.com\")
+	"
+	
+	inputStr_NO_TLS="
+#          -------------------------------------------------------
+#          Syslog Logging Directives for Loggly ($LOGGLY_ACCOUNT.loggly.com)
+#          -------------------------------------------------------
 # Define the template used for sending logs to Loggly. Do not change this format.
-\$template LogglyFormat,\"<%pri%>%protocol-version% %timestamp:::date-rfc3339% %HOSTNAME% %app-name% %procid% %msgid% [$2@$3] %msg%\n\"
-
+\$template LogglyFormat,\"<%pri%>%protocol-version% %timestamp:::date-rfc3339% %HOSTNAME% %app-name% %procid% %msgid% [$LOGGLY_AUTH_TOKEN@$LOGGLY_DISTRIBUTION_ID tag=\\\"Rsyslog\\\"] %msg%\n\"
 \$WorkDirectory /var/spool/rsyslog # where to place spool files
 \$ActionQueueFileName fwdRule1 # unique name prefix for spool files
 \$ActionQueueMaxDiskSpace 1g   # 1gb space limit (use as much as possible)
 \$ActionQueueSaveOnShutdown on # save messages to disk on shutdown
 \$ActionQueueType LinkedList   # run asynchronously
 \$ActionResumeRetryCount -1    # infinite retries if host is down
-
 # Send messages to Loggly over TCP using the template.
-*.*             @@$4:$5;LogglyFormat
-
+*.*             @@$LOGS_01_HOST:$LOGGLY_SYSLOG_PORT;LogglyFormat
 #     -------------------------------------------------------
-"
+	"
+if [ "$RSYSLOG_VERSION_TMP" -le "7" ]; then
+                inputStrTls=$inputStr_TLS_RSYS_7
+elif [ "$RSYSLOG_VERSION_TMP" -ge "8" ]; then
+                inputStrTls=$inputStr_TLS_RSYS_8
+fi
+inputStr=$inputStr_NO_TLS
+if [ $LOGGLY_TLS_SENDING == "true" ]; then
+	downloadTlsCerts
+	/bin/bash -c "sudo $PKG_MGR install rsyslog-gnutls -y"
+				if [ $(dpkg-query -W -f='${Status}' rsyslog-gnutls 2>/dev/null | grep -c "ok installed") -eq 0 ];
+				then
+				logMsgToConfigSysLog "ERROR" "ERROR: The rsyslog-gnutls package was not downloaded. Please download it and then run the script again."
+				exit 1
+				fi
+	inputStr=$inputStrTls
+fi
+}
+
+#write the contents to 22-loggly.conf file
+writeContents()
+{
+checkIfTLS
+confString
+WRITE_SCRIPT_CONTENTS="false"
+
 	if [ -f "$LOGGLY_RSYSLOG_CONFFILE" ]; then
 		logMsgToConfigSysLog "INFO" "INFO: Loggly rsyslog file $LOGGLY_RSYSLOG_CONFFILE already exist."
 
@@ -534,7 +617,7 @@ inputStr="
 	else
 		WRITE_SCRIPT_CONTENTS="true"
 	fi
-
+	
 	if [ "$WRITE_SCRIPT_CONTENTS" == "true" ]; then
 
 cat << EOIPFW >> $LOGGLY_RSYSLOG_CONFFILE
@@ -753,11 +836,42 @@ getPassword()
 	echo
 }
 
+#Change TLS settings
+checkIfTLS()
+{
+   if [[ $LOGGLY_SYSLOG_PORT == 514 ]]; then
+   
+        if [ "$SUPPRESS_PROMPT" == "false" ]; then
+	        while true;
+			do
+	            read -p "Hey you are going to setup system logs in insecure mode. Do you want to overwrite this with secure mode? (yes/no)" yn
+						case $yn in
+						[Yy]* )
+							logMsgToConfigSysLog "INFO" "INFO: Going to overwrite the conf file: $LOGGLY_RSYSLOG_CONFFILE with secure configuration";
+							LOGGLY_TLS_SENDING="true"
+							LOGGLY_SYSLOG_PORT=6514
+							break;;
+						[Nn]* )
+							LINUX_DO_VERIFICATION="false"
+							logMsgToConfigSysLog "INFO" "INFO: Skipping Linux verification."
+							break;;
+						* ) echo "Please answer yes or no.";;
+						esac
+			done			
+		else
+		    logMsgToConfigSysLog "WARN" "WARN: Your system logs are being send insecurely. We prefer to send system logs securely so switching to secure configuration."
+			LOGGLY_TLS_SENDING="true"
+			LOGGLY_SYSLOG_PORT=6514
+			
+	    fi
+    fi		
+}
+
 #display usage syntax
 usage()
 {
 cat << EOF
-usage: configure-linux [-a loggly auth account or subdomain] [-t loggly token (optional)] [-u username] [-p password (optional)] [-s suppress prompts {optional)]
+usage: configure-linux [-a loggly auth account or subdomain] [-t loggly token (optional)] [-u username] [-p password (optional)] [-s suppress prompts {optional)] [--insecure {to send logs without TLS} (optional)]
 usage: configure-linux [-a loggly auth account or subdomain] [-r to remove]
 usage: configure-linux [-h for help]
 EOF
@@ -791,6 +905,10 @@ if [ "$1" != "being-invoked" ]; then
 				;;
 			-s | --suppress )
 				SUPPRESS_PROMPT="true"
+				;;
+			     --insecure )
+				LOGGLY_TLS_SENDING="false"
+				LOGGLY_SYSLOG_PORT=514
 				;;
 			-h | --help)
 				usage
