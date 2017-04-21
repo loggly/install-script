@@ -2,14 +2,14 @@
 
 #downloads configure-linux.sh
 echo "INFO: Downloading dependencies - configure-linux.sh"
-curl -s -o configure-linux.sh https://www.loggly.com/install/configure-linux.sh
+curl -s -o configure-linux.sh https://raw.githubusercontent.com/Shwetajain148/install-script/tls-support-filemonitoring/Linux%20Script/configure-linux.sh
 source configure-linux.sh "being-invoked"
 	
 ##########  Variable Declarations - Start  ##########
 #name of the current script
 SCRIPT_NAME=configure-apache.sh
 #version of the current script
-SCRIPT_VERSION=1.5
+SCRIPT_VERSION=1.6
 
 #we have not found the apache version yet at this point in the script
 APP_TAG="\"apache-version\":\"\""
@@ -42,6 +42,9 @@ LOGGLY_FILE_TAG="apache"
 
 #add tags to the logs
 TAG=
+
+TLS_SENDING="true"
+
 ##########  Variable Declarations - End  ##########
 
 #check if apache environment is compatible for Loggly
@@ -250,17 +253,27 @@ write21ApacheFileContents()
 	logMsgToConfigSysLog "INFO" "INFO: Creating file $APACHE_SYSLOG_CONFFILE"
 	sudo touch $APACHE_SYSLOG_CONFFILE
 	sudo chmod o+w $APACHE_SYSLOG_CONFFILE
-
-	imfileStr="\$ModLoad imfile
+	commonContent="
+	\$ModLoad imfile
 	\$InputFilePollInterval 10 
 	\$WorkDirectory $RSYSLOG_DIR
 	"
+
 	if [[ "$LINUX_DIST" == *"Ubuntu"* ]]; then
-		imfileStr+="\$PrivDropToGroup adm
+		commonContent+="\$PrivDropToGroup adm
 		"
 	fi
 
-	imfileStr+="
+	imfileStr=$commonContent"
+	
+	\$ActionSendStreamDriver gtls
+	\$ActionSendStreamDriverMode 1
+	\$ActionSendStreamDriverAuthMode x509/name
+	\$ActionSendStreamDriverPermittedPeer *.loggly.com
+	
+	#RsyslogGnuTLS
+	\$DefaultNetstreamDriverCAFile /etc/rsyslog.d/keys/ca.d/logs-01.loggly.com_sha12.crt
+		
 	# Apache access file:
 	\$InputFileName $LOGGLY_APACHE_LOG_HOME/$APACHE_ACCESS_LOG_FILE
 	\$InputFileTag apache-access:
@@ -279,12 +292,43 @@ write21ApacheFileContents()
 
 	#Add a tag for apache events
 	\$template LogglyFormatApache,\"<%pri%>%protocol-version% %timestamp:::date-rfc3339% %HOSTNAME% %app-name% %procid% %msgid% [$LOGGLY_AUTH_TOKEN@41058 $TAG] %msg%\n\"
-
+	
+	if \$programname == 'apache-access' then @@logs-01.loggly.com:6514;LogglyFormatApache
+	if \$programname == 'apache-access' then ~
+	if \$programname == 'apache-error' then @@logs-01.loggly.com:6514;LogglyFormatApache
+	if \$programname == 'apache-error' then ~
+	"
+	imfileStrNonTls=$commonContent"
+	
+	# Apache access file:
+	\$InputFileName $LOGGLY_APACHE_LOG_HOME/$APACHE_ACCESS_LOG_FILE
+	\$InputFileTag apache-access:
+	\$InputFileStateFile stat-apache-access
+	\$InputFileSeverity info
+	\$InputFilePersistStateInterval 20000
+	\$InputRunFileMonitor
+	
+	#Apache Error file: 
+	\$InputFileName $LOGGLY_APACHE_LOG_HOME/$APACHE_ERROR_LOG_FILE
+	\$InputFileTag apache-error:
+	\$InputFileStateFile stat-apache-error
+	\$InputFileSeverity error
+	\$InputFilePersistStateInterval 20000
+	\$InputRunFileMonitor
+	#Add a tag for apache events
+	#Add a tag for apache events
+	\$template LogglyFormatApache,\"<%pri%>%protocol-version% %timestamp:::date-rfc3339% %HOSTNAME% %app-name% %procid% %msgid% [$LOGGLY_AUTH_TOKEN@41058 $TAG] %msg%\n\"
+	
 	if \$programname == 'apache-access' then @@logs-01.loggly.com:514;LogglyFormatApache
 	if \$programname == 'apache-access' then ~
 	if \$programname == 'apache-error' then @@logs-01.loggly.com:514;LogglyFormatApache
 	if \$programname == 'apache-error' then ~
 	"
+	
+	if [ $TLS_SENDING == "false" ]; 
+	then
+		imfileStr=$imfileStrNonTls
+	fi
 
 	#change the apache-21 file to variable from above and also take the directory of the apache log file.
 sudo cat << EOIPFW >> $APACHE_SYSLOG_CONFFILE
@@ -427,6 +471,11 @@ while [ "$1" != "" ]; do
           usage
           exit
           ;;
+		--insecure )
+		LOGGLY_TLS_SENDING="false"
+		TLS_SENDING="false"
+		LOGGLY_SYSLOG_PORT=514
+		;;
     esac
     shift
 done
@@ -444,3 +493,4 @@ else
 fi
 
 ##########  Get Inputs from User - End  ##########
+
