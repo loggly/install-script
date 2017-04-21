@@ -428,7 +428,7 @@ remove21ApacheConfFile()
 usage()
 {
 cat << EOF
-usage: configure-apache [-a loggly auth account or subdomain] [-t loggly token (optional)] [-u username] [-p password (optional)] [-tag filetag1,filetag2 (optional)] [-s suppress prompts {optional)]
+usage: configure-apache [-a loggly auth account or subdomain] [-t loggly token (optional)] [-u username] [-p password (optional)] [-tag filetag1,filetag2 (optional)] [-s suppress prompts {optional)] [--insecure {to send logs without TLS} (optional)]
 usage: configure-apache [-a loggly auth account or subdomain] [-r to rollback]
 usage: configure-apache [-h for help]
 EOF
