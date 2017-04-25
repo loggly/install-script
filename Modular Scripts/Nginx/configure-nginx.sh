@@ -9,7 +9,7 @@ source configure-linux.sh "being-invoked"
 #name of the current script
 SCRIPT_NAME=configure-nginx.sh
 #version of the current script
-SCRIPT_VERSION=1.4
+SCRIPT_VERSION=1.3
 
 #we have not found the nginx version yet at this point in the script
 APP_TAG="\"nginx-version\":\"\""
@@ -42,8 +42,6 @@ LOGGLY_FILE_TAG="nginx"
 
 #add tags to the logs
 TAG=
-
-TLS_SENDING="true"
 
 ##########  Variable Declarations - End  ##########
 
@@ -218,52 +216,16 @@ write21NginxFileContents()
 	sudo touch $NGINX_SYSLOG_CONFFILE
 	sudo chmod o+w $NGINX_SYSLOG_CONFFILE
 
-	commonContent="
-	\$ModLoad imfile
+	imfileStr="\$ModLoad imfile
 	\$InputFilePollInterval 10 
 	\$WorkDirectory $RSYSLOG_DIR
 	"
 	if [[ "$LINUX_DIST" == *"Ubuntu"* ]]; then
-		commonContent+="\$PrivDropToGroup adm		
+		imfileStr+="\$PrivDropToGroup adm
 		"
 	fi
 
-	imfileStr+=$commonContent"
-	
-	\$ActionSendStreamDriver gtls
-	\$ActionSendStreamDriverMode 1
-	\$ActionSendStreamDriverAuthMode x509/name
-	\$ActionSendStreamDriverPermittedPeer *.loggly.com
-	
-	#RsyslogGnuTLS
-	\$DefaultNetstreamDriverCAFile /etc/rsyslog.d/keys/ca.d/logs-01.loggly.com_sha12.crt
-	
-	# nginx access file:
-	\$InputFileName $LOGGLY_NGINX_LOG_HOME/$NGINX_ACCESS_LOG_FILE
-	\$InputFileTag nginx-access:
-	\$InputFileStateFile stat-nginx-access
-	\$InputFileSeverity info
-	\$InputFilePersistStateInterval 20000
-	\$InputRunFileMonitor
-
-	#nginx Error file: 
-	\$InputFileName $LOGGLY_NGINX_LOG_HOME/$NGINX_ERROR_LOG_FILE
-	\$InputFileTag nginx-error:
-	\$InputFileStateFile stat-nginx-error
-	\$InputFileSeverity error
-	\$InputFilePersistStateInterval 20000
-	\$InputRunFileMonitor
-
-	#Add a tag for nginx events
-	\$template LogglyFormatNginx,\"<%pri%>%protocol-version% %timestamp:::date-rfc3339% %HOSTNAME% %app-name% %procid% %msgid% [$LOGGLY_AUTH_TOKEN@41058 $TAG] %msg%\n\"
-
-	if \$programname == 'nginx-access' then @@logs-01.loggly.com:6514;LogglyFormatNginx
-	if \$programname == 'nginx-access' then ~
-	if \$programname == 'nginx-error' then @@logs-01.loggly.com:6514;LogglyFormatNginx
-	if \$programname == 'nginx-error' then ~
-	"
-
-	imfileStrNonTls=$commonContent"
+	imfileStr+="
 	# nginx access file:
 	\$InputFileName $LOGGLY_NGINX_LOG_HOME/$NGINX_ACCESS_LOG_FILE
 	\$InputFileTag nginx-access:
@@ -288,12 +250,7 @@ write21NginxFileContents()
 	if \$programname == 'nginx-error' then @@logs-01.loggly.com:514;LogglyFormatNginx
 	if \$programname == 'nginx-error' then ~
 	"
-	
-	if [ $TLS_SENDING == "false" ]; 
-	then
-		imfileStr=$imfileStrNonTls
-	fi
-	
+
 	#change the nginx-21 file to variable from above and also take the directory of the nginx log file.
 sudo cat << EOIPFW >> $NGINX_SYSLOG_CONFFILE
 $imfileStr
@@ -391,7 +348,7 @@ remove21NginxConfFile()
 usage()
 {
 cat << EOF
-usage: configure-nginx [-a loggly auth account or subdomain] [-t loggly token (optional)] [-u username] [-p password (optional)] [-tag filetag1,filetag2 (optional)] [-s suppress prompts {optional)] [--insecure {to send logs without TLS} (optional)]
+usage: configure-nginx [-a loggly auth account or subdomain] [-t loggly token (optional)] [-u username] [-p password (optional)] [-tag filetag1,filetag2 (optional)] [-s suppress prompts {optional)]
 usage: configure-nginx [-a loggly auth account or subdomain] [-r to rollback]
 usage: configure-nginx [-h for help]
 EOF
@@ -430,11 +387,6 @@ while [ "$1" != "" ]; do
 	  -s | --suppress )
 		  SUPPRESS_PROMPT="true"
 		  ;;
-		  --insecure )
-		LOGGLY_TLS_SENDING="false"
-		TLS_SENDING="false"
-		LOGGLY_SYSLOG_PORT=514
-		;;
       -h | --help)
           usage
           exit
@@ -456,4 +408,3 @@ else
 fi
 
 ##########  Get Inputs from User - End  ##########
-
