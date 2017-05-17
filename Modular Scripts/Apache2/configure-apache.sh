@@ -315,7 +315,7 @@ write21ApacheFileContents()
 	\$InputFileSeverity error
 	\$InputFilePersistStateInterval 20000
 	\$InputRunFileMonitor
-	#Add a tag for apache events
+	
 	#Add a tag for apache events
 	\$template LogglyFormatApache,\"<%pri%>%protocol-version% %timestamp:::date-rfc3339% %HOSTNAME% %app-name% %procid% %msgid% [$LOGGLY_AUTH_TOKEN@41058 $TAG] %msg%\n\"
 	
