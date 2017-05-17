@@ -499,7 +499,9 @@ confString()
 ##########################################################
 ### RsyslogTemplate for Loggly ###
 ##########################################################
+
 \$template LogglyFormat,\"<%pri%>%protocol-version% %timestamp:::date-rfc3339% %HOSTNAME% %app-name% %procid% %msgid% [$LOGGLY_AUTH_TOKEN@$LOGGLY_DISTRIBUTION_ID tag=\\\"RsyslogTLS\\\"] %msg%\n\"
+
 # Setup disk assisted queues
 \$WorkDirectory /var/spool/rsyslog # where to place spool files
 \$ActionQueueFileName fwdRule1     # unique name prefix for spool files
@@ -507,12 +509,14 @@ confString()
 \$ActionQueueSaveOnShutdown on     # save messages to disk on shutdown
 \$ActionQueueType LinkedList       # run asynchronously
 \$ActionResumeRetryCount -1        # infinite retries if host is down
+
 #RsyslogGnuTLS
 \$DefaultNetstreamDriverCAFile /etc/rsyslog.d/keys/ca.d/logs-01.loggly.com_sha12.crt
 \$ActionSendStreamDriver gtls
 \$ActionSendStreamDriverMode 1
 \$ActionSendStreamDriverAuthMode x509/name
 \$ActionSendStreamDriverPermittedPeer *.loggly.com
+
 *.* @@$LOGS_01_HOST:$LOGGLY_SYSLOG_PORT;LogglyFormat
 #################END CONFIG FILE#########################
 	"
@@ -527,11 +531,15 @@ confString()
 \$ActionQueueSaveOnShutdown on     # save messages to disk on shutdown
 \$ActionQueueType LinkedList       # run asynchronously
 \$ActionResumeRetryCount -1        # infinite retries if host is down
+
 #RsyslogGnuTLS
 \$DefaultNetstreamDriverCAFile /etc/rsyslog.d/keys/ca.d/logs-01.loggly.com_sha12.crt
+
+
 template(name=\"LogglyFormat\" type=\"string\"
 string=\"<%pri%>%protocol-version% %timestamp:::date-rfc3339% %HOSTNAME% %app-name% %procid% %msgid% [$LOGGLY_AUTH_TOKEN@$LOGGLY_DISTRIBUTION_ID tag=\\\"RsyslogTLS\\\"] %msg%\n\"
 )
+
 # Send messages to Loggly over TCP using the template.
 action(type=\"omfwd\" protocol=\"tcp\" target=\"$LOGS_01_HOST\" port=\"$LOGGLY_SYSLOG_PORT\" template=\"LogglyFormat\" StreamDriver=\"gtls\" StreamDriverMode=\"1\" StreamDriverAuthMode=\"x509/name\" StreamDriverPermittedPeers=\"*.loggly.com\")
 	"
@@ -542,12 +550,15 @@ action(type=\"omfwd\" protocol=\"tcp\" target=\"$LOGS_01_HOST\" port=\"$LOGGLY_S
 #          -------------------------------------------------------
 # Define the template used for sending logs to Loggly. Do not change this format.
 \$template LogglyFormat,\"<%pri%>%protocol-version% %timestamp:::date-rfc3339% %HOSTNAME% %app-name% %procid% %msgid% [$LOGGLY_AUTH_TOKEN@$LOGGLY_DISTRIBUTION_ID tag=\\\"Rsyslog\\\"] %msg%\n\"
+
 \$WorkDirectory /var/spool/rsyslog # where to place spool files
 \$ActionQueueFileName fwdRule1 # unique name prefix for spool files
 \$ActionQueueMaxDiskSpace 1g   # 1gb space limit (use as much as possible)
 \$ActionQueueSaveOnShutdown on # save messages to disk on shutdown
 \$ActionQueueType LinkedList   # run asynchronously
 \$ActionResumeRetryCount -1    # infinite retries if host is down
+
+
 # Send messages to Loggly over TCP using the template.
 *.*             @@$LOGS_01_HOST:$LOGGLY_SYSLOG_PORT;LogglyFormat
 #     -------------------------------------------------------
