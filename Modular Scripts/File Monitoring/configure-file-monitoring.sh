@@ -427,8 +427,10 @@ write21ConfFileContents()
 			\$InputFileSeverity info
 			\$InputFilePersistStateInterval 20000
 			\$InputRunFileMonitor
+			
 			#Add a tag for file events
 			template (name=\"$CONF_FILE_FORMAT_NAME\" type=\"string\" string=\"<%pri%>%protocol-version% %timestamp:::date-rfc3339% %HOSTNAME% %app-name% %procid% %msgid% [$LOGGLY_AUTH_TOKEN@41058 $TAG] %msg%\n\")
+			
 			if \$programname == '$LOGGLY_FILE_TO_MONITOR_ALIAS' then action(type=\"omfwd\" protocol=\"tcp\" target=\"logs-01.loggly.com\" port=\"6514\" template=\"$CONF_FILE_FORMAT_NAME\")
 			if \$programname == '$LOGGLY_FILE_TO_MONITOR_ALIAS' then stop
 		"
@@ -436,6 +438,7 @@ write21ConfFileContents()
 			\$ModLoad imfile
 			\$InputFilePollInterval 10
 			\$WorkDirectory $RSYSLOG_DIR
+			
 			# File access file:
 			\$InputFileName $FILE_TO_MONITOR
 			\$InputFileTag $LOGGLY_FILE_TO_MONITOR_ALIAS
@@ -443,8 +446,10 @@ write21ConfFileContents()
 			\$InputFileSeverity info
 			\$InputFilePersistStateInterval 20000
 			\$InputRunFileMonitor
+			
 			#Add a tag for file events
 			template (name=\"$CONF_FILE_FORMAT_NAME\" type=\"string\" string=\"<%pri%>%protocol-version% %timestamp:::date-rfc3339% %HOSTNAME% %app-name% %procid% %msgid% [$LOGGLY_AUTH_TOKEN@41058 $TAG] %msg%\n\")
+			
 			if \$programname == '$LOGGLY_FILE_TO_MONITOR_ALIAS' then action(type=\"omfwd\" protocol=\"tcp\" target=\"logs-01.loggly.com\" port=\"514\" template=\"$CONF_FILE_FORMAT_NAME\")
 			if \$programname == '$LOGGLY_FILE_TO_MONITOR_ALIAS' then stop
 		"
