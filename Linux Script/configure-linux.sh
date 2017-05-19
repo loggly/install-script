@@ -576,7 +576,7 @@ if [ $LOGGLY_TLS_SENDING == "true" ]; then
 	if [ $PKG_MGR == "yum" ]; then
 	 
 	    if [ $(rpm -qa | grep -c "rsyslog-gnutls") -eq 0 ]; then                               
-                                logMsgToConfigSysLog "ERROR" "ERROR: The rsyslog-gnutls package was not downloaded. Please download it and then run the script again."
+                                logMsgToConfigSysLog "ERROR" ERROR: The rsyslog-gnutls package could not be installed automatically. Please install it and then run the script again. Manual instructions to configure rsyslog are available at https://www.loggly.com/docs/rsyslog-tls-configuration/. Rsyslog troubleshooting instructions are available at https://www.loggly.com/docs/troubleshooting-rsyslog/."
                                 exit 1
 	    fi 
 	
@@ -584,7 +584,7 @@ if [ $LOGGLY_TLS_SENDING == "true" ]; then
 	  else [ $PKG_MGR == "apt-get" ];
 	
 				if [ $(dpkg-query -W -f='${Status}' rsyslog-gnutls 2>/dev/null | grep -c "ok installed") -eq 0 ]; then                            
-                                logMsgToConfigSysLog "ERROR" "ERROR: The rsyslog-gnutls package was not downloaded. Please download it and then run the script again."
+                                logMsgToConfigSysLog "ERROR" ERROR: The rsyslog-gnutls package could not be installed automatically. Please install it and then run the script again. Manual instructions to configure rsyslog are available at https://www.loggly.com/docs/rsyslog-tls-configuration/. Rsyslog troubleshooting instructions are available at https://www.loggly.com/docs/troubleshooting-rsyslog/."
                                 exit 1
                 fi		
     
