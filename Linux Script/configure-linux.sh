@@ -558,7 +558,6 @@ action(type=\"omfwd\" protocol=\"tcp\" target=\"$LOGS_01_HOST\" port=\"$LOGGLY_S
 \$ActionQueueType LinkedList   # run asynchronously
 \$ActionResumeRetryCount -1    # infinite retries if host is down
 
-
 # Send messages to Loggly over TCP using the template.
 *.*             @@$LOGS_01_HOST:$LOGGLY_SYSLOG_PORT;LogglyFormat
 #     -------------------------------------------------------
@@ -571,6 +570,7 @@ fi
 inputStr=$inputStr_NO_TLS
 if [ $LOGGLY_TLS_SENDING == "true" ]; then
 	downloadTlsCerts
+
 	/bin/bash -c "sudo $PKG_MGR install rsyslog-gnutls"	
 
 	if [ $PKG_MGR == "yum" ]; then
