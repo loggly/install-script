@@ -152,12 +152,12 @@ installLogglyConf()
 	if [ "$LINUX_ENV_VALIDATED" = "false" ]; then
 		checkLinuxLogglyCompatibility
 	fi
+	
+	#create rsyslog dir if it doesn't exist, Modify the permission on rsyslog directory if exist on Ubuntu
+	createRsyslogDir
 
 	#if all the above check passes, write the 22-loggly.conf file
 	checkAuthTokenAndWriteContents
-
-	#create rsyslog dir if it doesn't exist, Modify the permission on rsyslog directory if exist on Ubuntu
-	createRsyslogDir
 
 	if [ "$LINUX_DO_VERIFICATION" = "true" ]; then
 		#check if the logs are going to loggly fro linux system now
@@ -852,18 +852,17 @@ checkIfTLS()
 							LOGGLY_SYSLOG_PORT=6514
 							break;;
 						[Nn]* )
-							LINUX_DO_VERIFICATION="false"
-							logMsgToConfigSysLog "INFO" "INFO: Skipping Linux verification."
 							break;;
 						* ) echo "Please answer yes or no.";;
 						esac
 			done			
 		else
-		    logMsgToConfigSysLog "WARN" "WARN: Your system logs are being send insecurely. We prefer to send system logs securely so switching to secure configuration."
+       logMsgToConfigSysLog "WARN" "WARN: Your system logs are being send insecurely. We prefer to send system logs securely so switching to secure configuration."
 			LOGGLY_TLS_SENDING="true"
 			LOGGLY_SYSLOG_PORT=6514
 			
-	    fi
+	     fi
+
     fi		
 }
 
