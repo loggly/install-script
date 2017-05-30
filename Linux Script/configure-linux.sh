@@ -208,6 +208,14 @@ checkIfUserHasRootPrivileges()
 	fi
 }
 
+#check if package-manager is installed
+checkIfPackageManagerIsInstalled()
+{
+   if  ! [ -x "$(command -v $1)" ]; then 
+		  logMsgToConfigSysLog "WARN" "WARN: Package manager(yum or apt-get) could not be found on your system. Please install it manually."  
+   fi
+}
+
 #check if supported operating system
 checkIfSupportedOS()
 {
@@ -219,22 +227,27 @@ checkIfSupportedOS()
 		*"ubuntu"* )
 		echo "INFO: Operating system is Ubuntu."
 		PKG_MGR="apt-get"
+                checkIfPackageManagerIsInstalled $PKG_MGR
 		;;
 		*"red"* )
 		echo "INFO: Operating system is Red Hat."
 		PKG_MGR="yum"
+		checkIfPackageManagerIsInstalled $PKG_MGR 
 		;;
 		*"centos"* )
 		echo "INFO: Operating system is CentOS."
 		PKG_MGR="yum"
+		checkIfPackageManagerIsInstalled $PKG_MGR 
 		;;
 		*"debian"* )
 		echo "INFO: Operating system is Debian."
 		PKG_MGR="apt-get"
+		checkIfPackageManagerIsInstalled $PKG_MGR 
 		;;
 		*"amazon"* )
 		echo "INFO: Operating system is Amazon AMI."
 		PKG_MGR="yum"
+		checkIfPackageManagerIsInstalled $PKG_MGR 
 		;;
 		*"darwin"* )
 		#if the OS is mac then exit
@@ -573,20 +586,24 @@ if [ $LOGGLY_TLS_SENDING == "true" ]; then
 
 	/bin/bash -c "sudo $PKG_MGR install rsyslog-gnutls"	
 
-	if [ $PKG_MGR == "yum" ]; then
+	if [ "$PKG_MGR" == "yum" ]; then
 	 
 	    if [ $(rpm -qa | grep -c "rsyslog-gnutls") -eq 0 ]; then                               
-                                logMsgToConfigSysLog "ERROR" ERROR: The rsyslog-gnutls package could not be installed automatically. Please install it and then run the script again. Manual instructions to configure rsyslog are available at https://www.loggly.com/docs/rsyslog-tls-configuration/. Rsyslog troubleshooting instructions are available at https://www.loggly.com/docs/troubleshooting-rsyslog/."
+                                logMsgToConfigSysLog "ERROR" "ERROR: The rsyslog-gnutls package could not be installed automatically. Please install it and then run the script again. Manual instructions to configure rsyslog are available at https://www.loggly.com/docs/rsyslog-tls-configuration/. Rsyslog troubleshooting instructions are available at https://www.loggly.com/docs/troubleshooting-rsyslog/."
                                 exit 1
 	    fi 
 	
     
-	  else [ $PKG_MGR == "apt-get" ];
+	    elif [ "$PKG_MGR" == "apt-get" ]; then
 	
 				if [ $(dpkg-query -W -f='${Status}' rsyslog-gnutls 2>/dev/null | grep -c "ok installed") -eq 0 ]; then                            
-                                logMsgToConfigSysLog "ERROR" ERROR: The rsyslog-gnutls package could not be installed automatically. Please install it and then run the script again. Manual instructions to configure rsyslog are available at https://www.loggly.com/docs/rsyslog-tls-configuration/. Rsyslog troubleshooting instructions are available at https://www.loggly.com/docs/troubleshooting-rsyslog/."
+                                logMsgToConfigSysLog "ERROR" "ERROR: The rsyslog-gnutls package could not be installed automatically. Please install it and then run the script again. Manual instructions to configure rsyslog are available at https://www.loggly.com/docs/rsyslog-tls-configuration/. Rsyslog troubleshooting instructions are available at https://www.loggly.com/docs/troubleshooting-rsyslog/."
                                 exit 1
-                fi		
+                                fi		
+			
+	else
+
+                      logMsgToConfigSysLog "WARN" "WARN: The rsyslog-gnutls package could not be installed automatically. Please install it manually for your distribution and then run the script again."					  
     
 	fi				
 	inputStr=$inputStrTls
