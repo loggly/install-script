@@ -101,8 +101,8 @@ checkLinuxLogglyCompatibility()
 	#check if the user has root permission to run this script
 	checkIfUserHasRootPrivileges
 
-	#check if the OS is supported by the script. If no, then exit
-	checkIfSupportedOS
+	#check if package-manager is installed
+        checkIfPackageManagerIsInstalled
 
 	#set the basic variables needed by this script
 	setLinuxVariables
@@ -179,9 +179,6 @@ removeLogglyConf()
 	#check if the user has root permission to run this script
 	checkIfUserHasRootPrivileges
 
-	#check if the OS is supported by the script. If no, then exit
-	checkIfSupportedOS
-
 	#set the basic variables needed by this script
 	setLinuxVariables
 
@@ -211,66 +208,17 @@ checkIfUserHasRootPrivileges()
 #check if package-manager is installed
 checkIfPackageManagerIsInstalled()
 {
-   if  ! [ -x "$(command -v $1)" ]; then 
-		  logMsgToConfigSysLog "WARN" "WARN: Package manager(yum or apt-get) could not be found on your system. Please install it manually."  
+   if   [ -x "$(command -v apt-get)" ]; then
+
+	    PKG_MGR="apt-get"
+
+   else
+       if [ -x "$(command -v yum)" ]; then
+
+	    PKG_MGR="yum"
+
+	   fi
    fi
-}
-
-#check if supported operating system
-checkIfSupportedOS()
-{
-	getOs
-
-	LINUX_DIST_IN_LOWER_CASE=$(echo $LINUX_DIST | tr "[:upper:]" "[:lower:]")
-
-	case "$LINUX_DIST_IN_LOWER_CASE" in
-		*"ubuntu"* )
-		echo "INFO: Operating system is Ubuntu."
-		PKG_MGR="apt-get"
-                checkIfPackageManagerIsInstalled $PKG_MGR
-		;;
-		*"red"* )
-		echo "INFO: Operating system is Red Hat."
-		PKG_MGR="yum"
-		checkIfPackageManagerIsInstalled $PKG_MGR 
-		;;
-		*"centos"* )
-		echo "INFO: Operating system is CentOS."
-		PKG_MGR="yum"
-		checkIfPackageManagerIsInstalled $PKG_MGR 
-		;;
-		*"debian"* )
-		echo "INFO: Operating system is Debian."
-		PKG_MGR="apt-get"
-		checkIfPackageManagerIsInstalled $PKG_MGR 
-		;;
-		*"amazon"* )
-		echo "INFO: Operating system is Amazon AMI."
-		PKG_MGR="yum"
-		checkIfPackageManagerIsInstalled $PKG_MGR 
-		;;
-		*"darwin"* )
-		#if the OS is mac then exit
-		logMsgToConfigSysLog "ERROR" "ERROR: This script is for Linux systems, and Darwin or Mac OSX are not currently supported. You can find alternative options here: https://www.loggly.com/docs/send-mac-logs-to-loggly/"
-		exit 1
-		;;
-		* )
-		logMsgToConfigSysLog "WARN" "WARN: The linux distribution '$LINUX_DIST' has not been previously tested with Loggly."
-		if [ "$SUPPRESS_PROMPT" == "false" ]; then
-			while true; do
-				read -p "Would you like to continue anyway? (yes/no)" yn
-				case $yn in
-					[Yy]* )
-					break;;
-					[Nn]* )
-					exit 1
-					;;
-					* ) echo "Please answer yes or no.";;
-				esac
-			done
-		fi
-		;;
-	esac
 }
 
 getOs()
@@ -603,7 +551,7 @@ if [ $LOGGLY_TLS_SENDING == "true" ]; then
 			
 	else
 
-                      logMsgToConfigSysLog "WARN" "WARN: The rsyslog-gnutls package could not be installed automatically. Please install it manually for your distribution and then run the script again."					  
+                      logMsgToConfigSysLog "WARN" "WARN: The rsyslog-gnutls package could not be download automatically because your package manager couldn't be found. Please download it manually for your distribution and then run the script again."					  
     
 	fi				
 	inputStr=$inputStrTls
