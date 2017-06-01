@@ -102,7 +102,10 @@ checkLinuxLogglyCompatibility()
 	checkIfUserHasRootPrivileges
 
 	#check if the OS is supported by the script. If no, then exit
-	checkIfSupportedOS
+        checkIfSupportedOS
+	
+	#check if package-manager is installed
+	checkIfPackageManagerIsInstalled
 
 	#set the basic variables needed by this script
 	setLinuxVariables
@@ -178,7 +181,7 @@ removeLogglyConf()
 
 	#check if the user has root permission to run this script
 	checkIfUserHasRootPrivileges
-
+	
 	#check if the OS is supported by the script. If no, then exit
 	checkIfSupportedOS
 
@@ -208,6 +211,22 @@ checkIfUserHasRootPrivileges()
 	fi
 }
 
+#check if package-manager is installed
+checkIfPackageManagerIsInstalled()
+{
+   if [ -x "$(command -v apt-get)" ]; then
+
+	    PKG_MGR="apt-get"
+
+   else
+       if [ -x "$(command -v yum)" ]; then
+        
+	    PKG_MGR="yum"
+       fi
+
+   fi
+}
+
 #check if supported operating system
 checkIfSupportedOS()
 {
@@ -218,23 +237,18 @@ checkIfSupportedOS()
 	case "$LINUX_DIST_IN_LOWER_CASE" in
 		*"ubuntu"* )
 		echo "INFO: Operating system is Ubuntu."
-		PKG_MGR="apt-get"
 		;;
 		*"redhat"* )
 		echo "INFO: Operating system is Red Hat."
-		PKG_MGR="yum"
 		;;
 		*"centos"* )
 		echo "INFO: Operating system is CentOS."
-		PKG_MGR="yum"
 		;;
 		*"debian"* )
 		echo "INFO: Operating system is Debian."
-		PKG_MGR="apt-get"
 		;;
 		*"amazon"* )
 		echo "INFO: Operating system is Amazon AMI."
-		PKG_MGR="yum"
 		;;
 		*"darwin"* )
 		#if the OS is mac then exit
@@ -499,7 +513,9 @@ confString()
 ##########################################################
 ### RsyslogTemplate for Loggly ###
 ##########################################################
+
 \$template LogglyFormat,\"<%pri%>%protocol-version% %timestamp:::date-rfc3339% %HOSTNAME% %app-name% %procid% %msgid% [$LOGGLY_AUTH_TOKEN@$LOGGLY_DISTRIBUTION_ID tag=\\\"RsyslogTLS\\\"] %msg%\n\"
+
 # Setup disk assisted queues
 \$WorkDirectory /var/spool/rsyslog # where to place spool files
 \$ActionQueueFileName fwdRule1     # unique name prefix for spool files
@@ -507,12 +523,14 @@ confString()
 \$ActionQueueSaveOnShutdown on     # save messages to disk on shutdown
 \$ActionQueueType LinkedList       # run asynchronously
 \$ActionResumeRetryCount -1        # infinite retries if host is down
+
 #RsyslogGnuTLS
 \$DefaultNetstreamDriverCAFile /etc/rsyslog.d/keys/ca.d/logs-01.loggly.com_sha12.crt
 \$ActionSendStreamDriver gtls
 \$ActionSendStreamDriverMode 1
 \$ActionSendStreamDriverAuthMode x509/name
 \$ActionSendStreamDriverPermittedPeer *.loggly.com
+
 *.* @@$LOGS_01_HOST:$LOGGLY_SYSLOG_PORT;LogglyFormat
 #################END CONFIG FILE#########################
 	"
@@ -527,11 +545,15 @@ confString()
 \$ActionQueueSaveOnShutdown on     # save messages to disk on shutdown
 \$ActionQueueType LinkedList       # run asynchronously
 \$ActionResumeRetryCount -1        # infinite retries if host is down
+
 #RsyslogGnuTLS
 \$DefaultNetstreamDriverCAFile /etc/rsyslog.d/keys/ca.d/logs-01.loggly.com_sha12.crt
+
+
 template(name=\"LogglyFormat\" type=\"string\"
 string=\"<%pri%>%protocol-version% %timestamp:::date-rfc3339% %HOSTNAME% %app-name% %procid% %msgid% [$LOGGLY_AUTH_TOKEN@$LOGGLY_DISTRIBUTION_ID tag=\\\"RsyslogTLS\\\"] %msg%\n\"
 )
+
 # Send messages to Loggly over TCP using the template.
 action(type=\"omfwd\" protocol=\"tcp\" target=\"$LOGS_01_HOST\" port=\"$LOGGLY_SYSLOG_PORT\" template=\"LogglyFormat\" StreamDriver=\"gtls\" StreamDriverMode=\"1\" StreamDriverAuthMode=\"x509/name\" StreamDriverPermittedPeers=\"*.loggly.com\")
 	"
@@ -542,12 +564,14 @@ action(type=\"omfwd\" protocol=\"tcp\" target=\"$LOGS_01_HOST\" port=\"$LOGGLY_S
 #          -------------------------------------------------------
 # Define the template used for sending logs to Loggly. Do not change this format.
 \$template LogglyFormat,\"<%pri%>%protocol-version% %timestamp:::date-rfc3339% %HOSTNAME% %app-name% %procid% %msgid% [$LOGGLY_AUTH_TOKEN@$LOGGLY_DISTRIBUTION_ID tag=\\\"Rsyslog\\\"] %msg%\n\"
+
 \$WorkDirectory /var/spool/rsyslog # where to place spool files
 \$ActionQueueFileName fwdRule1 # unique name prefix for spool files
 \$ActionQueueMaxDiskSpace 1g   # 1gb space limit (use as much as possible)
 \$ActionQueueSaveOnShutdown on # save messages to disk on shutdown
 \$ActionQueueType LinkedList   # run asynchronously
 \$ActionResumeRetryCount -1    # infinite retries if host is down
+
 # Send messages to Loggly over TCP using the template.
 *.*             @@$LOGS_01_HOST:$LOGGLY_SYSLOG_PORT;LogglyFormat
 #     -------------------------------------------------------
@@ -560,12 +584,29 @@ fi
 inputStr=$inputStr_NO_TLS
 if [ $LOGGLY_TLS_SENDING == "true" ]; then
 	downloadTlsCerts
-	/bin/bash -c "sudo $PKG_MGR install rsyslog-gnutls -y"
-				if [ $(dpkg-query -W -f='${Status}' rsyslog-gnutls 2>/dev/null | grep -c "ok installed") -eq 0 ];
-				then
-				logMsgToConfigSysLog "ERROR" "ERROR: The rsyslog-gnutls package was not downloaded. Please download it and then run the script again."
-				exit 1
-				fi
+
+	/bin/bash -c "sudo $PKG_MGR install rsyslog-gnutls"	
+
+	if [ "$PKG_MGR" == "yum" ]; then
+	 
+	    if [ $(rpm -qa | grep -c "rsyslog-gnutls") -eq 0 ]; then                               
+                                logMsgToConfigSysLog "ERROR" "ERROR: The rsyslog-gnutls package could not be installed automatically. Please install it and then run the script again. Manual instructions to configure rsyslog are available at https://www.loggly.com/docs/rsyslog-tls-configuration/. Rsyslog troubleshooting instructions are available at https://www.loggly.com/docs/troubleshooting-rsyslog/."
+                                exit 1
+	    fi 
+	
+    
+	    elif [ "$PKG_MGR" == "apt-get" ]; then
+	
+				if [ $(dpkg-query -W -f='${Status}' rsyslog-gnutls 2>/dev/null | grep -c "ok installed") -eq 0 ]; then                            
+                                logMsgToConfigSysLog "ERROR" "ERROR: The rsyslog-gnutls package could not be installed automatically. Please install it and then run the script again. Manual instructions to configure rsyslog are available at https://www.loggly.com/docs/rsyslog-tls-configuration/. Rsyslog troubleshooting instructions are available at https://www.loggly.com/docs/troubleshooting-rsyslog/."
+                                exit 1
+                                fi		
+			
+	else
+
+                      logMsgToConfigSysLog "WARN" "WARN: The rsyslog-gnutls package could not be download automatically because your package manager couldn't be found. Please download it manually for your distribution and then run the script again."					  
+    
+	fi				
 	inputStr=$inputStrTls
 fi
 }
@@ -937,3 +978,6 @@ fi
 ##########  Get Inputs from User - End  ##########       -------------------------------------------------------
 #          End of Syslog Logging Directives for Loggly
 #
+
+
+
