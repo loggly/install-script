@@ -238,7 +238,7 @@ checkIfSupportedOS()
 		*"ubuntu"* )
 		echo "INFO: Operating system is Ubuntu."
 		;;
-		*"redhat"* )
+		*"red"* )
 		echo "INFO: Operating system is Red Hat."
 		;;
 		*"centos"* )
@@ -585,7 +585,7 @@ inputStr=$inputStr_NO_TLS
 if [ $LOGGLY_TLS_SENDING == "true" ]; then
 	downloadTlsCerts
 
-	/bin/bash -c "sudo $PKG_MGR install rsyslog-gnutls"	
+	/bin/bash -c "sudo $PKG_MGR install -y rsyslog-gnutls"	
 
 	if [ "$PKG_MGR" == "yum" ]; then
 	 
