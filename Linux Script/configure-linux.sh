@@ -102,7 +102,7 @@ checkLinuxLogglyCompatibility()
 	checkIfUserHasRootPrivileges
 
 	#check if the OS is supported by the script. If no, then exit
-    checkIfSupportedOS
+        checkIfSupportedOS
 	
 	#check if package-manager is installed
 	checkIfPackageManagerIsInstalled
@@ -596,14 +596,14 @@ if [ $LOGGLY_TLS_SENDING == "true" ]; then
 	 
 	    if [ $(rpm -qa | grep -c "rsyslog-gnutls") -eq 0 ]; then                               
                                 logMsgToConfigSysLog "ERROR" "ERROR: The rsyslog-gnutls package could not be installed automatically. Please install it and then run the script again. Manual instructions to configure rsyslog are available at https://www.loggly.com/docs/rsyslog-tls-configuration/. Rsyslog troubleshooting instructions are available at https://www.loggly.com/docs/troubleshooting-rsyslog/."
-                                exit 1		    
+                                exit 1
 	    fi 
 	
     
 	  elif [ "$PKG_MGR" == "apt-get" ]; then
 	
 				if [ $(dpkg-query -W -f='${Status}' rsyslog-gnutls 2>/dev/null | grep -c "ok installed") -eq 0 ]; then                            
-                                logMsgToConfigSysLog "ERROR" "ERROR: The rsyslog-gnutls package could not be installed automatically. Please install it and then run the script again. Manual instructions to configure rsyslog are available at https://www.loggly.com/docs/rsyslog-tls-configuration/. Rsyslog troubleshooting instructions are available at https://www.loggly.com/docs/troubleshooting-rsyslog/."								
+                                logMsgToConfigSysLog "ERROR" "ERROR: The rsyslog-gnutls package could not be installed automatically. Please install it and then run the script again. Manual instructions to configure rsyslog are available at https://www.loggly.com/docs/rsyslog-tls-configuration/. Rsyslog troubleshooting instructions are available at https://www.loggly.com/docs/troubleshooting-rsyslog/."
                                 exit 1
                 fi	
       elif [ "$FORCE_SECURE" == "true" ]; then
@@ -634,7 +634,8 @@ if [ "$DEPENDENCIES_INSTALLED" == "false" ]; then
 							LOGGLY_SYSLOG_PORT=514
 							break;;
 						[Nn]* )
-							break;;
+						    logMsgToConfigSysLog "INFO" "INFO: Since the rsyslog-gnutls package could not be installed automatically, please install it yourself and then re-run the script using the --force-secure flag. This option will force the secure TLS configuration instead of falling back on insecure mode. It is useful for Linux distributions where this script cannot automatically detect the dependency using yum or apt-get.";
+							exit 1;;
 						* ) echo "Please answer yes or no.";;
 						esac
 			done			
@@ -947,7 +948,7 @@ checkIfTLS()
 usage()
 {
 cat << EOF
-usage: configure-linux [-a loggly auth account or subdomain] [-t loggly token (optional)] [-u username] [-p password (optional)] [-s suppress prompts {optional)] [--insecure {to send logs without TLS} (optional)]
+usage: configure-linux [-a loggly auth account or subdomain] [-t loggly token (optional)] [-u username] [-p password (optional)] [-s suppress prompts {optional)] [--insecure {to send logs without TLS} (optional)[--force-secure {optional} ]
 usage: configure-linux [-a loggly auth account or subdomain] [-r to remove]
 usage: configure-linux [-h for help]
 EOF
@@ -1020,3 +1021,4 @@ fi
 ##########  Get Inputs from User - End  ##########       -------------------------------------------------------
 #          End of Syslog Logging Directives for Loggly
 #
+
