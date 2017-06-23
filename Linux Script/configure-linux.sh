@@ -458,8 +458,9 @@ checkIfSelinuxServiceEnforced()
 	if [ $? -ne 0 ]; then
 		logMsgToConfigSysLog "INFO" "INFO: selinux status is not enforced."
 	elif [ $(getenforce | grep "Enforcing" | wc -l) -gt 0 ]; then
-		logMsgToConfigSysLog "ERROR" "ERROR: selinux status is 'Enforcing'. Please disable it and start the rsyslog daemon manually."
-		exit 1
+	        logMsgToConfigSysLog "Info" "Info: selinux status is 'Enforcing'. Setting it to the permissive mode and restarting the rsyslog daemon."
+		setenforce 0
+		restartRsyslog
 	fi
 }
 
@@ -875,7 +876,7 @@ searchAndFetch()
 {
 	url=$2
 
-	result=$(wget -qO- /dev/null --user "$LOGGLY_USERNAME" --password "$LOGGLY_PASSWORD" "$url")
+	result=$(curl -s -u $LOGGLY_USERNAME:$LOGGLY_PASSWORD $url)
 
 	if [ -z "$result" ]; then
 		logMsgToConfigSysLog "ERROR" "ERROR: Please check your network/firewall settings & ensure Loggly subdomain, username and password is specified correctly."
@@ -889,7 +890,7 @@ searchAndFetch()
 	url="$LOGGLY_ACCOUNT_URL/apiv2/events?rsid=$id"
 
 	# retrieve the data
-	result=$(wget -qO- /dev/null --user "$LOGGLY_USERNAME" --password "$LOGGLY_PASSWORD" "$url")
+	result=$(curl -s -u $LOGGLY_USERNAME:$LOGGLY_PASSWORD $url)
 	count=$(echo "$result" | grep total_events | awk '{print $2}')
 	count="${count%\,}"
 	eval $1="'$count'"
@@ -1021,4 +1022,3 @@ fi
 ##########  Get Inputs from User - End  ##########       -------------------------------------------------------
 #          End of Syslog Logging Directives for Loggly
 #
-
