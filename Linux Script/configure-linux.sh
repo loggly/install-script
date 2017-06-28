@@ -458,9 +458,8 @@ checkIfSelinuxServiceEnforced()
 	if [ $? -ne 0 ]; then
 		logMsgToConfigSysLog "INFO" "INFO: selinux status is not enforced."
 	elif [ $(getenforce | grep "Enforcing" | wc -l) -gt 0 ]; then
-	        logMsgToConfigSysLog "Info" "Info: selinux status is 'Enforcing'. Setting it to the permissive mode and restarting the rsyslog daemon."
-		setenforce 0
-		restartRsyslog
+	        logMsgToConfigSysLog "ERROR" "ERROR: selinux status is 'Enforcing'. Please manually restart the rsyslog daemon or turn off selinux by running `setenforce 0` and then rerun the script."
+		exit 1
 	fi
 }
 
