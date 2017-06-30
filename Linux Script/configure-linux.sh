@@ -110,6 +110,9 @@ checkLinuxLogglyCompatibility()
 	#set the basic variables needed by this script
 	setLinuxVariables
 
+	#check if curl is not installed. If yes, ask user to install it manually and run the script again.
+	checkIfCurlIsNotInstalled
+
 	#check if the Loggly servers are accessible. If no, ask user to check network connectivity & exit
 	checkIfLogglyServersAccessible
 
@@ -302,6 +305,15 @@ setLinuxVariables()
 
 	#set loggly account url
 	LOGGLY_ACCOUNT_URL=https://$LOGGLY_ACCOUNT.loggly.com
+}
+
+#check if curl is not installed
+checkIfCurlIsNotInstalled()
+{
+        if ! [ -x "$(command -v curl)" ]; then
+	        logMsgToConfigSysLog "ERROR" "ERROR: 'Curl' is not installed on your machine, please install it manually and then run the script again.";
+	        exit 1
+        fi
 }
 
 #checks if all the various endpoints used for configuring loggly are accessible
