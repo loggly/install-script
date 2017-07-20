@@ -15,7 +15,7 @@ function ctrl_c()  {
 #name of the current script. This will get overwritten by the child script which calls this
 SCRIPT_NAME=configure-linux.sh
 #version of the current script. This will get overwritten by the child script which calls this
-SCRIPT_VERSION=1.17
+SCRIPT_VERSION=1.18
 
 #application tag. This will get overwritten by the child script which calls this
 APP_TAG=
@@ -109,6 +109,9 @@ checkLinuxLogglyCompatibility()
 
 	#set the basic variables needed by this script
 	setLinuxVariables
+
+	#check if curl is not installed. If yes, ask user to install it manually and run the script again.
+	checkIfCurlIsNotInstalled
 
 	#check if the Loggly servers are accessible. If no, ask user to check network connectivity & exit
 	checkIfLogglyServersAccessible
@@ -215,15 +218,11 @@ checkIfUserHasRootPrivileges()
 checkIfPackageManagerIsInstalled()
 {
    if [ -x "$(command -v apt-get)" ]; then
-
 	    PKG_MGR="apt-get"
-
    else
-       if [ -x "$(command -v yum)" ]; then
-        
+       if [ -x "$(command -v yum)" ]; then       
 	    PKG_MGR="yum"
        fi
-
    fi
 }
 
@@ -306,6 +305,15 @@ setLinuxVariables()
 
 	#set loggly account url
 	LOGGLY_ACCOUNT_URL=https://$LOGGLY_ACCOUNT.loggly.com
+}
+
+#check if curl is not installed
+checkIfCurlIsNotInstalled()
+{
+        if ! [ -x "$(command -v curl)" ]; then
+	        logMsgToConfigSysLog "ERROR" "ERROR: 'Curl' is not installed on your machine, please install it manually and then run the script again.";
+	        exit 1
+        fi
 }
 
 #checks if all the various endpoints used for configuring loggly are accessible
@@ -462,7 +470,7 @@ checkIfSelinuxServiceEnforced()
 	if [ $? -ne 0 ]; then
 		logMsgToConfigSysLog "INFO" "INFO: selinux status is not enforced."
 	elif [ $(getenforce | grep "Enforcing" | wc -l) -gt 0 ]; then
-		logMsgToConfigSysLog "ERROR" "ERROR: selinux status is 'Enforcing'. Please disable it and start the rsyslog daemon manually."
+	        logMsgToConfigSysLog "ERROR" "ERROR: selinux status is 'Enforcing'. Please manually restart the rsyslog daemon or turn off selinux by running 'setenforce 0' and then rerun the script."
 		exit 1
 	fi
 }
@@ -582,10 +590,19 @@ elif [ "$RSYSLOG_VERSION_TMP" -ge "8" ]; then
                 inputStrTls=$inputStr_TLS_RSYS_8
 fi
 inputStr=$inputStr_NO_TLS
+}
+
+#install the certificate and check if gnutls package is installed
+installTLSDependencies()
+{
 if [ $LOGGLY_TLS_SENDING == "true" ]; then
 	downloadTlsCerts
 
+	if [ "$SUPPRESS_PROMPT" == "true" ]; then
 	/bin/bash -c "sudo $PKG_MGR install -y rsyslog-gnutls"	
+	  else
+	    /bin/bash -c "sudo $PKG_MGR install rsyslog-gnutls"
+	fi	
 
 	if [ "$PKG_MGR" == "yum" ]; then
 	 
@@ -595,19 +612,50 @@ if [ $LOGGLY_TLS_SENDING == "true" ]; then
 	    fi 
 	
     
-	    elif [ "$PKG_MGR" == "apt-get" ]; then
+	  elif [ "$PKG_MGR" == "apt-get" ]; then
 	
 				if [ $(dpkg-query -W -f='${Status}' rsyslog-gnutls 2>/dev/null | grep -c "ok installed") -eq 0 ]; then                            
                                 logMsgToConfigSysLog "ERROR" "ERROR: The rsyslog-gnutls package could not be installed automatically. Please install it and then run the script again. Manual instructions to configure rsyslog are available at https://www.loggly.com/docs/rsyslog-tls-configuration/. Rsyslog troubleshooting instructions are available at https://www.loggly.com/docs/troubleshooting-rsyslog/."
                                 exit 1
-                                fi		
-			
-	else
+                fi	
+      elif [ "$FORCE_SECURE" == "true" ]; then
 
-                      logMsgToConfigSysLog "WARN" "WARN: The rsyslog-gnutls package could not be download automatically because your package manager couldn't be found. Please download it manually for your distribution and then run the script again."					  
-    
-	fi				
-	inputStr=$inputStrTls
+		  logMsgToConfigSysLog "WARN" "WARN: The rsyslog-gnutls package could not be download automatically because your package manager could not be found. Please install it and restart the rsyslog service to send logs to Loggly."
+	  else
+		     DEPENDENCIES_INSTALLED="false";
+	fi	
+    inputStr=$inputStrTls	
+fi
+}
+
+#prompt users if they want to switch to insecure mode on gnutls-package download failure 
+switchToInsecureModeIfTLSNotFound()
+{
+if [ "$DEPENDENCIES_INSTALLED" == "false" ]; then
+
+    if [ "$SUPPRESS_PROMPT" == "false" ]; then
+
+            logMsgToConfigSysLog "WARN" "WARN: The rsyslog-gnutls package could not be download automatically because your package manager could not be found." 
+					  
+	        while true;
+			do
+	            read -p "Do you wish to continue with insecure mode? (yes/no)" yn
+						case $yn in
+						[Yy]* )
+							logMsgToConfigSysLog "INFO" "INFO: Going to overwrite the conf file: $LOGGLY_RSYSLOG_CONFFILE with insecure configuration";
+							LOGGLY_SYSLOG_PORT=514
+							break;;
+						[Nn]* )
+						    logMsgToConfigSysLog "INFO" "INFO: Since the rsyslog-gnutls package could not be installed automatically, please install it yourself and then re-run the script using the --force-secure flag. This option will force the secure TLS configuration instead of falling back on insecure mode. It is useful for Linux distributions where this script cannot automatically detect the dependency using yum or apt-get.";
+							exit 1;;
+						* ) echo "Please answer yes or no.";;
+						esac
+			done			
+	 else
+		    logMsgToConfigSysLog "WARN" "WARN: The rsyslog-gnutls package could not be download automatically because your package manager could not be found, continuing with insecure mode."
+			LOGGLY_SYSLOG_PORT=514
+    fi			
+    confString
 fi
 }
 
@@ -616,6 +664,8 @@ writeContents()
 {
 checkIfTLS
 confString
+installTLSDependencies
+switchToInsecureModeIfTLSNotFound
 WRITE_SCRIPT_CONTENTS="false"
 
 	if [ -f "$LOGGLY_RSYSLOG_CONFFILE" ]; then
@@ -837,7 +887,7 @@ searchAndFetch()
 {
 	url=$2
 
-	result=$(wget -qO- /dev/null --user "$LOGGLY_USERNAME" --password "$LOGGLY_PASSWORD" "$url")
+	result=$(curl -s -u $LOGGLY_USERNAME:$LOGGLY_PASSWORD $url)
 
 	if [ -z "$result" ]; then
 		logMsgToConfigSysLog "ERROR" "ERROR: Please check your network/firewall settings & ensure Loggly subdomain, username and password is specified correctly."
@@ -851,7 +901,7 @@ searchAndFetch()
 	url="$LOGGLY_ACCOUNT_URL/apiv2/events?rsid=$id"
 
 	# retrieve the data
-	result=$(wget -qO- /dev/null --user "$LOGGLY_USERNAME" --password "$LOGGLY_PASSWORD" "$url")
+	result=$(curl -s -u $LOGGLY_USERNAME:$LOGGLY_PASSWORD $url)
 	count=$(echo "$result" | grep total_events | awk '{print $2}')
 	count="${count%\,}"
 	eval $1="'$count'"
@@ -910,7 +960,7 @@ checkIfTLS()
 usage()
 {
 cat << EOF
-usage: configure-linux [-a loggly auth account or subdomain] [-t loggly token (optional)] [-u username] [-p password (optional)] [-s suppress prompts {optional)] [--insecure {to send logs without TLS} (optional)]
+usage: configure-linux [-a loggly auth account or subdomain] [-t loggly token (optional)] [-u username] [-p password (optional)] [-s suppress prompts {optional)] [--insecure {to send logs without TLS} (optional)[--force-secure {optional} ]
 usage: configure-linux [-a loggly auth account or subdomain] [-r to remove]
 usage: configure-linux [-h for help]
 EOF
@@ -949,6 +999,11 @@ if [ "$1" != "being-invoked" ]; then
 				LOGGLY_TLS_SENDING="false"
 				LOGGLY_SYSLOG_PORT=514
 				;;
+				 --force-secure )
+				FORCE_SECURE="true" 
+				LOGGLY_TLS_SENDING="true"
+				LOGGLY_SYSLOG_PORT=6514
+				;;
 			-h | --help)
 				usage
 				exit
@@ -978,6 +1033,3 @@ fi
 ##########  Get Inputs from User - End  ##########       -------------------------------------------------------
 #          End of Syslog Logging Directives for Loggly
 #
-
-
-
