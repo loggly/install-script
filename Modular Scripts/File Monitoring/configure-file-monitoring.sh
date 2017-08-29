@@ -154,7 +154,7 @@ constructFileVariables()
 	FILE_SYSLOG_CONFFILE="$RSYSLOG_ETCDIR_CONF/21-filemonitoring-$FILE_ALIAS.conf"
 
 	#conf file backup name
-	FILE_SYSLOG_CONFFILE_BACKUP="$FILE_ALIAS.loggly.bk"
+	FILE_SYSLOG_CONFFILE_BACKUP="$RSYSLOG_ETCDIR_CONF/$FILE_ALIAS.loggly.bk"
 
 	#application tag
 	APP_TAG="\"file-alias\":\"$LOGGLY_FILE_TO_MONITOR_ALIAS\""
