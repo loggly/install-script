@@ -935,7 +935,7 @@ checkIfTLS()
         if [ "$SUPPRESS_PROMPT" == "false" ]; then
 	        while true;
 			do
-	            read -p "Hey you are going to setup system logs in insecure mode. Do you want to overwrite this with secure mode? (yes/no)" yn
+	            read -p "Hey, you are going to setup the system logs in insecure mode. Do you want to overwrite this with secure mode? (yes/no)" yn
 						case $yn in
 						[Yy]* )
 							logMsgToConfigSysLog "INFO" "INFO: Going to overwrite the conf file: $LOGGLY_RSYSLOG_CONFFILE with secure configuration";
@@ -948,7 +948,7 @@ checkIfTLS()
 						esac
 			done			
 	    else
-		    logMsgToConfigSysLog "WARN" "WARN: Your system logs are being send insecurely. We prefer to send system logs securely so switching to secure configuration."
+		    logMsgToConfigSysLog "WARN" "WARN: Your system logs are being sent insecurely. We prefer to send the system logs securely so switching to the secure configuration."
 			LOGGLY_TLS_SENDING="true"
 			LOGGLY_SYSLOG_PORT=6514
 			
