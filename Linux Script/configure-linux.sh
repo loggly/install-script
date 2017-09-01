@@ -856,13 +856,12 @@ checkIfTLS()
 						* ) echo "Please answer yes or no.";;
 						esac
 			done			
-		else
-       logMsgToConfigSysLog "WARN" "WARN: Your system logs are being send insecurely. We prefer to send system logs securely so switching to secure configuration."
+	    else
+		    logMsgToConfigSysLog "WARN" "WARN: Your system logs are being send insecurely. We prefer to send system logs securely so switching to secure configuration."
 			LOGGLY_TLS_SENDING="true"
 			LOGGLY_SYSLOG_PORT=6514
 			
-	     fi
-
+	    fi
     fi		
 }
 
