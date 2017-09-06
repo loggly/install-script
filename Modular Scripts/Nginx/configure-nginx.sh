@@ -116,13 +116,13 @@ checkNginxDetails()
 {	
 	#verify if nginx is installed as service
 	if [ -f /etc/init.d/$SERVICE ]; then
-	        logMsgToConfigSysLog "INFO" "INFO: Nginx is present as a service."
-	elif [ -f /usr/lib/systemd/system/$SERVICE.service ]; then
-		logMsgToConfigSysLog "INFO" "INFO: Nginx is present as a service."
-	else
-		logMsgToConfigSysLog "ERROR" "ERROR: Nginx is not configured as a service"
-		exit 1
-	fi
+                logMsgToConfigSysLog "INFO" "INFO: Nginx is present as a service."
+  elif [[ $(which systemctl) && $(systemctl list-unit-files $SERVICE.service | grep "$SERVICE.service") ]] &>/dev/null; then
+                logMsgToConfigSysLog "INFO" "INFO: Nginx is present as a service."
+  else
+                logMsgToConfigSysLog "ERROR" "ERROR: Nginx is not configured as a service"
+                exit 1
+  fi
 	
 	#get the version of nginx installed
 	getNginxVersion
