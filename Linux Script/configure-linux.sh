@@ -636,7 +636,8 @@ if [ "$FORCE_SECURE" == "false" ]; then
 	if [ "$DEPENDENCIES_INSTALLED" == "false" ]; then
 		if [ "$SUPPRESS_PROMPT" == "false" ]; then
 			logMsgToConfigSysLog "WARN" "WARN: The rsyslog-gnutls package could not download automatically either because of your package manager could not be found or due to some other reason."		  
-			while true;	do
+			while true;	
+			do
 				read -p "Do you wish to continue with insecure mode? (yes/no)" yn
 					case $yn in
 					[Yy]* )
@@ -662,7 +663,6 @@ fi
 #write the contents to 22-loggly.conf file
 writeContents()
 {
-checkIfTLS
 confString
 installTLSDependencies
 switchToInsecureModeIfTLSNotFound
@@ -925,35 +925,6 @@ getPassword()
 		LOGGLY_PASSWORD+="$char"
 	done
 	echo
-}
-
-#Change TLS settings
-checkIfTLS()
-{
-   if [[ $LOGGLY_SYSLOG_PORT == 514 ]]; then
-   
-        if [ "$SUPPRESS_PROMPT" == "false" ]; then
-	        while true;
-			do
-	            read -p "Hey, you are going to setup the system logs in insecure mode. Do you want to overwrite this with secure mode? (yes/no)" yn
-						case $yn in
-						[Yy]* )
-							logMsgToConfigSysLog "INFO" "INFO: Going to overwrite the conf file: $LOGGLY_RSYSLOG_CONFFILE with secure configuration";
-							LOGGLY_TLS_SENDING="true"
-							LOGGLY_SYSLOG_PORT=6514
-							break;;
-						[Nn]* )
-							break;;
-						* ) echo "Please answer yes or no.";;
-						esac
-			done			
-	    else
-		    logMsgToConfigSysLog "WARN" "WARN: Your system logs are being sent insecurely. We prefer to send the system logs securely so switching to the secure configuration."
-			LOGGLY_TLS_SENDING="true"
-			LOGGLY_SYSLOG_PORT=6514
-			
-	    fi
-    fi		
 }
 
 #display usage syntax
