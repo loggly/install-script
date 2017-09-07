@@ -464,7 +464,7 @@ checkIfMinVersionOfRsyslog()
 	RSYSLOG_VERSION=${RSYSLOG_VERSION%,*}
 	RSYSLOG_VERSION=$RSYSLOG_VERSION | tr -d " "
 	if [ $(compareVersions $RSYSLOG_VERSION $MIN_RSYSLOG_VERSION 3) -lt 0 ]; then
-		logMsgToConfigSysLog "ERROR" "ERROR: Min rsyslog version required is 5.8.0."
+		logMsgToConfigSysLog "ERROR" "ERROR: Minimum rsyslog version required to run this script is 5.8.0. Please upgrade your rsyslog version or follow the manual instructions."
 		exit 1
 	fi
 }
