@@ -40,6 +40,9 @@ MIN_RSYSLOG_VERSION=5.8.0
 #this variable will hold the users syslog version
 RSYSLOG_VERSION=
 
+#this variable will hold the existing syslog port of 22-loggly.conf
+EXISTING_SYSLOG_PORT=
+
 #this variable will hold the host name
 HOST_NAME=
 #this variable will hold the name of the linux distribution
@@ -659,8 +662,8 @@ fi
 #write the contents to 22-loggly.conf file
 writeContents()
 {
-checkIfTLS
 confString
+checkScriptRunningMode
 installTLSDependencies
 switchToInsecureModeIfTLSNotFound
 WRITE_SCRIPT_CONTENTS="false"
@@ -924,33 +927,82 @@ getPassword()
 	echo
 }
 
-#Change TLS settings
-checkIfTLS()
+#function to switch system logging to insecure mode if user runs the modular script in insecure mode
+switchSystemLoggingToInsecure()
 {
-   if [[ $LOGGLY_SYSLOG_PORT == 514 ]]; then
-   
-        if [ "$SUPPRESS_PROMPT" == "false" ]; then
-	        while true;
-			do
-	            read -p "Hey you are going to setup system logs in insecure mode. Do you want to overwrite this with secure mode? (yes/no)" yn
-						case $yn in
-						[Yy]* )
-							logMsgToConfigSysLog "INFO" "INFO: Going to overwrite the conf file: $LOGGLY_RSYSLOG_CONFFILE with secure configuration";
-							LOGGLY_TLS_SENDING="true"
-							LOGGLY_SYSLOG_PORT=6514
-							break;;
-						[Nn]* )
-							break;;
-						* ) echo "Please answer yes or no.";;
-						esac
-			done			
-	    else
-		    logMsgToConfigSysLog "WARN" "WARN: Your system logs are being send insecurely. We prefer to send system logs securely so switching to secure configuration."
-			LOGGLY_TLS_SENDING="true"
-			LOGGLY_SYSLOG_PORT=6514
-			
-	    fi
-    fi		
+	if [ -f $LOGGLY_RSYSLOG_CONFFILE ]; then
+		if [[ $RSYSLOG_VERSION_TMP -le "7" ]]; then
+				EXISTING_SYSLOG_PORT=$(grep 6514 $LOGGLY_RSYSLOG_CONFFILE | awk {'print $2'} | cut -d':' -f2 | cut -d';' -f1)
+		elif [[ "$RSYSLOG_VERSION_TMP" -ge "8" ]]; then
+				EXISTING_SYSLOG_PORT=$(grep 6514 $LOGGLY_RSYSLOG_CONFFILE | awk {'print $4'} | cut -d'"' -f2)
+		fi
+			if [[ $EXISTING_SYSLOG_PORT == 6514 ]]; then
+				if [ "$SUPPRESS_PROMPT" == "false" ]; then
+					while true;
+					do
+						read -p "You are running the script using insecure mode, but your system logs are using secure mode. The script only supports a single mode for both, so would you like to switch your system logs to insecure mode? (yes/no)" yn
+								case $yn in
+								[Yy]* )
+									logMsgToConfigSysLog "INFO" "INFO: Going to overwrite the conf file: $LOGGLY_RSYSLOG_CONFFILE with insecure configuration";
+									LOGGLY_TLS_SENDING="false"
+									LOGGLY_SYSLOG_PORT=514
+									break;;
+								[Nn]* )
+									logMsgToConfigSysLog "INFO" "INFO: Please re-run the script in secure mode if you want to setup secure logging"
+									exit 1;;
+								* ) echo "Please answer yes or no.";;
+								esac
+					done
+				else
+					logMsgToConfigSysLog "WARN" "WARNING: You are running the script using insecure mode, but your system logs are using secure mode. The script only supports a single mode for both, so we are switching the system logs to insecure mode as well."
+					LOGGLY_TLS_SENDING="false"
+					LOGGLY_SYSLOG_PORT=514
+				fi
+			fi
+		fi
+}
+
+#function to switch system logging to secure mode if user runs the modular script in secure mode
+switchSystemLoggingToSecure()
+{
+	if [ -f $LOGGLY_RSYSLOG_CONFFILE ]; then
+			EXISTING_SYSLOG_PORT=$(grep 514 $LOGGLY_RSYSLOG_CONFFILE | awk {'print $2'} | cut -d':' -f2 | cut -d';' -f1)
+			if [[ $EXISTING_SYSLOG_PORT == 514 ]]; then
+				if [ "$SUPPRESS_PROMPT" == "false" ]; then
+					while true;
+					do
+						read -p "You are running the script using secure mode, but your system logs are using insecure mode. The script only supports a single mode for both, so would you like to switch your system logs to secure mode? (yes/no)" yn
+								case $yn in
+								[Yy]* )
+									logMsgToConfigSysLog "INFO" "INFO: Going to overwrite the conf file: $LOGGLY_RSYSLOG_CONFFILE with secure configuration";
+									LOGGLY_TLS_SENDING="true"
+									LOGGLY_SYSLOG_PORT=6514
+									break;;
+								[Nn]* )
+									logMsgToConfigSysLog "INFO" "INFO: Please re-run the script in insecure mode if you want to setup insecure logging"
+									exit 1;;
+								* ) echo "Please answer yes or no.";;
+								esac
+					done
+				else
+					logMsgToConfigSysLog "WARN" "WARNING: You are running the script using secure mode, but your system logs are using insecure mode. The script only supports a single mode for both, so we are switching the system logs to secure mode as well."
+					LOGGLY_TLS_SENDING="true"
+					LOGGLY_SYSLOG_PORT=6514
+				fi
+			fi
+	fi
+}
+
+#check whether the user is running the script in secure or insecure mode and then switch system logging accordingly.
+checkScriptRunningMode()
+{
+	if [ "$FORCE_SECURE" == "false"  ]; then
+		if [[ $LOGGLY_SYSLOG_PORT == 514 ]]; then
+			switchSystemLoggingToInsecure
+		else
+			switchSystemLoggingToSecure
+		fi
+	fi
 }
 
 #display usage syntax
