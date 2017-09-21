@@ -325,8 +325,15 @@ checkIfCurlIsNotInstalled()
 #checks if all the various endpoints used for configuring loggly are accessible
 checkIfLogglyServersAccessible()
 {
+	echo "INFO: Checking if $LOGS_01_HOST can be pinged."
+	if [ $(ping -c 1 $LOGS_01_HOST | grep "1 packets transmitted, 1 received, 0% packet loss" | wc -l) == 1 ]; then
+		echo "INFO: $LOGS_01_HOST can be pinged."
+	else
+		logMsgToConfigSysLog "WARNING" "WARNING: $LOGS_01_HOST cannot be pinged. Please check your network and firewall settings."
+	fi
+
 	echo "INFO: Checking if $LOGS_01_HOST is reachable."
-	if [ $(ping -c 1 $LOGS_01_HOST | grep "1 packets transmitted, 1 received, 0% packet loss" | wc -l) == 1 ] || [ $(sleep 1 | telnet $LOGS_01_HOST $LOGGLY_SYSLOG_PORT | grep Connected | wc -l) == 1 ]; then
+	if [ $(sleep 1 | telnet $LOGS_01_HOST $LOGGLY_SYSLOG_PORT 2>/dev/null | grep Connected | wc -l) == 1 ]; then
 		echo "INFO: $LOGS_01_HOST is reachable."
 	else
 		logMsgToConfigSysLog "ERROR" "ERROR: $LOGS_01_HOST is not reachable. Please check your network and firewall settings."
@@ -931,11 +938,7 @@ getPassword()
 switchSystemLoggingToInsecure()
 {
 	if [ -f $LOGGLY_RSYSLOG_CONFFILE ]; then
-		if [[ $RSYSLOG_VERSION_TMP -le "7" ]]; then
-				EXISTING_SYSLOG_PORT=$(grep 6514 $LOGGLY_RSYSLOG_CONFFILE | awk {'print $2'} | cut -d':' -f2 | cut -d';' -f1)
-		elif [[ "$RSYSLOG_VERSION_TMP" -ge "8" ]]; then
-				EXISTING_SYSLOG_PORT=$(grep 6514 $LOGGLY_RSYSLOG_CONFFILE | awk {'print $4'} | cut -d'"' -f2)
-		fi
+		EXISTING_SYSLOG_PORT=$(egrep -ow 6514 $LOGGLY_RSYSLOG_CONFFILE)
 			if [[ $EXISTING_SYSLOG_PORT == 6514 ]]; then
 				if [ "$SUPPRESS_PROMPT" == "false" ]; then
 					while true;
@@ -959,14 +962,14 @@ switchSystemLoggingToInsecure()
 					LOGGLY_SYSLOG_PORT=514
 				fi
 			fi
-		fi
+	fi
 }
 
 #function to switch system logging to secure mode if user runs the modular script in secure mode
 switchSystemLoggingToSecure()
 {
 	if [ -f $LOGGLY_RSYSLOG_CONFFILE ]; then
-			EXISTING_SYSLOG_PORT=$(grep 514 $LOGGLY_RSYSLOG_CONFFILE | awk {'print $2'} | cut -d':' -f2 | cut -d';' -f1)
+		EXISTING_SYSLOG_PORT=$(egrep -ow 514 $LOGGLY_RSYSLOG_CONFFILE)
 			if [[ $EXISTING_SYSLOG_PORT == 514 ]]; then
 				if [ "$SUPPRESS_PROMPT" == "false" ]; then
 					while true;
