@@ -938,7 +938,7 @@ getPassword()
 switchSystemLoggingToInsecure()
 {
 	if [ -f $LOGGLY_RSYSLOG_CONFFILE ]; then
-		EXISTING_SYSLOG_PORT=$(egrep -ow 6514 $LOGGLY_RSYSLOG_CONFFILE)
+		EXISTING_SYSLOG_PORT=$(grep -Eow 6514 $LOGGLY_RSYSLOG_CONFFILE)
 			if [[ $EXISTING_SYSLOG_PORT == 6514 ]]; then
 				if [ "$SUPPRESS_PROMPT" == "false" ]; then
 					while true;
@@ -969,7 +969,7 @@ switchSystemLoggingToInsecure()
 switchSystemLoggingToSecure()
 {
 	if [ -f $LOGGLY_RSYSLOG_CONFFILE ]; then
-		EXISTING_SYSLOG_PORT=$(egrep -ow 514 $LOGGLY_RSYSLOG_CONFFILE)
+		EXISTING_SYSLOG_PORT=$(grep -Eow 514 $LOGGLY_RSYSLOG_CONFFILE)
 			if [[ $EXISTING_SYSLOG_PORT == 514 ]]; then
 				if [ "$SUPPRESS_PROMPT" == "false" ]; then
 					while true;
