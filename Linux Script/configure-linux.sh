@@ -95,6 +95,12 @@ LOGGLY_TLS_SENDING="true"
 #Setting FORCE_SECURE to false
 FORCE_SECURE="false"
 
+#Setting LOGGLY_REMOVE to false
+LOGGLY_REMOVE="false"
+
+#Setting INSECURE mode to false initially
+INSECURE_MODE="false"
+
 ##########  Variable Declarations - End  ##########
 
 #check if the Linux environment is compatible with Loggly.
@@ -872,9 +878,9 @@ logMsgToConfigSysLog()
 sendPayloadToConfigSysLog()
 {
 	if [ "$APP_TAG" = "" ]; then
-		var="{\"sub-domain\":\"$LOGGLY_ACCOUNT\", \"user-name\":\"$LOGGLY_USERNAME\", \"customer-token\":\"$LOGGLY_AUTH_TOKEN\", \"host-name\":\"$HOST_NAME\", \"script-name\":\"$SCRIPT_NAME\", \"script-version\":\"$SCRIPT_VERSION\", \"status\":\"$1\", \"time-stamp\":\"$currentTime\", \"linux-distribution\":\"$LINUX_DIST\", \"messages\":\"$2\",\"rsyslog-version\":\"$RSYSLOG_VERSION\"}"
+		var="{\"sub-domain\":\"$LOGGLY_ACCOUNT\", \"user-name\":\"$LOGGLY_USERNAME\", \"customer-token\":\"$LOGGLY_AUTH_TOKEN\", \"host-name\":\"$HOST_NAME\", \"script-name\":\"$SCRIPT_NAME\", \"script-version\":\"$SCRIPT_VERSION\", \"status\":\"$1\", \"time-stamp\":\"$currentTime\", \"linux-distribution\":\"$LINUX_DIST\", \"messages\":\"$2\",\"rsyslog-version\":\"$RSYSLOG_VERSION\",\"insecure-mode\":\"$INSECURE_MODE\",\"suppress-enabled\":\"$SUPPRESS_PROMPT\",\"force-secure-enabled\":\"$FORCE_SECURE\",\"loggly-removed\":\"$LOGGLY_REMOVE\"}"
 	else
-		var="{\"sub-domain\":\"$LOGGLY_ACCOUNT\", \"user-name\":\"$LOGGLY_USERNAME\", \"customer-token\":\"$LOGGLY_AUTH_TOKEN\", \"host-name\":\"$HOST_NAME\", \"script-name\":\"$SCRIPT_NAME\", \"script-version\":\"$SCRIPT_VERSION\", \"status\":\"$1\", \"time-stamp\":\"$currentTime\", \"linux-distribution\":\"$LINUX_DIST\", $APP_TAG, \"messages\":\"$2\",\"rsyslog-version\":\"$RSYSLOG_VERSION\"}"
+		var="{\"sub-domain\":\"$LOGGLY_ACCOUNT\", \"user-name\":\"$LOGGLY_USERNAME\", \"customer-token\":\"$LOGGLY_AUTH_TOKEN\", \"host-name\":\"$HOST_NAME\", \"script-name\":\"$SCRIPT_NAME\", \"script-version\":\"$SCRIPT_VERSION\", \"status\":\"$1\", \"time-stamp\":\"$currentTime\", \"linux-distribution\":\"$LINUX_DIST\", $APP_TAG, \"messages\":\"$2\",\"rsyslog-version\":\"$RSYSLOG_VERSION\",\"insecure-mode\":\"$INSECURE_MODE\",\"suppress-enabled\":\"$SUPPRESS_PROMPT\",\"force-secure-enabled\":\"$FORCE_SECURE\",\"loggly-removed\":\"$LOGGLY_REMOVE\"}"
 	fi
 	curl -s -H "content-type:application/json" -d "$var" $LOGS_01_URL/inputs/$3 > /dev/null 2>&1
 }
@@ -995,6 +1001,7 @@ if [ "$1" != "being-invoked" ]; then
 			     --insecure )
 				LOGGLY_TLS_SENDING="false"
 				LOGGLY_SYSLOG_PORT=514
+				INSECURE_MODE="true"
 				;;
 				 --force-secure )
 				FORCE_SECURE="true" 
@@ -1013,7 +1020,7 @@ if [ "$1" != "being-invoked" ]; then
 		done
 	fi
 
-	if [ "$LOGGLY_REMOVE" != "" -a "$LOGGLY_ACCOUNT" != "" ]; then
+	if [ "$LOGGLY_REMOVE" == "true" -a "$LOGGLY_ACCOUNT" != "" ]; then
 		removeLogglyConf
 	elif [ "$LOGGLY_ACCOUNT" != "" -a "$LOGGLY_USERNAME" != "" ]; then
 		if [ "$LOGGLY_PASSWORD" = "" ]; then
