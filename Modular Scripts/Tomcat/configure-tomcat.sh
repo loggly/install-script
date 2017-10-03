@@ -49,6 +49,8 @@ LOGGLY_FILE_TAG="tomcat"
 #add tags to the logs
 TAG=
 
+TLS_SENDING="true"
+
 #this variable will hold the catalina home provide by user.
 #this is not a mandatory input
 LOGGLY_CATALINA_HOME=
@@ -524,15 +526,107 @@ write21TomcatFileContents()
 	sudo touch $TOMCAT_SYSLOG_CONFFILE
 	sudo chmod o+w $TOMCAT_SYSLOG_CONFFILE
 
-	imfileStr="\$ModLoad imfile
-\$WorkDirectory $RSYSLOG_DIR
-"
+	commonContent="
+	\$ModLoad imfile
+	\$WorkDirectory $RSYSLOG_DIR
+	"
 	if [[ "$LINUX_DIST" == *"Ubuntu"* ]]; then
-		imfileStr+="\$PrivDropToGroup adm
+		commonContent+="\$PrivDropToGroup adm		
+		"
+	fi
+
+    imfileStr=$commonContent"
+
+\$ActionSendStreamDriver gtls
+\$ActionSendStreamDriverMode 1
+\$ActionSendStreamDriverAuthMode x509/name
+\$ActionSendStreamDriverPermittedPeer *.loggly.com
+
+#RsyslogGnuTLS
+\$DefaultNetstreamDriverCAFile /etc/rsyslog.d/keys/ca.d/logs-01.loggly.com_sha12.crt
+
+#parameterized token here.......
+#Add a tag for tomcat events
+\$template LogglyFormatTomcat,\"<%pri%>%protocol-version% %timestamp:::date-rfc3339% %HOSTNAME% %app-name% %procid% %msgid% [$LOGGLY_AUTH_TOKEN@41058 $TAG] %msg%\n\"
+
+# catalina.out
+\$InputFileName $LOGGLY_CATALINA_LOG_HOME/catalina.out
+\$InputFileTag catalina-out
+\$InputFileStateFile stat-catalina-out
+\$InputFileSeverity info
+\$InputFilePersistStateInterval 20000
+\$InputRunFileMonitor
+if \$programname == 'catalina-out' then @@logs-01.loggly.com:6514;LogglyFormatTomcat
+if \$programname == 'catalina-out' then ~
+
+# initd.log
+\$InputFileName $LOGGLY_CATALINA_LOG_HOME/initd.log
+\$InputFileTag initd
+\$InputFileStateFile stat-initd
+\$InputFileSeverity info
+\$InputFilePersistStateInterval 20000
+\$InputRunFileMonitor
+if \$programname == 'initd' then @@logs-01.loggly.com:6514;LogglyFormatTomcat
+if \$programname == 'initd' then ~
+"
+
+	#if log rotation is enabled i.e. tomcat version is greater than or equal to
+	#6.0.33.0, then add the following lines to tomcat syslog conf file
+	if [ $(compareVersions $TOMCAT_VERSION $MIN_TOMCAT_VERSION 4) -ge 0 ]; then
+	imfileStr+=$commonContent"
+# catalina.log
+\$InputFileName $LOGGLY_CATALINA_LOG_HOME/catalina.log
+\$InputFileTag catalina-log
+\$InputFileStateFile stat-catalina-log
+\$InputFileSeverity info
+\$InputFilePersistStateInterval 20000
+\$InputRunFileMonitor
+if \$programname == 'catalina-log' then @@logs-01.loggly.com:6514;LogglyFormatTomcat
+if \$programname == 'catalina-log' then ~
+
+# host-manager.log
+\$InputFileName $LOGGLY_CATALINA_LOG_HOME/host-manager.log
+\$InputFileTag host-manager
+\$InputFileStateFile stat-host-manager
+\$InputFileSeverity info
+\$InputFilePersistStateInterval 20000
+\$InputRunFileMonitor
+if \$programname == 'host-manager' then @@logs-01.loggly.com:6514;LogglyFormatTomcat
+if \$programname == 'host-manager' then ~
+
+# localhost.log
+\$InputFileName $LOGGLY_CATALINA_LOG_HOME/localhost.log
+\$InputFileTag localhost-log
+\$InputFileStateFile stat-localhost-log
+\$InputFileSeverity info
+\$InputFilePersistStateInterval 20000
+\$InputRunFileMonitor
+if \$programname == 'localhost-log' then @@logs-01.loggly.com:6514;LogglyFormatTomcat
+if \$programname == 'localhost-log' then ~
+
+# manager.log
+\$InputFileName $LOGGLY_CATALINA_LOG_HOME/manager.log
+\$InputFileTag manager
+\$InputFileStateFile stat-manager
+\$InputFileSeverity info
+\$InputFilePersistStateInterval 20000
+\$InputRunFileMonitor
+if \$programname == 'manager' then @@logs-01.loggly.com:6514;LogglyFormatTomcat
+if \$programname == 'manager' then ~
+
+# localhost_access_log.txt 
+\$InputFileName $LOGGLY_CATALINA_LOG_HOME/localhost_access_log.txt
+\$InputFileTag tomcat-access
+\$InputFileStateFile stat-tomcat-access
+\$InputFileSeverity info
+\$InputFilePersistStateInterval 20000
+\$InputRunFileMonitor
+if \$programname == 'tomcat-access' then @@logs-01.loggly.com:6514;LogglyFormatTomcat
+if \$programname == 'tomcat-access' then ~
 "
 	fi
 
-	imfileStr+="
+	imfileStrNonTls=$commonContent"
 #parameterized token here.......
 #Add a tag for tomcat events
 \$template LogglyFormatTomcat,\"<%pri%>%protocol-version% %timestamp:::date-rfc3339% %HOSTNAME% %app-name% %procid% %msgid% [$LOGGLY_AUTH_TOKEN@41058 $TAG] %msg%\n\"
@@ -561,7 +655,7 @@ if \$programname == 'initd' then ~
 	#if log rotation is enabled i.e. tomcat version is greater than or equal to
 	#6.0.33.0, then add the following lines to tomcat syslog conf file
 	if [ $(compareVersions $TOMCAT_VERSION $MIN_TOMCAT_VERSION 4) -ge 0 ]; then
-	imfileStr+="
+	imfileStrNonTls+=$commonContent"
 # catalina.log
 \$InputFileName $LOGGLY_CATALINA_LOG_HOME/catalina.log
 \$InputFileTag catalina-log
@@ -612,6 +706,11 @@ if \$programname == 'manager' then ~
 if \$programname == 'tomcat-access' then @@logs-01.loggly.com:514;LogglyFormatTomcat
 if \$programname == 'tomcat-access' then ~
 "
+	fi
+
+    if [ $TLS_SENDING == "false" ];
+	then
+		imfileStr=$imfileStrNonTls
 	fi
 
 	#change the tomcat-21 file to variable from above and also take the directory of the tomcat log file.
@@ -787,6 +886,11 @@ while [ "$1" != "" ]; do
       -s | --suppress )
 	  SUPPRESS_PROMPT="true"
 	  ;;
+           --insecure )
+		LOGGLY_TLS_SENDING="false"
+		TLS_SENDING="false"
+		LOGGLY_SYSLOG_PORT=514
+	    ;;
       -h | --help)
           usage
           exit
