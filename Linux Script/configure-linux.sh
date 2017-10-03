@@ -333,7 +333,8 @@ checkIfLogglyServersAccessible()
 	fi
 
 	echo "INFO: Checking if $LOGS_01_HOST is reachable."
-	if [ $(sleep 1 | telnet $LOGS_01_HOST $LOGGLY_SYSLOG_PORT 2>/dev/null | grep Connected | wc -l) == 1 ]; then
+	(</dev/tcp/$LOGS_01_HOST/$LOGGLY_SYSLOG_PORT) > /dev/null 2>&1
+	if [ $? -eq 0 ]; then
 		echo "INFO: $LOGS_01_HOST is reachable."
 	else
 		logMsgToConfigSysLog "ERROR" "ERROR: $LOGS_01_HOST is not reachable. Please check your network and firewall settings."
