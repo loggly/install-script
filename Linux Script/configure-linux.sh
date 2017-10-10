@@ -115,15 +115,15 @@ checkLinuxLogglyCompatibility()
 
 	#check if the OS is supported by the script. If no, then exit
         checkIfSupportedOS
+
+	#check if required dependencies to run the script are not installed. If yes, ask user to install them manually and run the script again.
+	checkIfRequiredDependenciesAreNotInstalled
 	
-	#check if package-manager is installed
-	checkIfPackageManagerIsInstalled
+	#check if package-manager is present on the machine
+	checkIfPackageManagerIsPresent
 
 	#set the basic variables needed by this script
 	setLinuxVariables
-
-	#check if curl is not installed. If yes, ask user to install it manually and run the script again.
-	checkIfCurlIsNotInstalled
 
 	#check if the Loggly servers are accessible. If no, ask user to check network connectivity & exit
 	checkIfLogglyServersAccessible
@@ -226,8 +226,8 @@ checkIfUserHasRootPrivileges()
 	fi
 }
 
-#check if package-manager is installed
-checkIfPackageManagerIsInstalled()
+#check if package-manager is present on the machine
+checkIfPackageManagerIsPresent()
 {
    if [ -x "$(command -v apt-get)" ]; then
 	    PKG_MGR="apt-get"
@@ -235,6 +235,18 @@ checkIfPackageManagerIsInstalled()
        if [ -x "$(command -v yum)" ]; then       
 	    PKG_MGR="yum"
        fi
+   fi
+}
+
+#check if required dependencies to run the script are not installed, If yes then ask user to install them manually and run the script again
+checkIfRequiredDependenciesAreNotInstalled()
+{
+   if ! [ -x "$(command -v curl)" ]; then
+	        logMsgToConfigSysLog "ERROR" "ERROR: 'Curl' executable could not be found on your machine, since it is a dependent package to run this script, please install it manually and then run the script again.";
+	        exit 1
+   elif ! [ -x "$(command -v ping)" ]; then
+	        logMsgToConfigSysLog "ERROR" "ERROR: 'Ping' executable could not be found on your machine, since it is a dependent package to run this script, please install it manually and then run the script again.";
+	        exit 1
    fi
 }
 
@@ -317,15 +329,6 @@ setLinuxVariables()
 
 	#set loggly account url
 	LOGGLY_ACCOUNT_URL=https://$LOGGLY_ACCOUNT.loggly.com
-}
-
-#check if curl is not installed
-checkIfCurlIsNotInstalled()
-{
-        if ! [ -x "$(command -v curl)" ]; then
-	        logMsgToConfigSysLog "ERROR" "ERROR: 'Curl' is not installed on your machine, please install it manually and then run the script again.";
-	        exit 1
-        fi
 }
 
 #checks if all the various endpoints used for configuring loggly are accessible
@@ -478,7 +481,7 @@ checkIfMinVersionOfRsyslog()
 	RSYSLOG_VERSION=${RSYSLOG_VERSION%,*}
 	RSYSLOG_VERSION=$RSYSLOG_VERSION | tr -d " "
 	if [ $(compareVersions $RSYSLOG_VERSION $MIN_RSYSLOG_VERSION 3) -lt 0 ]; then
-		logMsgToConfigSysLog "ERROR" "ERROR: Min rsyslog version required is 5.8.0."
+		logMsgToConfigSysLog "ERROR" "ERROR: Minimum rsyslog version required to run this script is 5.8.0. Please upgrade your rsyslog version or follow the manual instructions."
 		exit 1
 	fi
 }
@@ -650,7 +653,8 @@ if [ "$FORCE_SECURE" == "false" ]; then
 	if [ "$DEPENDENCIES_INSTALLED" == "false" ]; then
 		if [ "$SUPPRESS_PROMPT" == "false" ]; then
 			logMsgToConfigSysLog "WARN" "WARN: The rsyslog-gnutls package could not download automatically either because of your package manager could not be found or due to some other reason."		  
-			while true;	do
+			while true;	
+			do
 				read -p "Do you wish to continue with insecure mode? (yes/no)" yn
 					case $yn in
 					[Yy]* )
