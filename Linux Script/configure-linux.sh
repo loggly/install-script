@@ -15,7 +15,7 @@ function ctrl_c()  {
 #name of the current script. This will get overwritten by the child script which calls this
 SCRIPT_NAME=configure-linux.sh
 #version of the current script. This will get overwritten by the child script which calls this
-SCRIPT_VERSION=1.19
+SCRIPT_VERSION=1.20
 
 #application tag. This will get overwritten by the child script which calls this
 APP_TAG=
@@ -39,6 +39,9 @@ RSYSLOGD=rsyslogd
 MIN_RSYSLOG_VERSION=5.8.0
 #this variable will hold the users syslog version
 RSYSLOG_VERSION=
+
+#this variable will hold the existing syslog port of 22-loggly.conf
+EXISTING_SYSLOG_PORT=
 
 #this variable will hold the host name
 HOST_NAME=
@@ -94,6 +97,12 @@ LOGGLY_TLS_SENDING="true"
 
 #Setting FORCE_SECURE to false
 FORCE_SECURE="false"
+
+#Setting LOGGLY_REMOVE to false
+LOGGLY_REMOVE="false"
+
+#Setting INSECURE mode to false initially
+INSECURE_MODE="false"
 
 ##########  Variable Declarations - End  ##########
 
@@ -325,8 +334,16 @@ setLinuxVariables()
 #checks if all the various endpoints used for configuring loggly are accessible
 checkIfLogglyServersAccessible()
 {
+	echo "INFO: Checking if $LOGS_01_HOST can be pinged."
+	if [ $(ping -c 1 $LOGS_01_HOST | grep "1 packets transmitted, 1 received, 0% packet loss" | wc -l) == 1 ]; then
+		echo "INFO: $LOGS_01_HOST can be pinged."
+	else
+		logMsgToConfigSysLog "WARNING" "WARNING: $LOGS_01_HOST cannot be pinged. Please check your network and firewall settings."
+	fi
+
 	echo "INFO: Checking if $LOGS_01_HOST is reachable."
-	if [ $(ping -c 1 $LOGS_01_HOST | grep "1 packets transmitted, 1 received, 0% packet loss" | wc -l) == 1 ] || [ $(sleep 1 | telnet $LOGS_01_HOST $LOGGLY_SYSLOG_PORT | grep Connected | wc -l) == 1 ]; then
+	(</dev/tcp/$LOGS_01_HOST/$LOGGLY_SYSLOG_PORT) > /dev/null 2>&1
+	if [ $? -eq 0 ]; then
 		echo "INFO: $LOGS_01_HOST is reachable."
 	else
 		logMsgToConfigSysLog "ERROR" "ERROR: $LOGS_01_HOST is not reachable. Please check your network and firewall settings."
@@ -664,6 +681,7 @@ fi
 writeContents()
 {
 confString
+checkScriptRunningMode
 installTLSDependencies
 switchToInsecureModeIfTLSNotFound
 WRITE_SCRIPT_CONTENTS="false"
@@ -875,9 +893,9 @@ logMsgToConfigSysLog()
 sendPayloadToConfigSysLog()
 {
 	if [ "$APP_TAG" = "" ]; then
-		var="{\"sub-domain\":\"$LOGGLY_ACCOUNT\", \"user-name\":\"$LOGGLY_USERNAME\", \"customer-token\":\"$LOGGLY_AUTH_TOKEN\", \"host-name\":\"$HOST_NAME\", \"script-name\":\"$SCRIPT_NAME\", \"script-version\":\"$SCRIPT_VERSION\", \"status\":\"$1\", \"time-stamp\":\"$currentTime\", \"linux-distribution\":\"$LINUX_DIST\", \"messages\":\"$2\",\"rsyslog-version\":\"$RSYSLOG_VERSION\"}"
+		var="{\"sub-domain\":\"$LOGGLY_ACCOUNT\", \"user-name\":\"$LOGGLY_USERNAME\", \"customer-token\":\"$LOGGLY_AUTH_TOKEN\", \"host-name\":\"$HOST_NAME\", \"script-name\":\"$SCRIPT_NAME\", \"script-version\":\"$SCRIPT_VERSION\", \"status\":\"$1\", \"time-stamp\":\"$currentTime\", \"linux-distribution\":\"$LINUX_DIST\", \"messages\":\"$2\",\"rsyslog-version\":\"$RSYSLOG_VERSION\",\"insecure-mode\":\"$INSECURE_MODE\",\"suppress-enabled\":\"$SUPPRESS_PROMPT\",\"force-secure-enabled\":\"$FORCE_SECURE\",\"loggly-removed\":\"$LOGGLY_REMOVE\"}"
 	else
-		var="{\"sub-domain\":\"$LOGGLY_ACCOUNT\", \"user-name\":\"$LOGGLY_USERNAME\", \"customer-token\":\"$LOGGLY_AUTH_TOKEN\", \"host-name\":\"$HOST_NAME\", \"script-name\":\"$SCRIPT_NAME\", \"script-version\":\"$SCRIPT_VERSION\", \"status\":\"$1\", \"time-stamp\":\"$currentTime\", \"linux-distribution\":\"$LINUX_DIST\", $APP_TAG, \"messages\":\"$2\",\"rsyslog-version\":\"$RSYSLOG_VERSION\"}"
+		var="{\"sub-domain\":\"$LOGGLY_ACCOUNT\", \"user-name\":\"$LOGGLY_USERNAME\", \"customer-token\":\"$LOGGLY_AUTH_TOKEN\", \"host-name\":\"$HOST_NAME\", \"script-name\":\"$SCRIPT_NAME\", \"script-version\":\"$SCRIPT_VERSION\", \"status\":\"$1\", \"time-stamp\":\"$currentTime\", \"linux-distribution\":\"$LINUX_DIST\", $APP_TAG, \"messages\":\"$2\",\"rsyslog-version\":\"$RSYSLOG_VERSION\",\"insecure-mode\":\"$INSECURE_MODE\",\"suppress-enabled\":\"$SUPPRESS_PROMPT\",\"force-secure-enabled\":\"$FORCE_SECURE\",\"loggly-removed\":\"$LOGGLY_REMOVE\"}"
 	fi
 	curl -s -H "content-type:application/json" -d "$var" $LOGS_01_URL/inputs/$3 > /dev/null 2>&1
 }
@@ -927,6 +945,80 @@ getPassword()
 	echo
 }
 
+#function to switch system logging to insecure mode if user runs the modular script in insecure mode
+switchSystemLoggingToInsecure()
+{
+	if [ -f $LOGGLY_RSYSLOG_CONFFILE ]; then
+		EXISTING_SYSLOG_PORT=$(grep -Eow 6514 $LOGGLY_RSYSLOG_CONFFILE)
+			if [[ $EXISTING_SYSLOG_PORT == 6514 ]]; then
+				if [ "$SUPPRESS_PROMPT" == "false" ]; then
+					while true;
+					do
+						read -p "You are running the script using insecure mode, but your system logs are using secure mode. The script only supports a single mode for both, so would you like to switch your system logs to insecure mode? (yes/no)" yn
+								case $yn in
+								[Yy]* )
+									logMsgToConfigSysLog "INFO" "INFO: Going to overwrite the conf file: $LOGGLY_RSYSLOG_CONFFILE with insecure configuration";
+									LOGGLY_TLS_SENDING="false"
+									LOGGLY_SYSLOG_PORT=514
+									break;;
+								[Nn]* )
+									logMsgToConfigSysLog "INFO" "INFO: Please re-run the script in secure mode if you want to setup secure logging"
+									exit 1;;
+								* ) echo "Please answer yes or no.";;
+								esac
+					done
+				else
+					logMsgToConfigSysLog "WARN" "WARNING: You are running the script using insecure mode, but your system logs are using secure mode. The script only supports a single mode for both, so we are switching the system logs to insecure mode as well."
+					LOGGLY_TLS_SENDING="false"
+					LOGGLY_SYSLOG_PORT=514
+				fi
+			fi
+	fi
+}
+
+#function to switch system logging to secure mode if user runs the modular script in secure mode
+switchSystemLoggingToSecure()
+{
+	if [ -f $LOGGLY_RSYSLOG_CONFFILE ]; then
+		EXISTING_SYSLOG_PORT=$(grep -Eow 514 $LOGGLY_RSYSLOG_CONFFILE)
+			if [[ $EXISTING_SYSLOG_PORT == 514 ]]; then
+				if [ "$SUPPRESS_PROMPT" == "false" ]; then
+					while true;
+					do
+						read -p "You are running the script using secure mode, but your system logs are using insecure mode. The script only supports a single mode for both, so would you like to switch your system logs to secure mode? (yes/no)" yn
+								case $yn in
+								[Yy]* )
+									logMsgToConfigSysLog "INFO" "INFO: Going to overwrite the conf file: $LOGGLY_RSYSLOG_CONFFILE with secure configuration";
+									LOGGLY_TLS_SENDING="true"
+									LOGGLY_SYSLOG_PORT=6514
+									break;;
+								[Nn]* )
+									logMsgToConfigSysLog "INFO" "INFO: Please re-run the script in insecure mode if you want to setup insecure logging"
+									exit 1;;
+								* ) echo "Please answer yes or no.";;
+								esac
+					done
+				else
+					logMsgToConfigSysLog "WARN" "WARNING: You are running the script using secure mode, but your system logs are using insecure mode. The script only supports a single mode for both, so we are switching the system logs to secure mode as well."
+					LOGGLY_TLS_SENDING="true"
+					LOGGLY_SYSLOG_PORT=6514
+				fi
+			fi
+	fi
+}
+
+#check whether the user is running the script in secure or insecure mode and then switch system logging accordingly.
+checkScriptRunningMode()
+{
+	if [ "$FORCE_SECURE" == "false"  ]; then
+		if [[ $LOGGLY_SYSLOG_PORT == 514 ]]; then
+			switchSystemLoggingToInsecure
+		else
+			switchSystemLoggingToSecure
+		fi
+	fi
+}
+
 #display usage syntax
 usage()
 {
@@ -969,6 +1061,7 @@ if [ "$1" != "being-invoked" ]; then
 			     --insecure )
 				LOGGLY_TLS_SENDING="false"
 				LOGGLY_SYSLOG_PORT=514
+				INSECURE_MODE="true"
 				;;
 				 --force-secure )
 				FORCE_SECURE="true" 
@@ -987,7 +1080,7 @@ if [ "$1" != "being-invoked" ]; then
 		done
 	fi
 
-	if [ "$LOGGLY_REMOVE" != "" -a "$LOGGLY_ACCOUNT" != "" ]; then
+	if [ "$LOGGLY_REMOVE" == "true" -a "$LOGGLY_ACCOUNT" != "" ]; then
 		removeLogglyConf
 	elif [ "$LOGGLY_ACCOUNT" != "" -a "$LOGGLY_USERNAME" != "" ]; then
 		if [ "$LOGGLY_PASSWORD" = "" ]; then
