@@ -287,10 +287,12 @@ checkIfValidTomcatHome()
 		eval $1="false"
 	#check if tomcat is configured as a service. If no, then check if we have access to startup.sh file
 	elif [ ! -f /etc/init.d/$SERVICE ]; then
-		logMsgToConfigSysLog "INFO" "INFO: Tomcat is not configured as a service"
-		if [ ! -f "$LOGGLY_CATALINA_HOME/bin/startup.sh" ]; then
+		if [[ ! $(which systemctl) && $(systemctl list-unit-files $SERVICE.service | grep "$SERVICE.service") ]] &>/dev/null; then
+			logMsgToConfigSysLog "INFO" "INFO: Tomcat is not configured as a service."
+			if [ ! -f "$LOGGLY_CATALINA_HOME/bin/startup.sh" ]; then
 			logMsgToConfigSysLog "WARN" "WARN: Unable to find bin/startup.sh file within $LOGGLY_CATALINA_HOME."
 			eval $1="false"
+			fi
 		fi
 	fi
 }
