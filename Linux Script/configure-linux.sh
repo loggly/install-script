@@ -72,6 +72,9 @@ LOGGLY_USERNAME=
 #this is a mandatory input
 LOGGLY_PASSWORD=
 
+#Extra loggly tags to append to the syslog messages
+LOGGLY_TAGS=()
+
 #if this variable is set to true then suppress all prompts
 SUPPRESS_PROMPT="false"
 
@@ -515,6 +518,10 @@ downloadTlsCerts() {
 
 confString() {
   RSYSLOG_VERSION_TMP=$(echo $RSYSLOG_VERSION | cut -d "." -f1)
+  TAGS=""
+  for TAG in "${LOGGLY_TAGS[@]}"; do
+    TAGS+=" tag=\\\"${TAG}\\\""
+  done
   inputStr_TLS_RSYS_7="
 #          -------------------------------------------------------
 #          Syslog Logging Directives for Loggly ($LOGGLY_ACCOUNT.loggly.com)
@@ -523,7 +530,7 @@ confString() {
 ### RsyslogTemplate for Loggly ###
 ##########################################################
 
-\$template LogglyFormat,\"<%pri%>%protocol-version% %timestamp:::date-rfc3339% %HOSTNAME% %app-name% %procid% %msgid% [$LOGGLY_AUTH_TOKEN@$LOGGLY_DISTRIBUTION_ID tag=\\\"RsyslogTLS\\\"] %msg%\n\"
+\$template LogglyFormat,\"<%pri%>%protocol-version% %timestamp:::date-rfc3339% %HOSTNAME% %app-name% %procid% %msgid% [$LOGGLY_AUTH_TOKEN@$LOGGLY_DISTRIBUTION_ID tag=\\\"RsyslogTLS\\\"${TAGS}] %msg%\n\"
 
 # Setup disk assisted queues
 \$WorkDirectory /var/spool/rsyslog # where to place spool files
@@ -560,7 +567,7 @@ confString() {
 
 
 template(name=\"LogglyFormat\" type=\"string\"
-string=\"<%pri%>%protocol-version% %timestamp:::date-rfc3339% %HOSTNAME% %app-name% %procid% %msgid% [$LOGGLY_AUTH_TOKEN@$LOGGLY_DISTRIBUTION_ID tag=\\\"RsyslogTLS\\\"] %msg%\n\"
+string=\"<%pri%>%protocol-version% %timestamp:::date-rfc3339% %HOSTNAME% %app-name% %procid% %msgid% [$LOGGLY_AUTH_TOKEN@$LOGGLY_DISTRIBUTION_ID tag=\\\"RsyslogTLS\\\"${TAGS}] %msg%\n\"
 )
 
 # Send messages to Loggly over TCP using the template.
@@ -572,7 +579,7 @@ action(type=\"omfwd\" protocol=\"tcp\" target=\"$LOGS_01_HOST\" port=\"$LOGGLY_S
 #          Syslog Logging Directives for Loggly ($LOGGLY_ACCOUNT.loggly.com)
 #          -------------------------------------------------------
 # Define the template used for sending logs to Loggly. Do not change this format.
-\$template LogglyFormat,\"<%pri%>%protocol-version% %timestamp:::date-rfc3339% %HOSTNAME% %app-name% %procid% %msgid% [$LOGGLY_AUTH_TOKEN@$LOGGLY_DISTRIBUTION_ID tag=\\\"Rsyslog\\\"] %msg%\n\"
+\$template LogglyFormat,\"<%pri%>%protocol-version% %timestamp:::date-rfc3339% %HOSTNAME% %app-name% %procid% %msgid% [$LOGGLY_AUTH_TOKEN@$LOGGLY_DISTRIBUTION_ID tag=\\\"Rsyslog\\\"${TAGS}] %msg%\n\"
 
 \$WorkDirectory /var/spool/rsyslog # where to place spool files
 \$ActionQueueFileName fwdRule1 # unique name prefix for spool files
@@ -986,7 +993,7 @@ checkScriptRunningMode() {
 #display usage syntax
 usage() {
   cat <<EOF
-usage: configure-linux [-a loggly auth account or subdomain] [-t loggly token (optional)] [-u username] [-p password (optional)] [-s suppress prompts {optional)] [--insecure {to send logs without TLS} (optional)[--force-secure {optional} ]
+usage: configure-linux [-a loggly auth account or subdomain] [-t loggly token (optional)] [-u username] [-p password (optional)] [-s suppress prompts {optional)] [--insecure {to send logs without TLS} (optional)] [--force-secure {optional} ] [--tag <tag> (optional, multiple)]
 usage: configure-linux [-a loggly auth account or subdomain] [-r to remove]
 usage: configure-linux [-h for help]
 EOF
@@ -1034,6 +1041,10 @@ if [ "$1" != "being-invoked" ]; then
         FORCE_SECURE="true"
         LOGGLY_TLS_SENDING="true"
         LOGGLY_SYSLOG_PORT=6514
+        ;;
+      --tag)
+        shift
+        LOGGLY_TAGS+=("$1")
         ;;
       -h | --help)
         usage
