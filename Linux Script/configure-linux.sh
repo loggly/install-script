@@ -129,7 +129,7 @@ checkLinuxLogglyCompatibility() {
   setLinuxVariables
 
   # in unattended mode, we don't do remote checks
-  fi [ "$UNATTENDED_MODE" != "true" ]; then
+  if [ "$UNATTENDED_MODE" != "true" ]; then
   
     #check if the Loggly servers are accessible. If no, ask user to check network connectivity & exit
     checkIfLogglyServersAccessible
