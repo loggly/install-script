@@ -75,9 +75,9 @@ LOGGLY_PASSWORD=
 #if this variable is set to true then suppress all prompts
 SUPPRESS_PROMPT="false"
 
-#if this variable is "true", we are in batch mode: no remote tests are run
+#if this variable is "true", we are in unattended mode: no remote tests are run
 #and only account and token are required.
-BATCH_MODE="false"
+UNATTENDED_MODE="false"
 
 #variables used in 22-loggly.conf file
 LOGGLY_SYSLOG_PORT=6514
@@ -128,12 +128,12 @@ checkLinuxLogglyCompatibility() {
   #set the basic variables needed by this script
   setLinuxVariables
 
-  #check if the Loggly servers are accessible. If no, ask user to check network connectivity & exit
-  checkIfLogglyServersAccessible
-
-  #if we have username and password, check and verify account
-  if [ "$LOGGLY_USERNAME" != "" -a "$LOGGLY_PASSWORD" != "" ]; then
-
+  # in unattended mode, we don't do remote checks
+  fi [ "$UNATTENDED_MODE" != "true" ]; then
+  
+    #check if the Loggly servers are accessible. If no, ask user to check network connectivity & exit
+    checkIfLogglyServersAccessible
+  
     #check if user credentials are valid. If no, then exit
     checkIfValidUserNamePassword
 
@@ -996,7 +996,7 @@ checkScriptRunningMode() {
 usage() {
   cat <<EOF
 usage: configure-linux [-a loggly auth account or subdomain] [-t loggly token (optional)] [-u username] [-p password (optional)] [-s suppress prompts {optional)] [--insecure {to send logs without TLS} (optional)[--force-secure {optional} ]
-usage: configure-linux [-a loggly auth account or subdomain] [-t loggly token ] --batch [--insecure {to send logs without TLS} (optional)[--force-secure {optional} ]
+usage: configure-linux [-a loggly auth account or subdomain] [-t loggly token ] --unattended [--insecure {to send logs without TLS} (optional)[--force-secure {optional} ]
 usage: configure-linux [-a loggly auth account or subdomain] [-r to remove]
 usage: configure-linux [-h for help]
 EOF
@@ -1045,8 +1045,8 @@ if [ "$1" != "being-invoked" ]; then
         LOGGLY_TLS_SENDING="true"
         LOGGLY_SYSLOG_PORT=6514
         ;;
-      --batch)
-        BATCH_MODE="true"
+      --unattended)
+        UNATTENDED_MODE="true"
         LINUX_DO_VERIFICATION="false"
         SUPPRESS_PROMPT="true"
         ;;
@@ -1070,7 +1070,7 @@ if [ "$1" != "being-invoked" ]; then
       getPassword
     fi
     installLogglyConf
-  elif [ "$LOGGLY_ACCOUNT" != "" -a "$BATCH_MODE" == "true" ]; then
+  elif [ "$LOGGLY_ACCOUNT" != "" -a "$UNATTENDED_MODE" == "true" ]; then
     installLogglyConf
   else
     usage
