@@ -275,20 +275,20 @@ assumeTomcatHome() {
 #checks for startup.sh if tomcat is not configured as service
 checkIfValidTomcatHome()
 {
-	#check if logging.properties files  is present
-	if [ ! -f "$LOGGLY_CATALINA_HOME/conf/logging.properties" ]; then
-		logMsgToConfigSysLog "WARN" "WARN: Unable to find conf/logging.properties file within $LOGGLY_CATALINA_HOME."
-		eval $1="false"
-	#check if tomcat is configured as a service. If no, then check if we have access to startup.sh file
-	elif [ ! -f /etc/init.d/$SERVICE ]; then
-		if [[ ! $(which systemctl) && $(systemctl list-unit-files $SERVICE.service | grep "$SERVICE.service") ]] &>/dev/null; then
-			logMsgToConfigSysLog "INFO" "INFO: Tomcat is not configured as a service."
-			if [ ! -f "$LOGGLY_CATALINA_HOME/bin/startup.sh" ]; then
-			logMsgToConfigSysLog "WARN" "WARN: Unable to find bin/startup.sh file within $LOGGLY_CATALINA_HOME."
-			eval $1="false"
-			fi
-		fi
-	fi
+  #check if logging.properties files  is present
+  if [ ! -f "$LOGGLY_CATALINA_HOME/conf/logging.properties" ]; then
+    logMsgToConfigSysLog "WARN" "WARN: Unable to find conf/logging.properties file within $LOGGLY_CATALINA_HOME."
+    eval $1="false"
+  #check if tomcat is configured as a service. If no, then check if we have access to startup.sh file
+  elif [ ! -f /etc/init.d/$SERVICE ]; then
+    if [[ ! $(which systemctl) && $(systemctl list-unit-files $SERVICE.service | grep "$SERVICE.service") ]] &>/dev/null; then
+      logMsgToConfigSysLog "INFO" "INFO: Tomcat is not configured as a service."
+      if [ ! -f "$LOGGLY_CATALINA_HOME/bin/startup.sh" ]; then
+        logMsgToConfigSysLog "WARN" "WARN: Unable to find bin/startup.sh file within $LOGGLY_CATALINA_HOME."
+        eval $1="false"
+      fi
+    fi
+  fi
 }
 
 #sets tomcat variables which will be used across various functions
@@ -505,14 +505,14 @@ write21TomcatFileContents() {
   sudo touch $TOMCAT_SYSLOG_CONFFILE
   sudo chmod o+w $TOMCAT_SYSLOG_CONFFILE
 
-	commonContent="
-	\$ModLoad imfile
-	\$WorkDirectory $RSYSLOG_DIR
-	"
-	if [[ "$LINUX_DIST" == *"Ubuntu"* ]]; then
-		commonContent+="\$PrivDropToGroup adm		
-		"
-	fi
+  commonContent="
+  \$ModLoad imfile
+  \$WorkDirectory $RSYSLOG_DIR
+  "
+  if [[ "$LINUX_DIST" == *"Ubuntu"* ]]; then
+    commonContent+="\$PrivDropToGroup adm		
+    "
+  fi
 
     imfileStr=$commonContent"
 
@@ -549,10 +549,10 @@ if \$programname == 'initd' then @@logs-01.loggly.com:6514;LogglyFormatTomcat
 if \$programname == 'initd' then ~
 "
 
-	#if log rotation is enabled i.e. tomcat version is greater than or equal to
-	#6.0.33.0, then add the following lines to tomcat syslog conf file
-	if [ $(compareVersions $TOMCAT_VERSION $MIN_TOMCAT_VERSION 4) -ge 0 ]; then
-	imfileStr+=$commonContent"
+  #if log rotation is enabled i.e. tomcat version is greater than or equal to
+  #6.0.33.0, then add the following lines to tomcat syslog conf file
+  if [ $(compareVersions $TOMCAT_VERSION $MIN_TOMCAT_VERSION 4) -ge 0 ]; then
+  imfileStr+=$commonContent"
 # catalina.log
 \$InputFileName $LOGGLY_CATALINA_LOG_HOME/catalina.log
 \$InputFileTag catalina-log
@@ -605,7 +605,7 @@ if \$programname == 'tomcat-access' then ~
 "
   fi
 
-	imfileStrNonTls=$commonContent"
+  imfileStrNonTls=$commonContent"
 
 #parameterized token here.......
 #Add a tag for tomcat events
@@ -632,10 +632,10 @@ if \$programname == 'initd' then @@logs-01.loggly.com:514;LogglyFormatTomcat
 if \$programname == 'initd' then ~
 "
 
-	#if log rotation is enabled i.e. tomcat version is greater than or equal to
-	#6.0.33.0, then add the following lines to tomcat syslog conf file
-	if [ $(compareVersions $TOMCAT_VERSION $MIN_TOMCAT_VERSION 4) -ge 0 ]; then
-	imfileStrNonTls+=$commonContent"
+  #if log rotation is enabled i.e. tomcat version is greater than or equal to
+  #6.0.33.0, then add the following lines to tomcat syslog conf file
+  if [ $(compareVersions $TOMCAT_VERSION $MIN_TOMCAT_VERSION 4) -ge 0 ]; then
+  imfileStrNonTls+=$commonContent"
 # catalina.log
 \$InputFileName $LOGGLY_CATALINA_LOG_HOME/catalina.log
 \$InputFileTag catalina-log
@@ -689,9 +689,9 @@ if \$programname == 'tomcat-access' then ~
   fi
 
   if [ $TLS_SENDING == "false" ];
-	then
-		imfileStr=$imfileStrNonTls
-	fi
+  then
+    imfileStr=$imfileStrNonTls
+  fi
 
   #change the tomcat-21 file to variable from above and also take the directory of the tomcat log file.
   sudo cat <<EOIPFW >>$TOMCAT_SYSLOG_CONFFILE
@@ -846,24 +846,24 @@ else
          LOGGLY_USERNAME=$1
          echo "Username is set"
          ;;
-	  -p | --password ) shift
-          LOGGLY_PASSWORD=$1
-	 ;;
-      -tag| --filetag ) shift
-	  LOGGLY_FILE_TAG=$1
-	  echo "File tag: $LOGGLY_FILE_TAG"
-	  ;;
+      -p | --password ) shift
+         LOGGLY_PASSWORD=$1
+         ;;
+    -tag | --filetag ) shift
+    LOGGLY_FILE_TAG=$1
+    echo "File tag: $LOGGLY_FILE_TAG"
+    ;;
       -r | --rollback )
-	  LOGGLY_ROLLBACK="true"
+    LOGGLY_ROLLBACK="true"
           ;;
       -s | --suppress )
-	  SUPPRESS_PROMPT="true"
-	  ;;
+    SUPPRESS_PROMPT="true"
+    ;;
            --insecure )
-		LOGGLY_TLS_SENDING="false"
-		TLS_SENDING="false"
-		LOGGLY_SYSLOG_PORT=514
-	    ;;
+    LOGGLY_TLS_SENDING="false"
+    TLS_SENDING="false"
+    LOGGLY_SYSLOG_PORT=514
+      ;;
       -h | --help)
           usage
           exit
