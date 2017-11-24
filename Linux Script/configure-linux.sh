@@ -734,7 +734,7 @@ createRsyslogDir() {
 #check if the logs made it to Loggly
 checkIfLogsMadeToLoggly() {
   logMsgToConfigSysLog "INFO" "INFO: Sending test message to Loggly."
-  uuid=$(cat /dev/urandom | tr -dc 'a-zA-Z0-9' | fold -w 32 | head -n 1)
+  uuid=$(cat /proc/sys/kernel/random/uuid)
 
   queryParam="syslog.appName%3ALOGGLYVERIFY%20$uuid"
   logger -t "LOGGLYVERIFY" "LOGGLYVERIFY-Test message for verification with UUID $uuid"
