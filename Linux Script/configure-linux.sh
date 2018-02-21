@@ -15,7 +15,7 @@ function ctrl_c() {
 #name of the current script. This will get overwritten by the child script which calls this
 SCRIPT_NAME=configure-linux.sh
 #version of the current script. This will get overwritten by the child script which calls this
-SCRIPT_VERSION=1.20
+SCRIPT_VERSION=1.21
 
 #application tag. This will get overwritten by the child script which calls this
 APP_TAG=
@@ -103,6 +103,9 @@ LOGGLY_REMOVE="false"
 
 #Setting INSECURE mode to false initially
 INSECURE_MODE="false"
+
+#Setting invalid subdomain value
+INVALID_SUBDOMAIN=*".loggly.com"*
 
 ##########  Variable Declarations - End  ##########
 
@@ -350,10 +353,15 @@ checkIfLogglyServersAccessible() {
   fi
 
   echo "INFO: Checking if '$LOGGLY_ACCOUNT' subdomain is valid."
-  if [ $(curl --head -s --request GET $LOGGLY_ACCOUNT_URL/login | grep "200 OK\|HTTP/2 200" | wc -l) ] >0; then
-    echo "INFO: $LOGGLY_ACCOUNT_URL is valid and reachable."
+  if [[ $LOGGLY_ACCOUNT != $INVALID_SUBDOMAIN ]]; then
+      if [[ $(curl --head -s --request GET $LOGGLY_ACCOUNT_URL/login | grep "200 OK\|HTTP/2 200") ]]; then
+          echo "INFO: $LOGGLY_ACCOUNT_URL is valid and reachable."
+      else
+          logMsgToConfigSysLog "ERROR" "ERROR: This is not a recognized subdomain. Please ask the account owner for the subdomain they signed up with."
+          exit 1
+      fi
   else
-    logMsgToConfigSysLog "ERROR" "ERROR: This is not a recognized subdomain. Please ask the account owner for the subdomain they signed up with."
+    logMsgToConfigSysLog "ERROR" "ERROR: This is not a recognized subdomain. Please ask the account owner for the subdomain they signed up with. Please note that your subdomain is just the first string in your loggly account URL not the entire account name."
     exit 1
   fi
 
