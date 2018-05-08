@@ -30,6 +30,8 @@ parser.add_option("--s3bucket", dest="s3bucket",
                   help="s3 bucket name")
 parser.add_option("--user", dest="user",
                   help="user")
+parser.add_option("--admin", dest="admin",
+                  help="admin user name")
 parser.add_option("--sqsname", dest="sqsname",
                   help="sqsname")
 
@@ -40,6 +42,7 @@ s3bucket = opts.s3bucket
 acnumber = opts.acnumber
 sqsname = opts.sqsname
 user = opts.user
+admin = opts.admin
 
 if acnumber.isdigit()==False:
     print "Please check your account number, it should only contain digits, no other characters."
@@ -51,12 +54,18 @@ access_key=''
 secret_key=''
 bucket=''
 
+credentials_name = admin if admin else "default"
+
 with open(os.environ['HOME'] + '/.aws/credentials') as f:
     for line in f:
-        if "aws_access_key_id" in line:
-             access_key = line.split("=",1)[1].strip()
-        if "aws_secret_access_key" in line:
-             secret_key = line.split("=",1)[1].strip()
+        if credentials_name in line:
+            for line in f:
+                if "aws_access_key_id" in line:
+                     access_key = line.split("=",1)[1].strip()
+                if "aws_secret_access_key" in line:
+                     secret_key = line.split("=",1)[1].strip()
+                     break
+
 
 if not access_key:
     print "Please check your ~/.aws/credentials file and make sure that access key and secret access key are set. Run aws configure to set them up"
