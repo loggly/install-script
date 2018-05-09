@@ -55,8 +55,9 @@ secret_key=''
 bucket=''
 
 credentials_name = admin if admin else "default"
+home = os.path.expanduser("~")
 
-with open(os.environ['HOME'] + '/.aws/credentials') as f:
+with open(home+ '/.aws/credentials') as f:
     for line in f:
         if credentials_name in line:
             for line in f:
