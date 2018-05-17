@@ -303,7 +303,7 @@ checkIfLogglyServersAccessible()
 	fi
 
 	echo "INFO: Checking if '$LOGGLY_ACCOUNT' subdomain is valid."
-	if [ $(curl -s --head  --request GET $LOGGLY_ACCOUNT_URL/login | grep "200 OK" | wc -l) == 1 ]; then
+	if [ $(curl -s --head  --request GET $LOGGLY_ACCOUNT_URL/login | grep "200" | wc -l) == 1 ]; then
 		echo "INFO: $LOGGLY_ACCOUNT_URL is valid and reachable."
 	else
 		logMsgToConfigSysLog "ERROR" "ERROR: This is not a recognized subdomain. Please ask the account owner for the subdomain they signed up with."
