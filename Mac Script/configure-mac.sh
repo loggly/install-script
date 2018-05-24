@@ -15,7 +15,7 @@ function ctrl_c() {
 #name of the current script. This will get overwritten by the child script which calls this
 SCRIPT_NAME=configure-mac.sh
 #version of the current script. This will get overwritten by the child script which calls this
-SCRIPT_VERSION=1.4
+SCRIPT_VERSION=1.5
 
 #application tag. This will get overwritten by the child script which calls this
 APP_TAG=
@@ -88,6 +88,9 @@ SUPPRESS_PROMPT="false"
 
 #plist file path
 PROP_FILE=
+
+#Setting invalid subdomain value
+INVALID_SUBDOMAIN=*".loggly.com"*
 
 #manual instructions to be show in case of error
 MANUAL_CONFIG_INSTRUCTION="Manual instructions to configure Loggly on Mac are available at https://www.loggly.com/docs/send-mac-logs-to-loggly/."
@@ -230,11 +233,16 @@ checkIfLogglyServersAccessible() {
   fi
 
   echo "INFO: Checking if '$LOGGLY_ACCOUNT' subdomain is valid."
-  if [ $(curl -s --head --request GET $LOGGLY_ACCOUNT_URL/login | grep "200 OK" | wc -l) == 1 ]; then
-    echo "INFO: $LOGGLY_ACCOUNT_URL is valid and reachable."
+  if [[ $LOGGLY_ACCOUNT != $INVALID_SUBDOMAIN ]]; then
+    if [ $(curl -s --head --request GET $LOGGLY_ACCOUNT_URL/login | grep "200 OK\|HTTP/2 200" | wc -l) == 1 ]; then
+      echo "INFO: $LOGGLY_ACCOUNT_URL is valid and reachable."
+    else
+      logMsgToConfigSysLog "ERROR" "ERROR: This is not a recognized subdomain. Please ask the account owner for the subdomain they signed up with."
+      exit 1
+    fi
   else
-    logMsgToConfigSysLog "ERROR" "ERROR: This is not a recognized subdomain. Please ask the account owner for the subdomain they signed up with."
-    exit 1
+      logMsgToConfigSysLog "ERROR" "ERROR: This is not a recognized subdomain. Please ask the account owner for the subdomain they signed up with. Please note that your subdomain is just the first string in your loggly account URL not the entire account name."
+      exit 1
   fi
 }
 
