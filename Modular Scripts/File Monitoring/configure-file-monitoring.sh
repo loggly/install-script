@@ -180,7 +180,7 @@ configureDirectoryFileMonitoring() {
       esac
     done
     while true; do
-      read -p "Would you like install a Cron job to sync the files currently in your Directory every 5 minutes? (yes/no)" yn
+      read -p "Would you like install a Cron job to sync the files currently in your Directory every 10 minutes? (yes/no)" yn
       case $yn in
       [Yy]*)
         doCronInstallation
