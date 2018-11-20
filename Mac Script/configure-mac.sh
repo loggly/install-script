@@ -234,11 +234,11 @@ checkIfLogglyServersAccessible() {
 
   echo "INFO: Checking if '$LOGGLY_ACCOUNT' subdomain is valid."
   if [[ $LOGGLY_ACCOUNT != $INVALID_SUBDOMAIN ]]; then
-    if [ $(curl -s --head --request GET $LOGGLY_ACCOUNT_URL/login | grep "200 OK\|HTTP/2 200" | wc -l) == 1 ]; then
-      echo "INFO: $LOGGLY_ACCOUNT_URL is valid and reachable."
-    else
+    if  curl --head -s --request GET $LOGGLY_ACCOUNT_URL/login | grep -q "accounts/invalid" ; then
       logMsgToConfigSysLog "ERROR" "ERROR: This is not a recognized subdomain. Please ask the account owner for the subdomain they signed up with."
       exit 1
+    else
+      echo "INFO: $LOGGLY_ACCOUNT_URL is valid and reachable."
     fi
   else
       logMsgToConfigSysLog "ERROR" "ERROR: This is not a recognized subdomain. Please ask the account owner for the subdomain they signed up with. Please note that your subdomain is just the first string in your loggly account URL not the entire account name."
