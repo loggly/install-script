@@ -369,6 +369,7 @@ checkIfApacheLogsMadeToLoggly() {
       esac
 
       RESPONSE_CODE=$(curl --max-time 10 -s -o /dev/null -i -w "%{http_code}" $WEB_ADDRESS)
+      #curl return 000 response on reaching max-time
       if [ ${RESPONSE_CODE} != "000" ]; then
           logMsgToConfigSysLog "INFO" "INFO: Curl on server $WEB_ADDRESS has succeeded"
         break;
