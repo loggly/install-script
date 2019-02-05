@@ -220,7 +220,9 @@ write21ApacheConfFile() {
           write21ApacheFileContents
           break
           ;;
-        [Nn]*) break ;;
+        [Nn]*)
+          restartRsyslog
+          break ;;
         *) echo "Please answer yes or no." ;;
         esac
       done
@@ -347,6 +349,40 @@ checkIfApacheLogsMadeToLoggly() {
       TAGS="$TAGS%20tag%3A$i"
     fi
   done
+
+  read -p "In order to check if Apache logs are successfully sent to Loggly, apache needs to produce logs. Do you want to create a log record by accessing server? (yes/no)" yn
+  case $yn in
+  [Yy]*)
+    #access a page on apache server in order to create a log record in access log file
+    WEB_ADDRESS=127.0.0.1
+    while true; do
+      read -p "Default check is performed on a localhost address 127.0.0.1 . Are you running an apache server with a different address? (yes/no)" yesno
+      case $yesno in
+      [Yy]*)
+        logMsgToConfigSysLog "INFO" "INFO: Using specific apache server address."
+        read -p "Please enter Apache server address " -r WEB_ADDRESS
+        ;;
+      [Nn]*)
+        logMsgToConfigSysLog "INFO" "INFO: Using default apache server address."
+        ;;
+      *) echo "Please answer yes or no." ;;
+      esac
+
+      RESPONSE_CODE=$(curl --max-time 10 -s -o /dev/null -i -w "%{http_code}" $WEB_ADDRESS)
+      #curl return 000 response on reaching max-time
+      if [ ${RESPONSE_CODE} != "000" ]; then
+          logMsgToConfigSysLog "INFO" "INFO: Curl on server $WEB_ADDRESS has succeeded"
+        break;
+      else
+          logMsgToConfigSysLog "INFO" "INFO: Curl on server $WEB_ADDRESS has failed."
+      fi
+    done
+    ;;
+  [Nn]*)
+    logMsgToConfigSysLog "INFO" "INFO: Creating a sample log record has been skipped."
+    ;;
+  *) echo "Please answer yes or no." ;;
+  esac
 
   queryParam="$TAGS&from=-15m&until=now&size=1"
   queryUrl="$LOGGLY_ACCOUNT_URL/apiv2/search?q=$queryParam"
