@@ -103,13 +103,12 @@ class AWS:
                 self.add_statement(statement_to_add)
             else:
                 # Required action is contained in a statement, check resource.
-                statement, index = self.get_statement(action, resource)
-                if not statement:
+                if not self.get_statement(action, resource)[0]:
                     # Required resource is missing, add it to the statement with the required action.
                     self.add_resource_to_statement(resource, index)
 
         def add_statement(self, statement, index=None):
-            if index:
+            if index is not None:
                 self._policy_document['Statement'][index] = statement
             else:
                 self._policy_document['Statement'].append(statement)
@@ -231,7 +230,7 @@ class AWS:
                 # A statement with 'sqs:sendmessage' action and some ARN condition already exists,
                 # just append the bucket ARN to its condition.
                 bucket_arn += ',arn:aws:s3:::' + self._bucket.name
-                statement['Condition']['ArnLike']['aws:SourceArn'] = bucket_arn.split()
+                statement['Condition']['ArnLike']['aws:SourceArn'] = bucket_arn.split(',')
                 policy_document.add_statement(statement, index)
         self._queue.set_attributes(Attributes={'Policy': json.dumps(policy_document.get_policy())})
 
