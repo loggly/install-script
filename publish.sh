@@ -2,7 +2,7 @@
 # For Loggly's internal use only. Requires keys to publish.
 
 copy_to_aws() {
-	aws s3 cp "$1" s3://loggly-install/install/ --grants read=uri=http://acs.amazonaws.com/groups/global/AllUsers
+	aws s3 cp "$1" s3://loggly-install/install/ --acl public-read
 }
 
 declare -a files=("Linux Script/configure-linux.sh"
