@@ -181,7 +181,7 @@ class AWS:
             return
         pd = self.PolicyDocument(queue_policy)
         self._add_bucket_to_queue_policy(pd)
-        self._queue.add_permission(Label='AccountAccess', AWSAccountIds=[self._account_id], Actions=['*'])
+        self._add_account_access_to_queue_policy(pd)
 
     def set_bucket_notification(self):
         self._bucket.Notification().put(
@@ -234,9 +234,18 @@ class AWS:
                 policy_document.add_statement(statement, index)
         self._queue.set_attributes(Attributes={'Policy': json.dumps(policy_document.get_policy())})
 
+    def _add_account_access_to_queue_policy(self, policy_document):
+        statement, _ = policy_document.get_statement(
+            action='sqs:*', resource=self._queue.attributes['QueueArn'])
+        if not statement:
+            self._queue.add_permission(Label='AccountAccess', AWSAccountIds=[self._account_id], Actions=['*'])
+
     def _add_bucket_to_user_policy(self, policy_document):
         policy_document.add_statement_or_resource(["s3:ListBucket", "s3:GetObject", "s3:GetBucketLocation"],
                                                   'arn:aws:s3:::' + self._bucket.name,
+                                                  self.USER_POLICY_BUCKET_JSON % {'bucket_name': self._bucket.name})
+        policy_document.add_statement_or_resource(["s3:ListBucket", "s3:GetObject", "s3:GetBucketLocation"],
+                                                  'arn:aws:s3:::' + self._bucket.name + '/*',
                                                   self.USER_POLICY_BUCKET_JSON % {'bucket_name': self._bucket.name})
 
     def _add_queue_to_user_policy(self, policy_document):
@@ -279,13 +288,15 @@ def get_queue(session, queue_name):
     sqs = session.resource('sqs')
     try:
         queue = sqs.get_queue_by_name(QueueName=queue_name)
+        print('Queue {} already exists'.format(queue_name))
     except botocore.exceptions.ClientError as e:
         if e.response['Error']['Code'] == 'AWS.SimpleQueueService.NonExistentQueue':
-            print('Queue {} not found, creating it.'.format(queue_name))
+            print('Queue {} does not exist, creating it.'.format(queue_name))
             queue = sqs.create_queue(QueueName=queue_name)
+            print('Queue url: {}'.format(queue.url))
         else:
             raise e
-    print('Queue url: {}'.format(queue.url))
+    print('Queue name\n{}'.format(queue_name))
     return queue
 
 
@@ -294,16 +305,18 @@ def get_user(session, user_name):
     try:
         user = iam.User(user_name)
         user.arn  # This raises exception on non existent user.
+        print('IAM user {} already exists'.format(user_name))
+        print('Please provide the access key and secret key for the IAM user {} in the form fields'.format(user_name))
     except botocore.exceptions.ClientError as e:
         if e.response['Error']['Code'] == 'NoSuchEntity':
-            print("User {} does not exist, creating it")
+            print("IAM user {} does not exist, creating it".format(user_name))
             user = iam.create_user(UserName=user_name)
             access_key_pair = user.create_access_key_pair()
             print("Access key for Loggly")
             print(access_key_pair.access_key_id)
             print("Secret key for Loggly")
             print(access_key_pair.secret_access_key)
-            print('Please provide the access key and secret key for the IAM user {} in the form fields'.format(user_name))
+            print('Please save the above credentials')
         else:
             raise e
     return user
@@ -318,11 +331,8 @@ def main():
         user = get_user(session, args.user)
         aws = AWS(session, bucket, queue, user, args.acnumber)
         aws.set_queue_policy()
-        print('Queue policy has been set up')
         aws.set_bucket_notification()
-        print('Bucket notification has been set up')
         aws.set_user_policy()
-        print('User policy has been set up')
     except Exception as e:
         print(e)
         return 1
