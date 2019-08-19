@@ -1,10 +1,19 @@
 # Publishes the scripts to Loggly's S3 bucket where they are publically hosted.
 # For Loggly's internal use only. Requires keys to publish.
 
-s3cmd put --acl-public Linux\ Script/configure-linux.sh s3://loggly-install/install/
-s3cmd put --acl-public Modular\ Scripts/File\ Monitoring/configure-file-monitoring.sh s3://loggly-install/install/
-s3cmd put --acl-public Modular\ Scripts/Apache2/configure-apache.sh s3://loggly-install/install/
-s3cmd put --acl-public Modular\ Scripts/Nginx/configure-nginx.sh s3://loggly-install/install/
-s3cmd put --acl-public Modular\ Scripts/S3Logs\ Monitoring/configure-s3-file-monitoring.sh s3://loggly-install/install/
-s3cmd put --acl-public Modular\ Scripts/Tomcat/configure-tomcat.sh s3://loggly-install/install/
-s3cmd put --acl-public Mac\ Script/configure-mac.sh s3://loggly-install/install/
+copy_to_aws() {
+	aws s3 cp "$1" s3://loggly-install/install/ --acl public-read
+}
+
+declare -a files=("Linux Script/configure-linux.sh"
+				  "Modular Scripts/File Monitoring/configure-file-monitoring.sh"
+				  "Modular Scripts/Apache2/configure-apache.sh"
+				  "Modular Scripts/Nginx/configure-nginx.sh"
+				  "Modular Scripts/S3Logs Monitoring/configure-s3-file-monitoring.sh"
+				  "Modular Scripts/Tomcat/configure-tomcat.sh"
+				  "Mac Script/configure-mac.sh"
+				  "AWSscripts/SQS3script.py")
+
+for file in "${files[@]}";do
+	copy_to_aws "$file"
+done
