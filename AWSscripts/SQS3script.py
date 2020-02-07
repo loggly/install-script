@@ -30,7 +30,12 @@ class AWS:
               "Principal": {
                 "AWS": "arn:aws:iam::%(account_number)s:root"
               },
-              "Action": "SQS:*",
+              "Action": [
+                "sqs:ReceiveMessage",
+                "sqs:GetQueueUrl",
+                "sqs:GetQueueAttributes",
+                "sqs:DeleteMessage"
+              ],
               "Resource": "%(queue_arn)s"
         }
         """
@@ -73,7 +78,10 @@ class AWS:
     {
         "Effect": "Allow",
         "Action": [
-            "sqs:*"
+            "sqs:ReceiveMessage",
+            "sqs:GetQueueUrl",
+            "sqs:GetQueueAttributes",
+            "sqs:DeleteMessage"
         ],
         "Resource": [
             "%(queue_arn)s"
