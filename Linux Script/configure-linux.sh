@@ -898,12 +898,6 @@ searchAndFetch() {
   result=$(curl -s -u $LOGGLY_USERNAME:$LOGGLY_PASSWORD $url)
   count=$(echo "$result" | grep total_events | awk '{print $2}')
   count="${count%\,}"
-
-  # If no result is fetched, return 0
-  isNumberRegex='^[0-9]+$'
-  if ! [[ $count =~ $isNumberRegex ]] ; then
-     count=0
-  fi
   eval $1="'$count'"
   if [ "$count" -gt 0 ]; then
     timestamp=$(echo "$result" | grep timestamp)
