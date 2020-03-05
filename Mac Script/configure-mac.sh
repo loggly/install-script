@@ -249,7 +249,7 @@ checkIfLogglyServersAccessible() {
 #check if user name and password is valid
 checkIfValidUserNamePassword() {
   echo "INFO: Checking if provided username and password is correct."
-  if [ $(curl -s -u $LOGGLY_USERNAME:$LOGGLY_PASSWORD $LOGGLY_ACCOUNT_URL/apiv2/customer | grep "Unauthorized" | wc -l) == 1 ]; then
+  if [ $(curl -s -u "$LOGGLY_USERNAME:$LOGGLY_PASSWORD" $LOGGLY_ACCOUNT_URL/apiv2/customer | grep "Unauthorized" | wc -l) == 1 ]; then
     logMsgToConfigSysLog "INFO" "INFO: Please check your username or reset your password at $LOGGLY_ACCOUNT_URL/account/users/"
     logMsgToConfigSysLog "ERROR" "ERROR: Invalid Loggly username or password. Your username is visible at the top right of the Loggly console before the @ symbol. You can reset your password at http://<subdomain>.loggly.com/login."
     exit 1
@@ -327,7 +327,7 @@ checkIfFluentdInstalled() {
 #this function installs the Fluentd in the system
 installFluentd() {
   #install fluentd gem http://docs.fluentd.org/articles/install-by-gem
-  sudo gem install fluentd --no-ri --no-rdoc -n/usr/local/bin
+  sudo gem install fluentd --no-document -n/usr/local/bin
 
   if [[ ! -d "$LOGGLY_HOME" ]]; then
     mkdir $LOGGLY_HOME
@@ -461,7 +461,7 @@ checkIfLogsMadeToLoggly() {
 
   #sleeping for 30 secs so that fluentd service can start doing its work properly
   sleep 30
-  uuid=$(cat /dev/urandom | env LC_CTYPE=C tr -dc 'a-zA-Z0-9' | fold -w 32 | head -n 1)
+  uuid=$(LC_ALL=C tr -dc 'A-Za-z0-9' < /dev/urandom | fold -w 32 | head -n 1)
 
   queryParam="tag%3AMac%20$uuid"
   logger -t "Mac" "Mac-Test message for verification with UUID $uuid"
@@ -478,7 +478,7 @@ checkIfLogsMadeToLoggly() {
   searchAndFetch finalCount "$queryUrl"
   let counter=$counter+1
 
-  while [ "$finalCount" -eq 0 ]; do
+  while [[ "$finalCount" -eq 0 ]]; do
     echo "INFO: Did not find the test log message in Loggly's search yet. Waiting for 30 secs."
     sleep 30
     echo "INFO: Done waiting. Verifying again."
@@ -491,7 +491,7 @@ checkIfLogsMadeToLoggly() {
     fi
   done
 
-  if [ "$finalCount" -eq 1 ]; then
+  if [[ "$finalCount" -eq 1 ]]; then
     if [ "$IS_INVOKED" = "" ]; then
       logMsgToConfigSysLog "SUCCESS" "SUCCESS: Verification logs successfully transferred to Loggly! You are now sending Mac system logs to Loggly."
       exit 0
@@ -589,7 +589,7 @@ searchAndFetch() {
   count=$(echo "$result" | grep total_events | awk '{print $2}')
   count="${count%\,}"
   eval $1="'$count'"
-  if [ "$count" -gt 0 ]; then
+  if [[ "$count" -gt 0 ]]; then
     timestamp=$(echo "$result" | grep timestamp)
   fi
 }
