@@ -47,6 +47,8 @@ EXISTING_SYSLOG_PORT=
 HOST_NAME=
 #this variable will hold the name of the linux distribution
 LINUX_DIST=
+#this variable will hold the path to public root certificates
+CA_PATH="/etc/ssl/certs/ca-certificates.crt"
 
 #host name for logs-01.loggly.com
 LOGS_01_HOST=logs-01.loggly.com
