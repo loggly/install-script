@@ -366,14 +366,6 @@ checkIfLogglyServersAccessible() {
     logMsgToConfigSysLog "ERROR" "ERROR: This is not a recognized subdomain. Please ask the account owner for the subdomain they signed up with. Please note that your subdomain is just the first string in your loggly account URL not the entire account name."
     exit 1
   fi
-
-  echo "INFO: Checking if Gen2 account."
-  if [ $(curl -s --head --request GET $LOGGLY_ACCOUNT_URL/apiv2/customer | grep "404 NOT FOUND" | wc -l) == 1 ]; then
-    logMsgToConfigSysLog "ERROR" "ERROR: This scripts need a Gen2 account. Please contact Loggly support."
-    exit 1
-  else
-    echo "INFO: It is a Gen2 account."
-  fi
 }
 
 #check if user name and password is valid
