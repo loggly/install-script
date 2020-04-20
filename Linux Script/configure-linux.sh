@@ -526,7 +526,7 @@ confString() {
 \$ActionResumeRetryCount -1        # infinite retries if host is down
 
 #RsyslogGnuTLS
-\$DefaultNetstreamDriverCAFile /etc/rsyslog.d/keys/ca.d/logs-01.loggly.com_sha12.crt
+\$DefaultNetstreamDriverCAFile $CA_PATH
 \$ActionSendStreamDriver gtls
 \$ActionSendStreamDriverMode 1
 \$ActionSendStreamDriverAuthMode x509/name
@@ -548,7 +548,7 @@ confString() {
 \$ActionResumeRetryCount -1        # infinite retries if host is down
 
 #RsyslogGnuTLS
-\$DefaultNetstreamDriverCAFile /etc/rsyslog.d/keys/ca.d/logs-01.loggly.com_sha12.crt
+\$DefaultNetstreamDriverCAFile $CA_PATH
 
 
 template(name=\"LogglyFormat\" type=\"string\"
