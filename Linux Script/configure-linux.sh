@@ -503,16 +503,6 @@ checkAuthTokenAndWriteContents() {
   fi
 }
 
-downloadTlsCerts() {
-  echo "DOWNLOADING CERTIFICATE"
-  mkdir -pv /etc/rsyslog.d/keys/ca.d
-  curl -O https://logdog.loggly.com/media/logs-01.loggly.com_sha12.crt
-  sudo cp -Prf logs-01.loggly.com_sha12.crt /etc/rsyslog.d/keys/ca.d/logs-01.loggly.com_sha12.crt
-  sudo rm logs-01.loggly.com_sha12.crt
-  if [ ! -f /etc/rsyslog.d/keys/ca.d//logs-01.loggly.com_sha12.crt ]; then
-    logMsgToConfigSysLog "ERROR" "ERROR: Certificate could not be downloaded."
-    exit 1
-  fi
 }
 
 confString() {
@@ -598,7 +588,6 @@ action(type=\"omfwd\" protocol=\"tcp\" target=\"$LOGS_01_HOST\" port=\"$LOGGLY_S
 #install the certificate and check if gnutls package is installed
 installTLSDependencies() {
   if [ $LOGGLY_TLS_SENDING == "true" ]; then
-    downloadTlsCerts
     if [ "$SUPPRESS_PROMPT" == "true" ]; then
       /bin/bash -c "sudo $PKG_MGR install -y rsyslog-gnutls"
     else
