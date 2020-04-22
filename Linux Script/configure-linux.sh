@@ -512,7 +512,7 @@ setPathToCABundle () {
     CA_FILE_PATH="/etc/ssl/certs/ca-bundle.crt"
     ;;
   *)
-    logMsgToConfigSysLog "WARN" "WARN: The linux distribution '$LINUX_DIST' has not been previously tested with Loggly. Verify path to CA bundle of your linux distribution in '$RSYSLOG_ETCDIR_CONF' -> '\$DefaultNetstreamDriverCAFile' and restart rsyslog service or re-run script with '--inssecure' attribute. Default path to CA bundle is '$CA_FILE_PATH'."
+    logMsgToConfigSysLog "WARN" "WARN: The linux distribution '$LINUX_DIST' has not been previously tested with Loggly. Verify path to the file with root CA certificates (usually stored in OS trust store) in '$RSYSLOG_ETCDIR_CONF' -> '\$DefaultNetstreamDriverCAFile' and restart rsyslog service or re-run script with '--inssecure' attribute. Default path to CA file is '$CA_FILE_PATH'."
     ;;
   esac
 }
