@@ -561,7 +561,7 @@ confString() {
 \$ActionResumeRetryCount -1        # infinite retries if host is down
 
 #RsyslogGnuTLS
-\$DefaultNetstreamDriverCAFile $CA_PATH
+\$DefaultNetstreamDriverCAFile $CA_FILE_PATH
 
 
 template(name=\"LogglyFormat\" type=\"string\"
