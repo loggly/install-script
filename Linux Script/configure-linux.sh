@@ -539,7 +539,7 @@ confString() {
 \$ActionResumeRetryCount -1        # infinite retries if host is down
 
 #RsyslogGnuTLS
-\$DefaultNetstreamDriverCAFile $CA_PATH
+\$DefaultNetstreamDriverCAFile $CA_FILE_PATH
 \$ActionSendStreamDriver gtls
 \$ActionSendStreamDriverMode 1
 \$ActionSendStreamDriverAuthMode x509/name
