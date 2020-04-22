@@ -506,7 +506,7 @@ checkAuthTokenAndWriteContents() {
 setPathToCABundle () {
   case "$LINUX_DIST_IN_LOWER_CASE" in
   *"debian"* | *"ubuntu"*)
-    CA_PATH="/etc/ssl/certs/ca-certificates.crt"
+    CA_FILE_PATH="/etc/ssl/certs/ca-certificates.crt"
     ;;
   *"red"* | *"centos"* | *"amazon"*)
     CA_PATH="/etc/ssl/certs/ca-bundle.crt"
