@@ -48,7 +48,7 @@ HOST_NAME=
 #this variable will hold the name of the linux distribution
 LINUX_DIST=
 #this variable will hold the path to CA bundle
-CA_PATH="/etc/ssl/certs/ca-certificates.crt"
+CA_FILE_PATH="/etc/ssl/certs/ca-certificates.crt"
 
 #host name for logs-01.loggly.com
 LOGS_01_HOST=logs-01.loggly.com
