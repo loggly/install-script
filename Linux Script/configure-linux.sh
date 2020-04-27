@@ -47,6 +47,8 @@ EXISTING_SYSLOG_PORT=
 HOST_NAME=
 #this variable will hold the name of the linux distribution
 LINUX_DIST=
+#this variable will hold the path to CA bundle
+CA_FILE_PATH="/etc/ssl/certs/ca-certificates.crt"
 
 #host name for logs-01.loggly.com
 LOGS_01_HOST=logs-01.loggly.com
@@ -364,14 +366,6 @@ checkIfLogglyServersAccessible() {
     logMsgToConfigSysLog "ERROR" "ERROR: This is not a recognized subdomain. Please ask the account owner for the subdomain they signed up with. Please note that your subdomain is just the first string in your loggly account URL not the entire account name."
     exit 1
   fi
-
-  echo "INFO: Checking if Gen2 account."
-  if [ $(curl -s --head --request GET $LOGGLY_ACCOUNT_URL/apiv2/customer | grep "404 NOT FOUND" | wc -l) == 1 ]; then
-    logMsgToConfigSysLog "ERROR" "ERROR: This scripts need a Gen2 account. Please contact Loggly support."
-    exit 1
-  else
-    echo "INFO: It is a Gen2 account."
-  fi
 }
 
 #check if user name and password is valid
@@ -509,19 +503,22 @@ checkAuthTokenAndWriteContents() {
   fi
 }
 
-downloadTlsCerts() {
-  echo "DOWNLOADING CERTIFICATE"
-  mkdir -pv /etc/rsyslog.d/keys/ca.d
-  curl -O https://logdog.loggly.com/media/logs-01.loggly.com_sha12.crt
-  sudo cp -Prf logs-01.loggly.com_sha12.crt /etc/rsyslog.d/keys/ca.d/logs-01.loggly.com_sha12.crt
-  sudo rm logs-01.loggly.com_sha12.crt
-  if [ ! -f /etc/rsyslog.d/keys/ca.d//logs-01.loggly.com_sha12.crt ]; then
-    logMsgToConfigSysLog "ERROR" "ERROR: Certificate could not be downloaded."
-    exit 1
-  fi
+setPathToCABundle () {
+  case "$LINUX_DIST_IN_LOWER_CASE" in
+  *"debian"* | *"ubuntu"*)
+    CA_FILE_PATH="/etc/ssl/certs/ca-certificates.crt"
+    ;;
+  *"red"* | *"centos"* | *"amazon"*)
+    CA_FILE_PATH="/etc/ssl/certs/ca-bundle.crt"
+    ;;
+  *)
+    logMsgToConfigSysLog "WARN" "WARN: The linux distribution '$LINUX_DIST' has not been previously tested with Loggly. Verify path to the file with root CA certificates (usually stored in OS trust store) in '$RSYSLOG_ETCDIR_CONF' -> '\$DefaultNetstreamDriverCAFile' and restart rsyslog service or re-run script with '--inssecure' attribute. Default path to CA file is '$CA_FILE_PATH'."
+    ;;
+  esac
 }
 
 confString() {
+  setPathToCABundle
   RSYSLOG_VERSION_TMP=$(echo $RSYSLOG_VERSION | cut -d "." -f1)
   inputStr_TLS_RSYS_7="
 #          -------------------------------------------------------
@@ -542,7 +539,7 @@ confString() {
 \$ActionResumeRetryCount -1        # infinite retries if host is down
 
 #RsyslogGnuTLS
-\$DefaultNetstreamDriverCAFile /etc/rsyslog.d/keys/ca.d/logs-01.loggly.com_sha12.crt
+\$DefaultNetstreamDriverCAFile $CA_FILE_PATH
 \$ActionSendStreamDriver gtls
 \$ActionSendStreamDriverMode 1
 \$ActionSendStreamDriverAuthMode x509/name
@@ -564,7 +561,7 @@ confString() {
 \$ActionResumeRetryCount -1        # infinite retries if host is down
 
 #RsyslogGnuTLS
-\$DefaultNetstreamDriverCAFile /etc/rsyslog.d/keys/ca.d/logs-01.loggly.com_sha12.crt
+\$DefaultNetstreamDriverCAFile $CA_FILE_PATH
 
 
 template(name=\"LogglyFormat\" type=\"string\"
@@ -604,7 +601,6 @@ action(type=\"omfwd\" protocol=\"tcp\" target=\"$LOGS_01_HOST\" port=\"$LOGGLY_S
 #install the certificate and check if gnutls package is installed
 installTLSDependencies() {
   if [ $LOGGLY_TLS_SENDING == "true" ]; then
-    downloadTlsCerts
     if [ "$SUPPRESS_PROMPT" == "true" ]; then
       /bin/bash -c "sudo $PKG_MGR install -y rsyslog-gnutls"
     else
