@@ -9,7 +9,7 @@ source configure-linux.sh "being-invoked"
 #name of the current script
 SCRIPT_NAME=configure-apache.sh
 #version of the current script
-SCRIPT_VERSION=1.6
+SCRIPT_VERSION=1.7
 
 #we have not found the apache version yet at this point in the script
 APP_TAG="\"apache-version\":\"\""
