@@ -267,7 +267,7 @@ write21ApacheFileContents() {
     \$ActionSendStreamDriverPermittedPeer *.loggly.com
     
     #RsyslogGnuTLS
-    \$DefaultNetstreamDriverCAFile /etc/rsyslog.d/keys/ca.d/logs-01.loggly.com_sha12.crt
+    \$DefaultNetstreamDriverCAFile $CA_FILE_PATH
         
     # Apache access file:
     \$InputFileName $LOGGLY_APACHE_LOG_HOME/$APACHE_ACCESS_LOG_FILE
