@@ -9,7 +9,7 @@ source configure-linux.sh "being-invoked"
 #name of the current script
 SCRIPT_NAME=configure-apache.sh
 #version of the current script
-SCRIPT_VERSION=1.6
+SCRIPT_VERSION=1.7
 
 #we have not found the apache version yet at this point in the script
 APP_TAG="\"apache-version\":\"\""
@@ -267,7 +267,7 @@ write21ApacheFileContents() {
     \$ActionSendStreamDriverPermittedPeer *.loggly.com
     
     #RsyslogGnuTLS
-    \$DefaultNetstreamDriverCAFile /etc/rsyslog.d/keys/ca.d/logs-01.loggly.com_sha12.crt
+    \$DefaultNetstreamDriverCAFile $CA_FILE_PATH
         
     # Apache access file:
     \$InputFileName $LOGGLY_APACHE_LOG_HOME/$APACHE_ACCESS_LOG_FILE
