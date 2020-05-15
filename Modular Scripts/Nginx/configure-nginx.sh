@@ -9,7 +9,7 @@ source configure-linux.sh "being-invoked"
 #name of the current script
 SCRIPT_NAME=configure-nginx.sh
 #version of the current script
-SCRIPT_VERSION=1.4
+SCRIPT_VERSION=1.5
 
 #we have not found the nginx version yet at this point in the script
 APP_TAG="\"nginx-version\":\"\""
