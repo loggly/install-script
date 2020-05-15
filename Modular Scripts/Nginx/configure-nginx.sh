@@ -229,7 +229,7 @@ write21NginxFileContents() {
     \$ActionSendStreamDriverPermittedPeer *.loggly.com
     
     #RsyslogGnuTLS
-    \$DefaultNetstreamDriverCAFile /etc/rsyslog.d/keys/ca.d/logs-01.loggly.com_sha12.crt
+    \$DefaultNetstreamDriverCAFile $CA_FILE_PATH
     
     # nginx access file:
     \$InputFileName $LOGGLY_NGINX_LOG_HOME/$NGINX_ACCESS_LOG_FILE
