@@ -9,7 +9,7 @@ source configure-linux.sh "being-invoked"
 #name of the current script
 SCRIPT_NAME=configure-file-monitoring.sh
 #version of the current script
-SCRIPT_VERSION=1.15
+SCRIPT_VERSION=1.16
 
 #file to monitor (contains complete path and file name) provided by user
 LOGGLY_FILE_TO_MONITOR=
@@ -405,7 +405,7 @@ write21ConfFileContents() {
             \$ActionSendStreamDriverPermittedPeer *.loggly.com
 
             #RsyslogGnuTLS
-            \$DefaultNetstreamDriverCAFile /etc/rsyslog.d/keys/ca.d/logs-01.loggly.com_sha12.crt
+            \$DefaultNetstreamDriverCAFile $CA_FILE_PATH
 
             # File access file:
             \$InputFileName $FILE_TO_MONITOR
@@ -445,7 +445,7 @@ write21ConfFileContents() {
             module(load=\"imfile\")
 
             #RsyslogGnuTLS
-            \$DefaultNetstreamDriverCAFile /etc/rsyslog.d/keys/ca.d/logs-01.loggly.com_sha12.crt
+            \$DefaultNetstreamDriverCAFile $CA_FILE_PATH
 
             # Input for FILE1
             input(type=\"imfile\" tag=\"$LOGGLY_FILE_TO_MONITOR_ALIAS\" ruleset=\"filelog\" file=\"$FILE_TO_MONITOR\") #wildcard is allowed at file level only
