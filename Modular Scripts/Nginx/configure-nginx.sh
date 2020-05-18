@@ -9,7 +9,7 @@ source configure-linux.sh "being-invoked"
 #name of the current script
 SCRIPT_NAME=configure-nginx.sh
 #version of the current script
-SCRIPT_VERSION=1.4
+SCRIPT_VERSION=1.5
 
 #we have not found the nginx version yet at this point in the script
 APP_TAG="\"nginx-version\":\"\""
@@ -229,7 +229,7 @@ write21NginxFileContents() {
     \$ActionSendStreamDriverPermittedPeer *.loggly.com
     
     #RsyslogGnuTLS
-    \$DefaultNetstreamDriverCAFile /etc/rsyslog.d/keys/ca.d/logs-01.loggly.com_sha12.crt
+    \$DefaultNetstreamDriverCAFile $CA_FILE_PATH
     
     # nginx access file:
     \$InputFileName $LOGGLY_NGINX_LOG_HOME/$NGINX_ACCESS_LOG_FILE
