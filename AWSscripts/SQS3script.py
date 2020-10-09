@@ -288,7 +288,7 @@ def get_bucket(session, bucket_name):
     bucket = session.resource('s3').Bucket(bucket_name)
     if bucket.creation_date is None:
         region = boto3.session.Session().region_name
-        print('\033[91m', 'S3 bucket {} does not exist, please create it and run the script again. Also, make sure the S3 bucket and the SQS queue are in the same region. Current session region: {}'.format(bucket_name, region))
+        print_warn('S3 bucket {} does not exist, please create it and run the script again. Also, make sure the S3 bucket and the SQS queue are in the same region. Current session region: {}'.format(bucket_name, region))
         sys.exit(1)
     return bucket
 
@@ -297,15 +297,15 @@ def get_queue(session, queue_name):
     sqs = session.resource('sqs')
     try:
         queue = sqs.get_queue_by_name(QueueName=queue_name)
-        print('Queue {} already exists'.format(queue_name))
+        print_warn('Queue {} already exists'.format(queue_name))
     except botocore.exceptions.ClientError as e:
         if e.response['Error']['Code'] == 'AWS.SimpleQueueService.NonExistentQueue':
-            print('Queue {} does not exist, creating it.'.format(queue_name))
+            print_warn('Queue {} does not exist, creating it.'.format(queue_name))
             queue = sqs.create_queue(QueueName=queue_name)
-            print('Queue url: {}'.format(queue.url))
+            print_warn('Queue url: {}'.format(queue.url))
         else:
             raise e
-    print('Queue name\n{}'.format(queue_name))
+    print_warn('Queue name\n{}'.format(queue_name))
     return queue
 
 
@@ -314,22 +314,26 @@ def get_user(session, user_name):
     try:
         user = iam.User(user_name)
         user.arn  # This raises exception on non existent user.
-        print('IAM user {} already exists'.format(user_name))
-        print('Please provide the access key and secret key for the IAM user {} in the form fields'.format(user_name))
+        print_warn('IAM user {} already exists'.format(user_name))
+        print_warn('Please provide the access key and secret key for the IAM user {} in the form fields'.format(user_name))
     except botocore.exceptions.ClientError as e:
         if e.response['Error']['Code'] == 'NoSuchEntity':
-            print("IAM user {} does not exist, creating it".format(user_name))
+            print_warn("IAM user {} does not exist, creating it".format(user_name))
             user = iam.create_user(UserName=user_name)
             access_key_pair = user.create_access_key_pair()
-            print("Access key for Loggly")
-            print(access_key_pair.access_key_id)
-            print("Secret key for Loggly")
-            print(access_key_pair.secret_access_key)
-            print('Please save the above credentials')
+            print_warn("Access key for Loggly")
+            print_warn(access_key_pair.access_key_id)
+            print_warn("Secret key for Loggly")
+            print_warn(access_key_pair.secret_access_key)
+            print_warn('Please save the above credentials')
         else:
             raise e
     return user
 
+def print_warn(input):
+    WARN = '\033[91m'
+    ENDW = '\033[0m'
+    print(WARN+str(input)+ENDW)
 
 def main():
     args = get_args()
@@ -343,7 +347,7 @@ def main():
         aws.set_bucket_notification()
         aws.set_user_policy()
     except Exception as e:
-        print(e)
+        print_warn(e)
         return 1
     return 0
 
