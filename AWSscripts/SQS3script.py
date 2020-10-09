@@ -287,7 +287,8 @@ def get_args():
 def get_bucket(session, bucket_name):
     bucket = session.resource('s3').Bucket(bucket_name)
     if bucket.creation_date is None:
-        print('S3 bucket {} does not exist, please create it and run the script again'.format(bucket_name))
+        region = boto3.session.Session().region_name
+        print('\033[91m', 'S3 bucket {} does not exist, please create it and run the script again. Also, make sure the S3 bucket and the SQS queue are in the same region. Current session region: {}'.format(bucket_name, region))
         sys.exit(1)
     return bucket
 
