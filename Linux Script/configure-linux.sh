@@ -384,7 +384,7 @@ getAuthToken() {
   if [ "$LOGGLY_AUTH_TOKEN" = "" ]; then
     logMsgToConfigSysLog "INFO" "INFO: Authentication token not provided. Trying to retrieve it from $LOGGLY_ACCOUNT_URL account."
     #get authentication token if user has not provided one
-    tokenstr=$(curl -s -u $LOGGLY_USERNAME:$LOGGLY_PASSWORD $LOGGLY_ACCOUNT_URL/apiv2/customer | grep -A1 "\"tokens\"" | grep -v "tokens")
+    tokenstr=$(curl -s -u $LOGGLY_USERNAME:$LOGGLY_PASSWORD $LOGGLY_ACCOUNT_URL/apiv2/customer | grep -A1 "\"tokens\":" | grep -v "tokens")
 
     #get the string from index 0 to last occurence of "
     tokenstr=${tokenstr%\"*}
