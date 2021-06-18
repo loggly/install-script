@@ -384,10 +384,7 @@ getAuthToken() {
   if [ "$LOGGLY_AUTH_TOKEN" = "" ]; then
     logMsgToConfigSysLog "INFO" "INFO: Authentication token not provided. Trying to retrieve it from $LOGGLY_ACCOUNT_URL account."
     #get authentication token if user has not provided one
-    tokenstr=$(curl -s -u $LOGGLY_USERNAME:$LOGGLY_PASSWORD $LOGGLY_ACCOUNT_URL/apiv2/customer | grep -v "token")
-
-    #get the string from index 0 to first occurence of ,
-    tokenstr=${tokenstr%%,*}
+    tokenstr=$(curl -s -u $LOGGLY_USERNAME:$LOGGLY_PASSWORD $LOGGLY_ACCOUNT_URL/apiv2/customer | grep -A1 "\"tokens\":" | grep -v "tokens")
 
     #get the string from index 0 to last occurence of "
     tokenstr=${tokenstr%\"*}
@@ -498,7 +495,7 @@ checkAuthTokenAndWriteContents() {
     writeContents $LOGGLY_ACCOUNT $LOGGLY_AUTH_TOKEN $LOGGLY_DISTRIBUTION_ID $LOGS_01_HOST $LOGGLY_SYSLOG_PORT
     restartRsyslog
   else
-    logMsgToConfigSysLog "ERROR" "ERROR: Loggly auth token is required to configure rsyslog. Please pass -a <auth token> while running script."
+    logMsgToConfigSysLog "ERROR" "ERROR: Loggly auth token is required to configure rsyslog. Please pass -t <auth token> while running script."
     exit 1
   fi
 }
@@ -512,7 +509,7 @@ setPathToCABundle () {
     CA_FILE_PATH="/etc/ssl/certs/ca-bundle.crt"
     ;;
   *)
-    logMsgToConfigSysLog "WARN" "WARN: The linux distribution '$LINUX_DIST' has not been previously tested with Loggly. Verify path to the file with root CA certificates (usually stored in OS trust store) in '$RSYSLOG_ETCDIR_CONF' -> '\$DefaultNetstreamDriverCAFile' and restart rsyslog service or re-run script with '--inssecure' attribute. Default path to CA file is '$CA_FILE_PATH'."
+    logMsgToConfigSysLog "WARN" "WARN: The linux distribution '$LINUX_DIST' has not been previously tested with Loggly. Verify path to the file with root CA certificates (usually stored in OS trust store) in '$RSYSLOG_ETCDIR_CONF' -> '\$DefaultNetstreamDriverCAFile' and restart rsyslog service or re-run script with '--insecure' attribute. Default path to CA file is '$CA_FILE_PATH'."
     ;;
   esac
 }
