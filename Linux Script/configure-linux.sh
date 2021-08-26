@@ -880,11 +880,11 @@ searchAndFetch() {
     logMsgToConfigSysLog "ERROR" "ERROR: Please check your network/firewall settings & ensure Loggly subdomain, username and password is specified correctly."
     exit 1
   fi
-  id=$(echo "$result" | grep -v "{" | grep id | awk '{print $2}')
-  # strip last double quote from id
-  id="${id%\"}"
-  # strip first double quote from id
-  id="${id#\"}"
+  # remove newline characters
+  result=${result//$'\n'/}
+
+  id=$(echo "$result" | sed -E 's/.*"id": +"([0-9]+)".*/\1/g')
+
   url="$LOGGLY_ACCOUNT_URL/apiv2/events?rsid=$id"
 
   # retrieve the data
