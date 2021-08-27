@@ -883,7 +883,7 @@ searchAndFetch() {
   # remove newline characters
   result=${result//$'\n'/}
 
-  id=$(echo "$result" | sed -E 's/.*"id": +"([0-9]+)".*/\1/g')
+  id=$(echo "$result" | sed -E 's/.*"id"\s*:\s*"([^"]+)".*/\1/g')
 
   url="$LOGGLY_ACCOUNT_URL/apiv2/events?rsid=$id"
 
