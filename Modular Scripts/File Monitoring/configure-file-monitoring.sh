@@ -329,7 +329,7 @@ checkFileReadPermission() {
   *"centos"*) ;;
 
   *)
-    FILE_PERMISSIONS=$(ls -l $LOGGLY_FILE_TO_MONITOR)
+    FILE_PERMISSIONS=$(ls -ld $LOGGLY_FILE_TO_MONITOR)
     #checking if the file has read permission for others
     PERMISSION_READ_OTHERS=${FILE_PERMISSIONS:7:1}
     if [[ $PERMISSION_READ_OTHERS != r ]]; then
@@ -392,8 +392,8 @@ write21ConfFileContents() {
   sudo touch $FILE_SYSLOG_CONFFILE
   sudo chmod o+w $FILE_SYSLOG_CONFFILE
 
-  rsyslog_version="$(rsyslogd -v)"
-  r_ver=${rsyslog_version:9:1}
+  rsyslog_version=($(rsyslogd -v))
+  r_ver=${rsyslog_version[1]:0:1}
   if [ $r_ver -le 7 ]; then
     imfileStr="
             \$ModLoad imfile
