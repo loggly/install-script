@@ -129,6 +129,9 @@ checkLinuxLogglyCompatibility() {
   #set the basic variables needed by this script
   setLinuxVariables
 
+  #set TLS package
+  setTlsPackage
+
   #check if the Loggly servers are accessible. If no, ask user to check network connectivity & exit
   checkIfLogglyServersAccessible
 
@@ -161,6 +164,7 @@ checkLinuxLogglyCompatibility() {
 
   #update rsyslog.conf and adds $MaxMessageSize in it
   modifyMaxMessageSize
+
 
   LINUX_ENV_VALIDATED="true"
 }
@@ -236,6 +240,19 @@ checkIfPackageManagerIsPresent() {
       PKG_MGR="yum"
     fi
   fi
+}
+
+#set tls package
+setTlsPackage() {
+    case "$LINUX_DIST_IN_LOWER_CASE" in
+    *"amazon"*)
+      TLS_PACKAGE="rsyslog-openssl"
+      ;;
+
+    *)
+      TLS_PACKAGE="rsyslog-gnutls"
+      ;;
+      esac
 }
 
 #check if required dependencies to run the script are not installed, If yes then ask user to install them manually and run the script again
@@ -597,24 +614,25 @@ action(type=\"omfwd\" protocol=\"tcp\" target=\"$LOGS_01_HOST\" port=\"$LOGGLY_S
 
 #install the certificate and check if gnutls package is installed
 installTLSDependencies() {
+
   if [ $LOGGLY_TLS_SENDING == "true" ]; then
     if [ "$SUPPRESS_PROMPT" == "true" ]; then
-      /bin/bash -c "sudo $PKG_MGR install -y rsyslog-gnutls"
+      /bin/bash -c "sudo $PKG_MGR install -y $TLS_PACKAGE"
     else
-      /bin/bash -c "sudo $PKG_MGR install rsyslog-gnutls"
+      /bin/bash -c "sudo $PKG_MGR install $TLS_PACKAGE"
     fi
     if [ "$PKG_MGR" == "yum" ]; then
-      if [ $(rpm -qa | grep -c "rsyslog-gnutls") -eq 0 ]; then
+      if [ $(rpm -qa | grep -c "$TLS_PACKAGE") -eq 0 ]; then
         DEPENDENCIES_INSTALLED="false"
         if [ "$FORCE_SECURE" == "true" ]; then
-          logMsgToConfigSysLog "WARN" "WARN: The rsyslog-gnutls package could not be download automatically because your package manager could not be found. Please install it and restart the rsyslog service to send logs to Loggly."
+          logMsgToConfigSysLog "WARN" "WARN: The $TLS_PACKAGE package could not be download automatically because your package manager could not be found. Please install it and restart the rsyslog service to send logs to Loggly."
         fi
       fi
     elif [ "$PKG_MGR" == "apt-get" ]; then
-      if [ $(dpkg-query -W -f='${Status}' rsyslog-gnutls 2>/dev/null | grep -c "ok installed") -eq 0 ]; then
+      if [ $(dpkg-query -W -f='${Status}' $TLS_PACKAGE 2>/dev/null | grep -c "ok installed") -eq 0 ]; then
         DEPENDENCIES_INSTALLED="false"
         if [ "$FORCE_SECURE" == "true" ]; then
-          logMsgToConfigSysLog "WARN" "WARN: The rsyslog-gnutls package could not be download automatically because your package manager could not be found. Please install it and restart the rsyslog service to send logs to Loggly."
+          logMsgToConfigSysLog "WARN" "WARN: The $TLS_PACKAGE package could not be download automatically because your package manager could not be found. Please install it and restart the rsyslog service to send logs to Loggly."
         fi
       fi
     else
@@ -629,7 +647,7 @@ switchToInsecureModeIfTLSNotFound() {
   if [ "$FORCE_SECURE" == "false" ]; then
     if [ "$DEPENDENCIES_INSTALLED" == "false" ]; then
       if [ "$SUPPRESS_PROMPT" == "false" ]; then
-        logMsgToConfigSysLog "WARN" "WARN: The rsyslog-gnutls package could not download automatically either because of your package manager could not be found or due to some other reason."
+        logMsgToConfigSysLog "WARN" "WARN: The $TLS_PACKAGE package could not download automatically either because of your package manager could not be found or due to some other reason."
         while true; do
           read -p "Do you wish to continue with insecure mode? (yes/no)" yn
           case $yn in
@@ -639,14 +657,14 @@ switchToInsecureModeIfTLSNotFound() {
             break
             ;;
           [Nn]*)
-            logMsgToConfigSysLog "INFO" "INFO: Since the rsyslog-gnutls package could not be installed automatically, please install it yourself and then re-run the script using the --force-secure flag. This option will force the secure TLS configuration instead of falling back on insecure mode. It is useful for Linux distributions where this script cannot automatically detect the dependency using yum or apt-get."
+            logMsgToConfigSysLog "INFO" "INFO: Since the $TLS_PACKAGE package could not be installed automatically, please install it yourself and then re-run the script using the --force-secure flag. This option will force the secure TLS configuration instead of falling back on insecure mode. It is useful for Linux distributions where this script cannot automatically detect the dependency using yum or apt-get."
             exit 1
             ;;
           *) echo "Please answer yes or no." ;;
           esac
         done
       else
-        logMsgToConfigSysLog "WARN" "WARN: The rsyslog-gnutls package could not download automatically either because of your package manager could not be found or due to some other reason, continuing with insecure mode."
+        logMsgToConfigSysLog "WARN" "WARN: The $TLS_PACKAGE package could not download automatically either because of your package manager could not be found or due to some other reason, continuing with insecure mode."
         LOGGLY_SYSLOG_PORT=514
 
       fi
