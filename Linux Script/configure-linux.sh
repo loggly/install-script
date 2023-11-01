@@ -247,10 +247,12 @@ setTlsPackage() {
     case "$LINUX_DIST_IN_LOWER_CASE" in
     *"amazon"*)
       TLS_PACKAGE="rsyslog-openssl"
+      TLS_DRIVER="ossl"
       ;;
 
     *)
       TLS_PACKAGE="rsyslog-gnutls"
+      TLS_DRIVER="gtls"
       ;;
       esac
 }
@@ -554,7 +556,7 @@ confString() {
 
 #RsyslogGnuTLS
 \$DefaultNetstreamDriverCAFile $CA_FILE_PATH
-\$ActionSendStreamDriver gtls
+\$ActionSendStreamDriver $TLS_DRIVER
 \$ActionSendStreamDriverMode 1
 \$ActionSendStreamDriverAuthMode x509/name
 \$ActionSendStreamDriverPermittedPeer *.loggly.com
@@ -583,7 +585,7 @@ string=\"<%pri%>%protocol-version% %timestamp:::date-rfc3339% %HOSTNAME% %app-na
 )
 
 # Send messages to Loggly over TCP using the template.
-action(type=\"omfwd\" protocol=\"tcp\" target=\"$LOGS_01_HOST\" port=\"$LOGGLY_SYSLOG_PORT\" template=\"LogglyFormat\" StreamDriver=\"gtls\" StreamDriverMode=\"1\" StreamDriverAuthMode=\"x509/name\" StreamDriverPermittedPeers=\"*.loggly.com\")
+action(type=\"omfwd\" protocol=\"tcp\" target=\"$LOGS_01_HOST\" port=\"$LOGGLY_SYSLOG_PORT\" template=\"LogglyFormat\" StreamDriver=\"$TLS_DRIVER\" StreamDriverMode=\"1\" StreamDriverAuthMode=\"x509/name\" StreamDriverPermittedPeers=\"*.loggly.com\")
   "
 
   inputStr_NO_TLS="
