@@ -244,17 +244,16 @@ checkIfPackageManagerIsPresent() {
 
 #set tls package
 setTlsPackage() {
-    case "$LINUX_DIST_IN_LOWER_CASE" in
-    *"amazon"*)
+  TLS_PACKAGE="rsyslog-gnutls"
+  TLS_DRIVER="gtls"
+
+  if [ "$LINUX_DIST_IN_LOWER_CASE" == "amazon" ]; then
+     LINUX_DIST_VERSION=$(cat /etc/system-release | cut -f 4 -d " ")
+     if [ "$LINUX_DIST_VERSION" == "2023" ]; then
       TLS_PACKAGE="rsyslog-openssl"
       TLS_DRIVER="ossl"
-      ;;
-
-    *)
-      TLS_PACKAGE="rsyslog-gnutls"
-      TLS_DRIVER="gtls"
-      ;;
-      esac
+    fi
+  fi
 }
 
 #check if required dependencies to run the script are not installed, If yes then ask user to install them manually and run the script again
