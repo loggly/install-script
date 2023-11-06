@@ -249,7 +249,7 @@ setTlsPackage() {
 
   if [ "$LINUX_DIST_IN_LOWER_CASE" == "amazon" ]; then
      LINUX_DIST_VERSION=$(cat /etc/system-release | cut -f 4 -d " ")
-     if [ "$LINUX_DIST_VERSION" == "2023" ]; then
+     if [ "$LINUX_DIST_VERSION" -ge 2023 ]; then
       TLS_PACKAGE="rsyslog-openssl"
       TLS_DRIVER="ossl"
     fi
