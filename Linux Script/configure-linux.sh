@@ -422,7 +422,7 @@ checkIfValidAuthToken() {
   if [ $(curl -s -u $LOGGLY_USERNAME:$LOGGLY_PASSWORD $LOGGLY_ACCOUNT_URL/apiv2/customer | grep \"$LOGGLY_AUTH_TOKEN\" | wc -l) == 1 ]; then
     logMsgToConfigSysLog "INFO" "INFO: Authentication token validated successfully."
   else
-    logMsgToConfigSysLog "ERROR" "ERROR: Invalid authentication token $LOGGLY_AUTH_TOKEN. You can get valid authentication token by following instructions at https://www.loggly.com/docs/customer-token-authentication-token/."
+    logMsgToConfigSysLog "ERROR" "ERROR: Invalid account name or authentication token $LOGGLY_AUTH_TOKEN. You can get valid authentication token by following instructions at https://www.loggly.com/docs/customer-token-authentication-token/."
     exit 1
   fi
 }
